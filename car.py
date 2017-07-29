@@ -16,6 +16,9 @@ class Vector2:
     def __mul__(self, scalar):
         return Vector2(self.x * scalar, self.y * scalar)
 
+    def __repr__(self):
+        return repr((self.x, self.y))
+
 class Car:
     def __init__(self, position, velocity, direction, wheel_direction):
         self.position        = Vector2(*position)        # centre of vehicle, relative to world
