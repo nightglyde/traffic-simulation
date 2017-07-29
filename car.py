@@ -1,8 +1,11 @@
+import math
+from graphics import *
 
-class Vector2:
+class Vector2(Point):
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        Point.__init__(self, x, y)
+        #self.x = x
+        #self.y = y
 
     def right90(self):
         return Vector2(-self.y, self.x)
@@ -16,8 +19,11 @@ class Vector2:
     def __mul__(self, scalar):
         return Vector2(self.x * scalar, self.y * scalar)
 
+    def __tuple__(self):
+        return (self.x, self.y)
+
     def __repr__(self):
-        return repr((self.x, self.y))
+        return repr(tuple(self))
 
 class Car:
     def __init__(self, position, velocity, direction, wheel_direction):
@@ -26,44 +32,105 @@ class Car:
         self.direction       = Vector2(*direction)       # direction the vehicle is facing
         self.wheel_direction = Vector2(*wheel_direction) # direction the front wheels are facing
 
-    def draw(self):
-        forward = self.direction
-        right   = self.direction.right90()
-
+    def draw(self, window):
+        forward       = self.direction
+        right         = self.direction.right90()
         wheel_forward = self.wheel_direction
         wheel_right   = self.wheel_direction.right90()
 
-        # front left corner
-        wheel_A_axle  = self.position + forward*4     - right*2
-        wheel_A_front = wheel_A_axle  + wheel_forward - wheel_right
-        wheel_A_back  = wheel_A_axle  - wheel_forward - wheel_right
-        chassis_A     = wheel_A_axle  + forward*2     - right
+        front_axle = self.position + forward*4
+        rear_axle  = self.position - forward*4
 
-        # front right corner
-        wheel_B_axle  = self.position + forward*4     + right*2
-        wheel_B_front = wheel_A_axle  + wheel_forward + wheel_right
-        wheel_B_back  = wheel_A_axle  - wheel_forward + wheel_right
-        chassis_B     = wheel_B_axle  + forward*2     + right
+        # front left wheel
+        wheel_A_axle        = front_axle          - right*2
+        wheel_A_inner_front = wheel_A_axle        + wheel_forward
+        wheel_A_inner_back  = wheel_A_axle        - wheel_forward
+        wheel_A_outer_front = wheel_A_inner_front - wheel_right
+        wheel_A_outer_back  = wheel_A_inner_back  - wheel_right
 
-        # rear left corner
-        wheel_C_axle  = self.position - forward*4 - right*2
-        wheel_C_front = wheel_C_axle  + forward   - right
-        wheel_C_back  = wheel_C_axle  - forward   - right
-        chassis_C     = wheel_C_back  - forward
+        wheel_A = Polygon(wheel_A_inner_front, wheel_A_outer_front,
+                          wheel_A_outer_back,  wheel_A_inner_back)
+        wheel_A.draw(window)
 
-        # rear right corner
-        wheel_D_axle  = self.position - forward*4 + right*2
-        wheel_D_front = wheel_D_axle  + forward   + right
-        wheel_D_back  = wheel_D_axle  - forward   + right
-        chassis_D     = wheel_D_back  - forward
+        #wheel_A_triangle = Polygon(wheel_A_axle, wheel_A_outer_front, wheel_A_outer_back)
+        #wheel_A_triangle.draw(window)
 
-        print(chassis_A, chassis_B, chassis_C, chassis_D)
-        print(wheel_A_axle, wheel_A_front, wheel_A_back)
-        print(wheel_B_axle, wheel_B_front, wheel_B_back)
-        print(wheel_C_axle, wheel_C_front, wheel_C_back)
-        print(wheel_D_axle, wheel_D_front, wheel_D_back)
+        # front right wheel
+        wheel_B_axle        = front_axle          + right*2
+        wheel_B_inner_front = wheel_B_axle        + wheel_forward
+        wheel_B_inner_back  = wheel_B_axle        - wheel_forward
+        wheel_B_outer_front = wheel_B_inner_front + wheel_right
+        wheel_B_outer_back  = wheel_B_inner_back  + wheel_right
 
-car = Car((0, 0), (0, 0), (10, 20), (20, 10))
+        wheel_B = Polygon(wheel_B_inner_front, wheel_B_outer_front,
+                          wheel_B_outer_back,  wheel_B_inner_back)
+        wheel_B.draw(window)
 
-car.draw()
+        #wheel_B_triangle = Polygon(wheel_B_axle, wheel_B_outer_front, wheel_B_outer_back)
+        #wheel_B_triangle.draw(window)
+
+        # rear right wheel
+        wheel_C_axle        = rear_axle           + right*2
+        wheel_C_inner_front = wheel_C_axle        + forward
+        wheel_C_inner_back  = wheel_C_axle        - forward
+        wheel_C_outer_front = wheel_C_inner_front + right
+        wheel_C_outer_back  = wheel_C_inner_back  + right
+
+        wheel_C = Polygon(wheel_C_inner_front, wheel_C_outer_front,
+                          wheel_C_outer_back,  wheel_C_inner_back)
+        wheel_C.draw(window)
+
+        #wheel_C_triangle = Polygon(wheel_C_axle, wheel_C_outer_front, wheel_C_outer_back)
+        #wheel_C_triangle.draw(window)
+
+        # rear left wheel
+        wheel_D_axle        = rear_axle           - right*2
+        wheel_D_inner_front = wheel_D_axle        + forward
+        wheel_D_inner_back  = wheel_D_axle        - forward
+        wheel_D_outer_front = wheel_D_inner_front - right
+        wheel_D_outer_back  = wheel_D_inner_back  - right
+
+        wheel_D = Polygon(wheel_D_inner_front, wheel_D_outer_front,
+                          wheel_D_outer_back,  wheel_D_inner_back)
+        wheel_D.draw(window)
+
+        #wheel_D_triangle = Polygon(wheel_D_axle, wheel_D_outer_front, wheel_D_outer_back)
+        #wheel_D_triangle.draw(window)
+
+        # outer shell
+        chassis_A = wheel_A_axle + forward*2 - right
+        chassis_B = wheel_B_axle + forward*2 + right
+        chassis_C = wheel_C_axle - forward*2 + right
+        chassis_D = wheel_D_axle - forward*2 - right
+
+        chassis = Polygon(chassis_A, chassis_B, chassis_C, chassis_D)
+        chassis.draw(window)
+
+        mid_line = Line(front_axle, rear_axle)
+        mid_line.draw(window)
+
+        front_line = Line(wheel_A_axle, wheel_B_axle)
+        front_line.draw(window)
+
+        rear_line = Line(wheel_C_axle, wheel_D_axle)
+        rear_line.draw(window)
+
+def generateVector(magnitude, side_length):
+    if side_length > magnitude or side_length <= 0:
+        return (int(magnitude), 0)
+
+    other_side_length = math.sqrt(magnitude**2 - side_length**2)
+
+    return (int(other_side_length), int(side_length))
+
+def main():
+    window = GraphWin("It's a car!", 800, 800)
+
+    car = Car((400, 400), (0, 0), (50, 0), generateVector(50, 10))
+    car.draw(window)
+
+    window.getMouse() # pause to view result
+    window.close()
+
+main()
 
