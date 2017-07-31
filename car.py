@@ -1,23 +1,28 @@
 import math
+import pygame
 import time
 
-from graphics import *
-# find a better animation library. perhaps pygame or matplotlib???
-# also, maybe numpy does vectors better???
+# define some basic colours in RGB
+BLACK   = (  0,   0,   0)
+GREY    = ( 63,  63,  63)
+WHITE   = (255, 255, 255)
+RED     = (255,   0,   0)
+YELLOW  = (255, 255,   0)
+GREEN   = (  0, 255,   0)
+CYAN    = (  0, 255, 255)
+BLUE    = (  0,   0, 255)
+MAGENTA = (255,   0, 255)
 
-WIDTH  = 1200
-HEIGHT =  800
+# here are some things
+SIZE_UNIT = 10
 
-CAR_SIZE   = 50
-AXLE_SIZE  = (CAR_SIZE*2)//3
-WHEEL_SIZE = CAR_SIZE//3
-
-class Vector2(Point):
+class Vector2:
     def __init__(self, x, y):
-        Point.__init__(self, x, y)
+        self.x = x
+        self.y = y
 
-    def right90(self):
-        return Vector2(-self.y, self.x)
+    def coords(self):
+        return [self.x, self.y]
 
     def __add__(self, other):
         return Vector2(self.x + other.x, self.y + other.y)
@@ -28,76 +33,165 @@ class Vector2(Point):
     def __mul__(self, scalar):
         return Vector2(self.x * scalar, self.y * scalar)
 
-def generateVector(magnitude, angle):
+    def __repr__(self):
+        return repr(self.coords())
+
+def getCartesian(magnitude, angle):
     rad = math.radians(angle)
     a = magnitude * math.cos(rad)
     b = magnitude * math.sin(rad)
 
-    return Vector2(int(round(a)), int(round(b)))
+    #return Vector2(int(round(a)), int(round(b)))
+    return Vector2(a, b)
 
-#
-# front wheels add velocity to the car
-# rear wheels roll forwards
-# whole chassis turns in response to velocity, tending towards facing the direction of motion
-# if the chassis is facing the direction of motion, that makes it easier for the rear wheels to turn
-#
+def getPolar(vector):
+    x = vector.x
+    y = vector.y
+
+    magnitude = math.sqrt(x**2 + y**2)
+
+    if x == 0:
+        angle = 90
+    else:
+        angle = math.degrees(math.atan(y / x))
+
+    if x < 0:
+        angle += 180
+
+    elif y < 0:
+        angle += 360
+
+    return magnitude, angle
 
 class Car:
-    def __init__(self, position, velocity, car_angle, wheel_angle):
-        self.position        = Vector2(*position)        # centre of vehicle, relative to world
-        self.velocity        = Vector2(*velocity)        # current velocity, relative to world
+    def __init__(self, screen, colour,
+                 position, velocity=(0,0), force=0,
+                 car_angle=0, wheel_angle=0):
 
+        self.screen = screen
+        self.colour = colour
+
+        self.position    = Vector2(*position) # centre of vehicle
+        self.velocity    = Vector2(*velocity)
+
+        self.force       = force
         self.car_angle   = car_angle
         self.wheel_angle = wheel_angle
 
-        self.shapes = []
+        self.centre_path  = [self.position.coords()]
+        self.wheel_A_path = [self.position.coords()]
+        self.wheel_B_path = [self.position.coords()]
+        self.wheel_C_path = [self.position.coords()]
+        self.wheel_D_path = [self.position.coords()]
 
-    def setAngles(self, car_angle, wheel_angle):
-        self.car_angle = car_angle
-        self.wheel_angle = wheel_angle
+        self.timer = 0
+        self.instructions = [(1, None, None),   (None, 45, None),
+                             (None, None, 100), (None, -30, None),
+                             (None, None, 50),  (None, 0, 50),
+                             (0, 0, None)]
+        self.instructions.reverse()
 
-    def draw(self, window, colour):
+    def update(self):
+        while self.instructions:
+            target_force, target_angle, target_time = self.instructions.pop()
+
+            change = False
+
+            if target_force != None:
+                if target_force > self.force:
+                    self.force = min(target_force, self.force+0.1)
+                    change = True
+
+                elif target_force < self.force:
+                    self.force = max(target_force, self.force-0.1)
+                    change = True
+
+            if target_angle != None:
+                if target_angle > self.wheel_angle:
+                    self.wheel_angle = min(target_angle, self.wheel_angle+1)
+                    change = True
+
+                elif target_angle < self.wheel_angle:
+                    self.wheel_angle = max(target_angle, self.wheel_angle-1)
+                    change = True
+
+            if target_time != None:
+                if target_time > self.timer:
+                    self.timer += 1
+                    change = True
+
+            if change:
+                self.instructions.append((target_force, target_angle, target_time))
+                break
+
+            else:
+                print("DONE", target_force, target_angle, target_time)
+                self.timer = 0
+
+        # slow down
+        self.velocity *= 0.90
+
+        # speed up
+        acceleration = getCartesian(self.force, self.car_angle + self.wheel_angle)
+        self.velocity += acceleration
+
+        # move car
+        self.position += self.velocity
+        magnitude, angle = getPolar(self.velocity)
+        self.car_angle = angle
+
+        #if magnitude > 0.1 or self.instructions:
+        #    self.path.append(self.position.coords())
+
+        # print update message
+        #print(self.force, self.wheel_angle, self.velocity)
+
+    def draw(self):
         # outer shell
-        car_forward         = generateVector(CAR_SIZE, self.car_angle)
-        car_right           = car_forward.right90()
+        car_forward = getCartesian(SIZE_UNIT*12, self.car_angle)
+        car_right   = getCartesian(SIZE_UNIT*6,  self.car_angle + 90)
 
-        chassis_A = self.position + car_forward*2 - car_right
-        chassis_B = self.position + car_forward*2 + car_right
-        chassis_C = self.position - car_forward*2 + car_right
-        chassis_D = self.position - car_forward*2 - car_right
+        chassis_A = self.position + car_forward - car_right
+        chassis_B = self.position + car_forward + car_right
+        chassis_C = self.position - car_forward + car_right
+        chassis_D = self.position - car_forward - car_right
 
-        chassis = Polygon(chassis_A, chassis_B, chassis_C, chassis_D)
-        chassis.setFill(colour)
+        chassis = [chassis_A.coords(), chassis_B.coords(),
+                   chassis_C.coords(), chassis_D.coords()]
+
+        pygame.draw.polygon(self.screen, self.colour, chassis)
+        pygame.draw.polygon(self.screen,       BLACK, chassis, 2)
 
         # axles
-        axle_forward        = generateVector(AXLE_SIZE, self.car_angle)
-        axle_right          = axle_forward.right90()
+        axle_forward = getCartesian(SIZE_UNIT*8, self.car_angle)
+        axle_right   = getCartesian(SIZE_UNIT*4, self.car_angle + 90)
 
-        front_axle   = self.position + axle_forward*2
+        front_axle   = self.position + axle_forward
         wheel_A_axle = front_axle    - axle_right
         wheel_B_axle = front_axle    + axle_right
 
-        rear_axle    = self.position - axle_forward*2
+        rear_axle    = self.position - axle_forward
         wheel_C_axle = rear_axle     + axle_right
         wheel_D_axle = rear_axle     - axle_right
 
-        mid_line = Line(front_axle, rear_axle)
-        front_line = Line(wheel_A_axle, wheel_B_axle)
-        rear_line = Line(wheel_C_axle, wheel_D_axle)
+        pygame.draw.line(self.screen, BLACK,   front_axle.coords(),    rear_axle.coords(), 3)
+        pygame.draw.line(self.screen, BLACK, wheel_A_axle.coords(), wheel_B_axle.coords(), 3)
+        pygame.draw.line(self.screen, BLACK, wheel_C_axle.coords(), wheel_D_axle.coords(), 3)
 
         # front left wheel
-        front_wheel_forward = generateVector(WHEEL_SIZE, self.car_angle + self.wheel_angle)
-        front_wheel_right   = front_wheel_forward.right90()
+        front_wheel_forward = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle)
+        front_wheel_right   = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle + 90)
 
         wheel_A_inner_front = wheel_A_axle        + front_wheel_forward
         wheel_A_inner_back  = wheel_A_axle        - front_wheel_forward
         wheel_A_outer_front = wheel_A_inner_front - front_wheel_right
         wheel_A_outer_back  = wheel_A_inner_back  - front_wheel_right
 
-        wheel_A = Polygon(
-            wheel_A_inner_front, wheel_A_outer_front,
-            wheel_A_outer_back,  wheel_A_inner_back)
-        wheel_A.setFill("gray")
+        wheel_A = [wheel_A_inner_front.coords(), wheel_A_outer_front.coords(),
+                   wheel_A_outer_back.coords(),  wheel_A_inner_back.coords()]
+
+        pygame.draw.polygon(self.screen,  GREY, wheel_A)
+        pygame.draw.polygon(self.screen, BLACK, wheel_A, 2)
 
         # front right wheel
         wheel_B_inner_front = wheel_B_axle        + front_wheel_forward
@@ -105,24 +199,26 @@ class Car:
         wheel_B_outer_front = wheel_B_inner_front + front_wheel_right
         wheel_B_outer_back  = wheel_B_inner_back  + front_wheel_right
 
-        wheel_B = Polygon(
-            wheel_B_inner_front, wheel_B_outer_front,
-            wheel_B_outer_back,  wheel_B_inner_back)
-        wheel_B.setFill("gray")
+        wheel_B = [wheel_B_inner_front.coords(), wheel_B_outer_front.coords(),
+                   wheel_B_outer_back.coords(),  wheel_B_inner_back.coords()]
+
+        pygame.draw.polygon(self.screen,  GREY, wheel_B)
+        pygame.draw.polygon(self.screen, BLACK, wheel_B, 2)
 
         # rear right wheel
-        rear_wheel_forward  = generateVector(WHEEL_SIZE, self.car_angle)
-        rear_wheel_right    = rear_wheel_forward.right90()
+        rear_wheel_forward  = getCartesian(SIZE_UNIT*2, self.car_angle)
+        rear_wheel_right    = getCartesian(SIZE_UNIT*2, self.car_angle + 90)
 
         wheel_C_inner_front = wheel_C_axle        + rear_wheel_forward
         wheel_C_inner_back  = wheel_C_axle        - rear_wheel_forward
         wheel_C_outer_front = wheel_C_inner_front + rear_wheel_right
         wheel_C_outer_back  = wheel_C_inner_back  + rear_wheel_right
 
-        wheel_C = Polygon(
-            wheel_C_inner_front, wheel_C_outer_front,
-            wheel_C_outer_back,  wheel_C_inner_back)
-        wheel_C.setFill("gray")
+        wheel_C = [wheel_C_inner_front.coords(), wheel_C_outer_front.coords(),
+                   wheel_C_outer_back.coords(),  wheel_C_inner_back.coords()]
+
+        pygame.draw.polygon(self.screen,  GREY, wheel_C)
+        pygame.draw.polygon(self.screen, BLACK, wheel_C, 2)
 
         # rear left wheel
         wheel_D_inner_front = wheel_D_axle        + rear_wheel_forward
@@ -130,63 +226,70 @@ class Car:
         wheel_D_outer_front = wheel_D_inner_front - rear_wheel_right
         wheel_D_outer_back  = wheel_D_inner_back  - rear_wheel_right
 
-        wheel_D = Polygon(
-            wheel_D_inner_front, wheel_D_outer_front,
-            wheel_D_outer_back,  wheel_D_inner_back)
-        wheel_D.setFill("gray")
+        wheel_D = [wheel_D_inner_front.coords(), wheel_D_outer_front.coords(),
+                   wheel_D_outer_back.coords(),  wheel_D_inner_back.coords()]
 
-        # draw new shapes
-        chassis.draw(window)
-        wheel_A.draw(window)
-        wheel_B.draw(window)
-        wheel_C.draw(window)
-        wheel_D.draw(window)
-        mid_line.draw(window)
-        front_line.draw(window)
-        rear_line.draw(window)
+        pygame.draw.polygon(self.screen,  GREY, wheel_D)
+        pygame.draw.polygon(self.screen, BLACK, wheel_D, 2)
 
-        # undraw old shapes
-        while self.shapes:
-            shape = self.shapes.pop()
-            shape.undraw()
+        wheel_A_centre = wheel_A_axle - getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
+        wheel_B_centre = wheel_B_axle + getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
+        wheel_C_centre = wheel_C_axle + getCartesian(SIZE_UNIT, self.car_angle + 90)
+        wheel_D_centre = wheel_D_axle - getCartesian(SIZE_UNIT, self.car_angle + 90)
 
-        # save new shapes
-        self.shapes.append(chassis)
-        self.shapes.append(wheel_A)
-        self.shapes.append(wheel_B)
-        self.shapes.append(wheel_C)
-        self.shapes.append(wheel_D)
-        self.shapes.append(mid_line)
-        self.shapes.append(front_line)
-        self.shapes.append(rear_line)
+        self.centre_path.append(self.position.coords())
+        self.wheel_A_path.append(wheel_A_centre.coords())
+        self.wheel_B_path.append(wheel_B_centre.coords())
+        self.wheel_C_path.append(wheel_C_centre.coords())
+        self.wheel_D_path.append(wheel_D_centre.coords())
+
+        pygame.draw.lines(self.screen, BLUE,    False, self.centre_path, 1)
+        pygame.draw.lines(self.screen, RED,     False, self.wheel_A_path, 1)
+        pygame.draw.lines(self.screen, GREEN,   False, self.wheel_B_path, 1)
+        pygame.draw.lines(self.screen, CYAN,    False, self.wheel_C_path, 1)
+        pygame.draw.lines(self.screen, MAGENTA, False, self.wheel_D_path, 1)
+
+WIDTH  = 1200
+HEIGHT = 800
 
 def main():
-    window = GraphWin("It's a car!", WIDTH, HEIGHT)
+    # initialise game engine
+    pygame.init()
 
-    colours = ["blue", "magenta", "red", "yellow", "green", "cyan"]
+    # set some options
+    size = [WIDTH, HEIGHT]
+    screen = pygame.display.set_mode(size)
+    pygame.display.set_caption("Here we go!")
+    clock = pygame.time.Clock()
 
-    car = Car((600, 400), (0, 0), 0, 0)
+    # create car
+    car = Car(screen, BLUE, (1*WIDTH//4, 1*HEIGHT//4), (0, 0), 0, 0, 0)
 
-    now = time.time()
+    # loop until the user clicks the close button
+    done = False
+    while not done:
 
-    for i in range(1000):
-        car.setAngles(i*5, 0)
-        car.draw(window, colours[0])
-        time.sleep(0.03)
+        # limit the while loop to 10 times per second
+        clock.tick(30)
 
-    #for i in range(72, -1, -1):
-    #    car = Car((300, 400), (0, 0), i*5, i*5)
-    #    car.draw(window, colours[i%6])
+        for event in pygame.event.get():
+            # user did something
 
-    #for i in range(73):
-    #    car = Car((900, 400), (0, 0), i*5, i*5)
-    #    car.draw(window, colours[i%6])
+            if event.type == pygame.QUIT:
+                # user clicked close
+                done = True
 
-    time_elapsed = time.time() - now
-    print(time_elapsed)
+        # clear the screen and set the screen background
+        screen.fill(WHITE)
 
-    window.getMouse() # pause to view result
-    window.close()
+        # animate the car
+        car.update()
+        car.draw() # we start from the 2nd frame, for some reason
+
+        # update the screen
+        pygame.display.flip()
+
+    pygame.quit()
 
 main()
 
