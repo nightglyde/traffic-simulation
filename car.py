@@ -14,12 +14,18 @@ BLUE    = (  0,   0, 255)
 MAGENTA = (255,   0, 255)
 
 # here are some things
-SIZE_UNIT = 10
+SIZE_UNIT     = 1000
+DRAG_CONSTANT = 0.01
+RR_CONSTANT   = 30*DRAG_CONSTANT
+DIVIDE_THING  = 150
 
 class Vector2:
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
+    def right90(self):
+        return Vector2(-self.y, self.x)
 
     def coords(self):
         return [self.x, self.y]
@@ -32,6 +38,12 @@ class Vector2:
 
     def __mul__(self, scalar):
         return Vector2(self.x * scalar, self.y * scalar)
+
+    def __truediv__(self, scalar):
+        return Vector2(self.x / scalar, self.y / scalar)
+
+    def __floordiv__(self, scalar):
+        return Vector2(self.x // scalar, self.y // scalar)
 
     def __repr__(self):
         return repr(self.coords())
@@ -65,18 +77,20 @@ def getPolar(vector):
 
 class Car:
     def __init__(self, screen, colour,
-                 position, velocity=(0,0), force=0,
+                 position, velocity=(0,0), engine_force=0,
                  car_angle=0, wheel_angle=0):
 
         self.screen = screen
         self.colour = colour
 
-        self.position    = Vector2(*position) # centre of vehicle
-        self.velocity    = Vector2(*velocity)
+        self.position   = Vector2(*position) # centre of vehicle
+        self.velocity   = Vector2(*velocity)
+        self.car_unit   = getCartesian(1, car_angle)
+        self.wheel_unit = getCartesian(1, car_angle + wheel_angle)
 
-        self.force       = force
-        self.car_angle   = car_angle
-        self.wheel_angle = wheel_angle
+        self.engine_force = engine_force
+        self.car_angle    = car_angle
+        self.wheel_angle  = wheel_angle
 
         self.centre_path  = [self.position.coords()]
         self.wheel_A_path = [self.position.coords()]
@@ -85,8 +99,8 @@ class Car:
         self.wheel_D_path = [self.position.coords()]
 
         self.timer = 0
-        self.instructions = [(1, None, None),   (None, 45, None),
-                             (None, None, 100), (None, -30, None),
+        self.instructions = [(1, None, None),   (None, 15, None),
+                             (None, None, 100), (None, -10, None),
                              (None, None, 50),  (None, 0, 50),
                              (0, 0, None)]
         self.instructions.reverse()
@@ -98,12 +112,12 @@ class Car:
             change = False
 
             if target_force != None:
-                if target_force > self.force:
-                    self.force = min(target_force, self.force+0.1)
+                if target_force > self.engine_force:
+                    self.engine_force = min(target_force, self.engine_force+0.1)
                     change = True
 
-                elif target_force < self.force:
-                    self.force = max(target_force, self.force-0.1)
+                elif target_force < self.engine_force:
+                    self.engine_force = max(target_force, self.engine_force-0.1)
                     change = True
 
             if target_angle != None:
@@ -128,28 +142,51 @@ class Car:
                 print("DONE", target_force, target_angle, target_time)
                 self.timer = 0
 
-        # slow down
-        self.velocity *= 0.90
+        if True:
+            speed, angle = getPolar(self.velocity)
 
-        # speed up
-        acceleration = getCartesian(self.force, self.car_angle + self.wheel_angle)
-        self.velocity += acceleration
+            traction           = self.wheel_unit * self.engine_force
+            drag               = self.velocity * (-DRAG_CONSTANT) * speed
+            rolling_resistance = self.velocity * (-RR_CONSTANT)
 
-        # move car
-        self.position += self.velocity
-        magnitude, angle = getPolar(self.velocity)
-        self.car_angle = angle
+            acceleration = traction + drag + rolling_resistance
+            dt = 1
 
-        #if magnitude > 0.1 or self.instructions:
-        #    self.path.append(self.position.coords())
+            self.velocity += acceleration*dt
+            self.position += self.velocity*dt
 
+            self.car_angle = (self.car_angle*4 + angle)/5
+
+        else:
+
+            # slow down
+            self.velocity *= 0.90
+
+            # speed up
+            acceleration = getCartesian(self.engine_force, self.car_angle + self.wheel_angle)
+            self.velocity += acceleration
+
+            # move car
+            self.position += self.velocity
+            magnitude, angle = getPolar(self.velocity)
+            self.car_angle = angle
+
+            #if magnitude > 0.1 or self.instructions:
+            #    self.path.append(self.position.coords())
+
+        self.car_unit   = getCartesian(1, self.car_angle)
+        self.wheel_unit = getCartesian(1, self.car_angle + self.wheel_angle)
         # print update message
-        #print(self.force, self.wheel_angle, self.velocity)
+        #print(self.engine_force, self.wheel_angle, self.velocity, traction, drag, rolling_resistance, acceleration)
 
     def draw(self):
+
         # outer shell
-        car_forward = getCartesian(SIZE_UNIT*12, self.car_angle)
-        car_right   = getCartesian(SIZE_UNIT*6,  self.car_angle + 90)
+        #car_forward = getCartesian(SIZE_UNIT*12, self.car_angle)
+        #car_right   = getCartesian(SIZE_UNIT*6,  self.car_angle + 90)
+
+        car_forward = self.car_unit*(SIZE_UNIT*12)//DIVIDE_THING
+        car_right   = self.car_unit.right90()*(SIZE_UNIT*6)//DIVIDE_THING
 
         chassis_A = self.position + car_forward - car_right
         chassis_B = self.position + car_forward + car_right
@@ -159,12 +196,17 @@ class Car:
         chassis = [chassis_A.coords(), chassis_B.coords(),
                    chassis_C.coords(), chassis_D.coords()]
 
+        #print(chassis)
+
         pygame.draw.polygon(self.screen, self.colour, chassis)
         pygame.draw.polygon(self.screen,       BLACK, chassis, 2)
 
         # axles
-        axle_forward = getCartesian(SIZE_UNIT*8, self.car_angle)
-        axle_right   = getCartesian(SIZE_UNIT*4, self.car_angle + 90)
+        #axle_forward = getCartesian(SIZE_UNIT*8, self.car_angle)
+        #axle_right   = getCartesian(SIZE_UNIT*4, self.car_angle + 90)
+
+        axle_forward = self.car_unit*(SIZE_UNIT*8)//DIVIDE_THING
+        axle_right   = self.car_unit.right90()*(SIZE_UNIT*4)//DIVIDE_THING
 
         front_axle   = self.position + axle_forward
         wheel_A_axle = front_axle    - axle_right
@@ -179,8 +221,11 @@ class Car:
         pygame.draw.line(self.screen, BLACK, wheel_C_axle.coords(), wheel_D_axle.coords(), 3)
 
         # front left wheel
-        front_wheel_forward = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle)
-        front_wheel_right   = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle + 90)
+        #front_wheel_forward = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle)
+        #front_wheel_right   = getCartesian(SIZE_UNIT*2, self.car_angle + self.wheel_angle + 90)
+
+        front_wheel_forward = self.wheel_unit*(SIZE_UNIT*2)//DIVIDE_THING
+        front_wheel_right   = self.wheel_unit.right90()*(SIZE_UNIT*2)//DIVIDE_THING
 
         wheel_A_inner_front = wheel_A_axle        + front_wheel_forward
         wheel_A_inner_back  = wheel_A_axle        - front_wheel_forward
@@ -206,8 +251,11 @@ class Car:
         pygame.draw.polygon(self.screen, BLACK, wheel_B, 2)
 
         # rear right wheel
-        rear_wheel_forward  = getCartesian(SIZE_UNIT*2, self.car_angle)
-        rear_wheel_right    = getCartesian(SIZE_UNIT*2, self.car_angle + 90)
+        #rear_wheel_forward  = getCartesian(SIZE_UNIT*2, self.car_angle)
+        #rear_wheel_right    = getCartesian(SIZE_UNIT*2, self.car_angle + 90)
+
+        rear_wheel_forward = self.car_unit*(SIZE_UNIT*2)//DIVIDE_THING
+        rear_wheel_right   = self.car_unit.right90()*(SIZE_UNIT*2)//DIVIDE_THING
 
         wheel_C_inner_front = wheel_C_axle        + rear_wheel_forward
         wheel_C_inner_back  = wheel_C_axle        - rear_wheel_forward
@@ -232,21 +280,25 @@ class Car:
         pygame.draw.polygon(self.screen,  GREY, wheel_D)
         pygame.draw.polygon(self.screen, BLACK, wheel_D, 2)
 
-        wheel_A_centre = wheel_A_axle - getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
-        wheel_B_centre = wheel_B_axle + getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
-        wheel_C_centre = wheel_C_axle + getCartesian(SIZE_UNIT, self.car_angle + 90)
-        wheel_D_centre = wheel_D_axle - getCartesian(SIZE_UNIT, self.car_angle + 90)
+        wheel_A_centre = wheel_A_axle - self.wheel_unit.right90()*SIZE_UNIT//DIVIDE_THING
+            #getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
+        wheel_B_centre = wheel_B_axle + self.wheel_unit.right90()*SIZE_UNIT//DIVIDE_THING
+            #getCartesian(SIZE_UNIT, self.car_angle + self.wheel_angle + 90)
+        wheel_C_centre = wheel_C_axle + self.car_unit.right90()*SIZE_UNIT//DIVIDE_THING
+            #getCartesian(SIZE_UNIT, self.car_angle + 90)
+        wheel_D_centre = wheel_D_axle - self.car_unit.right90()*SIZE_UNIT//DIVIDE_THING
+            #getCartesian(SIZE_UNIT, self.car_angle + 90)
 
-        self.centre_path.append(self.position.coords())
+        #self.centre_path.append(self.position.coords())
+        #pygame.draw.lines(self.screen, BLUE,    False, self.centre_path, 1)
+
         self.wheel_A_path.append(wheel_A_centre.coords())
-        self.wheel_B_path.append(wheel_B_centre.coords())
-        self.wheel_C_path.append(wheel_C_centre.coords())
-        self.wheel_D_path.append(wheel_D_centre.coords())
-
-        pygame.draw.lines(self.screen, BLUE,    False, self.centre_path, 1)
         pygame.draw.lines(self.screen, RED,     False, self.wheel_A_path, 1)
+        self.wheel_B_path.append(wheel_B_centre.coords())
         pygame.draw.lines(self.screen, GREEN,   False, self.wheel_B_path, 1)
+        self.wheel_C_path.append(wheel_C_centre.coords())
         pygame.draw.lines(self.screen, CYAN,    False, self.wheel_C_path, 1)
+        self.wheel_D_path.append(wheel_D_centre.coords())
         pygame.draw.lines(self.screen, MAGENTA, False, self.wheel_D_path, 1)
 
 WIDTH  = 1200
@@ -263,7 +315,7 @@ def main():
     clock = pygame.time.Clock()
 
     # create car
-    car = Car(screen, BLUE, (1*WIDTH//4, 1*HEIGHT//4), (0, 0), 0, 0, 0)
+    car = Car(screen, BLUE, (2*WIDTH//4, 2*HEIGHT//4))
 
     # loop until the user clicks the close button
     done = False
