@@ -14,10 +14,10 @@ BLUE    = (  0,   0, 255)
 MAGENTA = (255,   0, 255)
 
 # here are some things
-SIZE_UNIT     = 1000
+SIZE_UNIT     = 7.5
 DRAG_CONSTANT = 0.01
 RR_CONSTANT   = 30*DRAG_CONSTANT
-DIVIDE_THING  = 150
+DIVIDE_THING  = 1
 
 class Vector2:
     def __init__(self, x, y):
@@ -156,6 +156,7 @@ class Car:
             self.position += self.velocity*dt
 
             self.car_angle = (self.car_angle*4 + angle)/5
+            #self.car_angle = angle
 
         else:
 
@@ -315,7 +316,7 @@ def main():
     clock = pygame.time.Clock()
 
     # create car
-    car = Car(screen, BLUE, (2*WIDTH//4, 2*HEIGHT//4))
+    car = Car(screen, BLUE, (1*WIDTH//4, 1*HEIGHT//4))
 
     # loop until the user clicks the close button
     done = False
