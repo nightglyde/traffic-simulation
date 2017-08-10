@@ -316,7 +316,7 @@ def main():
     clock = pygame.time.Clock()
 
     # create car
-    car = Car(screen, BLUE, (1*WIDTH//4, 1*HEIGHT//4))
+    car = Car(screen, BLUE, (2*WIDTH//4, 2*HEIGHT//4))
 
     # loop until the user clicks the close button
     done = False
