@@ -5,12 +5,14 @@ import random
 
 from collections import deque
 
+# idea: slow down as you get near a point if the next point is angled away from car
+# idea: slow down as you get near a point if ther is no next point
+
 # define some basic colours in RGB
 BLACK      = (  0,   0,   0)
 DARK_GREY  = ( 63,  63,  63)
 GREY       = (127, 127, 127)
-#LIGHT_GREY = (191, 191, 191)
-LIGHT_GREY = (223, 223, 223)
+LIGHT_GREY = (191, 191, 191)
 WHITE      = (255, 255, 255)
 RED        = (255,   0,   0)
 YELLOW     = (255, 255,   0)
@@ -21,16 +23,29 @@ MAGENTA    = (255,   0, 255)
 
 WIDTH    = 1200
 HEIGHT   = 800
-WAYPOINT_RADIUS = 20
+WAYPOINT_RADIUS = 50
 
-# actual length and width will be twice this number
-CAR_LENGTH = 50
-CAR_WIDTH  = 20
+CAR_LENGTH = 100
+CAR_WIDTH  = 40
 
+PIXELS_PER_METRE = CAR_LENGTH / 4.5
+
+ARROW_LENGTH = 40
+ARROW_WIDTH  = 20
 ARROW_STEM_LENGTH = 30
-ARROW_STEM_WIDTH  = 5
-ARROW_HEAD_LENGTH = 10
-ARROW_HEAD_WIDTH  = 10
+ARROW_STEM_WIDTH  = 10
+
+DRAG_CONSTANT    = 0.5
+RR_CONSTANT      = DRAG_CONSTANT * 30
+BRAKING_CONSTANT = 10000
+GRAVITY_CONSTANT = 9.8
+
+TURNING_SPEED  = 2
+STRAIGHT_SPEED = 10
+
+MIN_ENGINE_FORCE = 0
+MAX_ENGINE_FORCE = 10000
+
 
 MIN_SPEED = 0
 MAX_SPEED = 300
@@ -122,47 +137,105 @@ def getPolar(vector):
     return Angle(angle), magnitude
 
 class Car:
-    def __init__(self, screen, colour, position, car_angle=0,
-                 speed=MIN_SPEED, wheel_angle=0):
+    def __init__(self, screen, colour, position, car_angle=0, velocity=(0, 0)):
 
         self.screen = screen
         self.colour = colour
 
         self.position     = Vector(*position)
-        self.speed        = speed
         self.car_angle    = Angle(car_angle)
-        self.wheel_angle  = Angle(wheel_angle)
+        self.velocity     = Vector(*velocity)
+
+        self.wheel_angle  = Angle(0)
         self.heading      = getVector(self.car_angle)
 
-        self.target       = None
+        self.engine_force = 0
+        self.braking      = False
+        self.acceleration = Vector(0, 0)
+
+        # honda civic
+        self.mass   = 1250
+        self.weight = self.mass * GRAVITY_CONSTANT
+
+        wheel_base       = 2.7
+        centre_to_front  = 1.8
+        centre_to_rear   = 0.9
+        centre_to_ground = 0.7
+
+        self.front_weight_static = (centre_to_front /wheel_base) * self.weight
+        self.rear_weight_static  = (centre_to_rear  /wheel_base) * self.weight
+        self.hLM                 = (centre_to_ground/wheel_base) * self.mass
+
+        # car shape
+        front = self.heading * CAR_LENGTH // 2
+        right = self.heading.right90() * CAR_WIDTH // 2
+
+        self.front = self.position + front
+        self.back  = self.position - front
+
+        self.front_left  = self.front - right
+        self.front_right = self.front + right
+        self.back_left   = self.back  - right
+        self.back_right  = self.back  + right
+
+        # course plotting
         self.instructions = deque()
-        #self.path         = []
-
-
-        self.time = pygame.time.get_ticks()
+        self.path_end     = self.front
 
     def addInstruction(self, pos):
-        instruction = Vector(*pos)
-        self.instructions.append(instruction.coords())
+        self.instructions.append(pos)
+        self.path_end = Vector(*pos)
 
-    def update(self, target=None):
+    def update(self, dt):
         # update position and velocity
-        time = pygame.time.get_ticks()
-        dt = (time - self.time) / 1000
-        self.time = time
 
-        self.position += self.heading * self.speed * dt
+        a_angle, a_magnitude = getPolar(self.acceleration)
+        a_car = a_magnitude * math.cos(abs((a_angle - self.car_angle).value))
+
+        front_weight = abs(self.front_weight_static - self.hLM * a_car)
+        rear_weight  = abs(self.rear_weight_static  + self.hLM * a_car)
+
+        # friction
+        angle, speed = getPolar(self.velocity)
+        drag               = self.velocity * speed * (-DRAG_CONSTANT)
+        rolling_resistance = self.velocity * (-RR_CONSTANT)
+
+        if not self.braking:
+            traction = self.heading * min(self.engine_force, front_weight)
+            force    = traction + drag + rolling_resistance
+
+        elif speed > 0:
+            braking = getVector(angle) * (-min(BRAKING_CONSTANT, self.weight))
+            force   = braking + drag + rolling_resistance
+
+        else:
+            force = Vector(0, 0)
+
+        self.acceleration = force / self.mass
+
+        self.velocity += self.acceleration  * dt
+        self.position += self.velocity * dt * PIXELS_PER_METRE
+
+        print(self.engine_force, speed, a_magnitude)
 
         self.car_angle += self.wheel_angle * dt
         self.heading    = getVector(self.car_angle)
 
-        angle_change = Angle(math.pi / 2 * dt)
-        speed_change = 20 * dt
+        # update car shape
+        front = self.heading * CAR_LENGTH // 2
+        right = self.heading.right90() * CAR_WIDTH // 2
 
-        if target:
-            self.target = target
-        else:
-            self.target = None
+        self.front = self.position + front
+        self.back  = self.position - front
+
+        self.front_left  = self.front - right
+        self.front_right = self.front + right
+        self.back_left   = self.back  - right
+        self.back_right  = self.back  + right
+
+        # update course
+        angle_change = Angle(math.pi * (dt * 10))
+        engine_change = 10000 * dt
 
         # follow instructions
         while self.instructions:
@@ -172,94 +245,89 @@ class Car:
                 self.instructions.popleft()
                 continue
 
-            break
+            angle_difference = self.car_angle - angle
 
-        else:
-            if not self.target:
+            coarse_angle = Angle(math.atan((WAYPOINT_RADIUS)/magnitude))
+            fine_angle   = Angle(math.atan((WAYPOINT_RADIUS/2)/magnitude))
+
+            if abs(angle_difference.value) < fine_angle.value:
                 if self.wheel_angle > ZERO_ANGLE:
                     self.wheel_angle = max(self.wheel_angle-angle_change, ZERO_ANGLE)
-
                 elif self.wheel_angle < ZERO_ANGLE:
                     self.wheel_angle = min(self.wheel_angle+angle_change, ZERO_ANGLE)
 
-                if self.speed > MIN_SPEED:
-                    self.speed = max(self.speed-speed_change, MIN_SPEED)
+                if speed > STRAIGHT_SPEED:
+                    self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
+                elif speed < STRAIGHT_SPEED:
+                    self.engine_force = min(self.engine_force+engine_change, MAX_ENGINE_FORCE)
 
-                return
+                self.braking = False
 
-            angle, magnitude = getPolar(Vector(*self.target) - self.position)
+            else:
+                if angle_difference > fine_angle:
+                    self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
 
-        orbit_angle = Angle(math.atan(WAYPOINT_RADIUS/magnitude))
-        angle_difference = self.car_angle - angle
+                elif angle_difference < -fine_angle:
+                    self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
 
-        if abs(angle_difference.value) < orbit_angle.value:
+                if abs(angle_difference.value) < coarse_angle.value:
+                    if speed > TURNING_SPEED:
+                        self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
+                    elif speed < TURNING_SPEED:
+                        self.engine_force = min(self.engine_force+engine_change, MAX_ENGINE_FORCE)
+
+                else:
+                    self.braking = True
+
+            break
+
+        else:
+            # no instructions to follow
+            self.path_end = self.front
+
             if self.wheel_angle > ZERO_ANGLE:
                 self.wheel_angle = max(self.wheel_angle-angle_change, ZERO_ANGLE)
 
             elif self.wheel_angle < ZERO_ANGLE:
                 self.wheel_angle = min(self.wheel_angle+angle_change, ZERO_ANGLE)
 
-            if self.speed < MAX_SPEED:
-                self.speed = min(self.speed+speed_change, MAX_SPEED)
+            self.engine_force = MIN_ENGINE_FORCE
+            self.braking = True
 
-        else:
-            if angle_difference > orbit_angle:
-                self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
-
-            elif angle_difference < -orbit_angle:
-                self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
-
-            if self.speed > MIN_SPEED:
-                self.speed = max(self.speed-speed_change, MIN_SPEED)
-
-    def draw(self):
-        forward = self.heading
-        right   = self.heading.right90()
-
-        front = self.position + forward * CAR_LENGTH
-        back  = self.position - forward * CAR_LENGTH
-
-        # draw path
-        #self.path.append(back.coords())
-        #if len(self.path) > 1:
-        #    pygame.draw.lines(self.screen, LIGHT_GREY, False, self.path, 1)
-
-        # draw course
-        prev = front.coords()
+    def drawCourse(self):
+        prev = self.front.coords()
         for instruction in self.instructions:
             pygame.draw.line(self.screen,   self.colour, prev, instruction, 1)
             pygame.draw.circle(self.screen, self.colour, instruction, WAYPOINT_RADIUS, 2)
             prev = instruction
 
-        if self.target:
-            pygame.draw.line(self.screen,   self.colour, prev, self.target, 1)
-            pygame.draw.circle(self.screen, self.colour, self.target, WAYPOINT_RADIUS, 2)
+    def drawToMouse(self, mouse):
+        pygame.draw.line(self.screen, self.colour, self.path_end.coords(), mouse, 1)
+        pygame.draw.circle(self.screen, self.colour, mouse, WAYPOINT_RADIUS, 2)
 
+    def drawCar(self):
         # draw car
-        front_left  = front - right * CAR_WIDTH
-        front_right = front + right * CAR_WIDTH
-        back_left   = back  - right * CAR_WIDTH
-        back_right  = back  + right * CAR_WIDTH
-
-        chassis = [front_left.coords(), front_right.coords(),
-                   back_right.coords(), back_left.coords()]
+        chassis = [self.front_left.coords(), self.front_right.coords(),
+                   self.back_right.coords(), self.back_left.coords()]
         pygame.draw.polygon(self.screen, self.colour, chassis)
         pygame.draw.polygon(self.screen,       BLACK, chassis, 2)
 
-        # draw arrow
-        arrow_base_left  = self.position - right * ARROW_STEM_WIDTH
-        arrow_base_right = self.position + right * ARROW_STEM_WIDTH
+    def drawArrow(self):
+        forward = self.heading
+        right   = self.heading.right90()
 
-        arrow_bend_left  = arrow_base_left  + forward * ARROW_STEM_LENGTH
-        arrow_bend_right = arrow_base_right + forward * ARROW_STEM_LENGTH
+        stem_front = forward * ARROW_STEM_LENGTH
+        stem_right = right   * ARROW_STEM_WIDTH // 2
+        head_front = forward * ARROW_LENGTH
+        head_right = right   * ARROW_WIDTH // 2
 
-        arrow_point = self.position + forward * (ARROW_STEM_LENGTH + ARROW_HEAD_LENGTH)
-        arrow_left  = self.position + forward * ARROW_STEM_LENGTH - right * ARROW_HEAD_WIDTH
-        arrow_right = self.position + forward * ARROW_STEM_LENGTH + right * ARROW_HEAD_WIDTH
-
-        arrow = [arrow_base_left.coords(), arrow_bend_left.coords(),
-                 arrow_left.coords(), arrow_point.coords(), arrow_right.coords(),
-                 arrow_bend_right.coords(), arrow_base_right.coords()]
+        arrow = [(self.position              - stem_right).coords(),
+                 (self.position + stem_front - stem_right).coords(),
+                 (self.position + stem_front - head_right).coords(),
+                 (self.position + head_front             ).coords(),
+                 (self.position + stem_front + head_right).coords(),
+                 (self.position + stem_front + stem_right).coords(),
+                 (self.position              + stem_right).coords()]
         pygame.draw.polygon(self.screen, BLACK, arrow, 1)
 
 def main():
@@ -273,15 +341,18 @@ def main():
     clock = pygame.time.Clock()
 
     # create car
-    colours = [RED, GREEN, BLUE]#[RED, YELLOW, GREEN, CYAN, BLUE, MAGENTA]
+    #colours = [RED, GREEN, BLUE]#[RED, YELLOW, GREEN, CYAN, BLUE, MAGENTA]
 
-    cars = []
-    for colour in colours:
-        cars.append(Car(screen, colour,
-                        (random.randint(0, WIDTH-1),
-                         random.randint(0, HEIGHT-1)),
-                        random.random()*math.pi*2)
-                   )
+    #cars = []
+    #for colour in colours:
+        #x = random.randint(CAR_LENGTH, WIDTH-CAR_LENGTH-1)
+        #y = random.randint(CAR_LENGTH, HEIGHT-CAR_LENGTH-1)
+        #a = random.random()*math.pi*2
+        #cars.append(Car(screen, colour, (x, y), a))
+
+    cars = [Car(screen, BLUE, (CAR_LENGTH, HEIGHT//2), 0)]
+
+    prev_time = pygame.time.get_ticks()
 
     # loop until the user clicks the close button
     done = False
@@ -290,32 +361,24 @@ def main():
         # limit the while loop to 10 times per second
         clock.tick(60)
 
+        # find time between frames
+        curr_time = pygame.time.get_ticks()
+        dt = (curr_time - prev_time) / 1000
+        prev_time = curr_time
+
+        # find closest car to mouse
         mouse = pygame.mouse.get_pos()
 
         closest_car = None
-        closest_pos = None
         closest_mag = None
         for car in cars:
-            if car.instructions:
-                pos = car.instructions[-1]
-            else:
-                pos = car.position.coords()
-
-            angle, magnitude = getPolar(Vector(*pos) - Vector(*mouse))
-
-            if closest_mag != None:
-                if closest_mag > magnitude:
-                    closest_car = car
-                    closest_pos = pos
-                    closest_mag = magnitude
-
-            else:
+            angle, magnitude = getPolar(car.path_end - Vector(*mouse))
+            if closest_mag == None or closest_mag > magnitude:
                 closest_car = car
-                closest_pos = pos
                 closest_mag = magnitude
 
+        # deal with events
         for event in pygame.event.get():
-            # user did something
 
             if event.type == pygame.QUIT:
                 # user clicked close
@@ -327,15 +390,20 @@ def main():
         # clear the screen and set the screen background
         screen.fill(WHITE)
 
-        # animate the car
+        # update cars
         for car in cars:
-            if car is closest_car:
-                car.update(mouse)
-            else:
-                car.update()
+            car.update(dt)
 
+        # draw courses
         for car in cars:
-            car.draw()
+            car.drawCourse()
+
+        closest_car.drawToMouse(mouse)
+
+        # draw cars
+        for car in cars:
+            car.drawCar()
+            car.drawArrow()
 
         # update the screen
         pygame.display.flip()
