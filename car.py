@@ -25,10 +25,10 @@ WIDTH    = 1200
 HEIGHT   = 800
 WAYPOINT_RADIUS = 50
 
-CAR_LENGTH = 100
-CAR_WIDTH  = 40
-
-PIXELS_PER_METRE = CAR_LENGTH / 4.5
+CAR_LENGTH   = 100
+CAR_WIDTH    = 40
+AXLE_LENGTH  = 60
+AXLE_WIDTH   = 30
 
 ARROW_LENGTH = 40
 ARROW_WIDTH  = 20
@@ -40,7 +40,9 @@ RR_CONSTANT      = DRAG_CONSTANT * 30
 BRAKING_CONSTANT = 10000
 GRAVITY_CONSTANT = 9.8
 
-TURNING_SPEED  = 2
+PIXELS_PER_METRE = CAR_LENGTH / 4.5
+
+TURNING_SPEED  = 5
 STRAIGHT_SPEED = 10
 
 MIN_ENGINE_FORCE = 0
@@ -59,7 +61,7 @@ class Vector:
         return Vector(-self.y, self.x)
 
     def coords(self):
-        return [self.x, self.y]
+        return [round(self.x), round(self.y)]
 
     def __add__(self, other):
         return Vector(self.x + other.x, self.y + other.y)
@@ -111,9 +113,16 @@ class Angle:
     def __repr__(self):
         return repr(math.degrees(self.value))
 
-LOWER_LIMIT = Angle(-math.pi/4)
-UPPER_LIMIT = Angle(math.pi/4)
-ZERO_ANGLE  = Angle(0)
+ANGLE_0  = Angle(0)
+ANGLE_15 = Angle(math.pi/12)
+ANGLE_30 = Angle(math.pi/6)
+ANGLE_45 = Angle(math.pi/4)
+ANGLE_60 = Angle(math.pi/3)
+ANGLE_90 = Angle(math.pi/2)
+
+LOWER_LIMIT = -ANGLE_30
+UPPER_LIMIT = ANGLE_30
+ZERO_ANGLE  = ANGLE_0
 
 def getVector(angle):
     return Vector(math.cos(angle.value), math.sin(angle.value))
@@ -131,52 +140,50 @@ def getPolar(vector):
 
     if x < 0:
         angle += math.pi
-    #elif y < 0:
-    #    angle += math.pi * 2
 
     return Angle(angle), magnitude
 
 class Car:
-    def __init__(self, screen, colour, position, car_angle=0, velocity=(0, 0)):
+    def __init__(self, screen, colour, position, car_angle=0, speed=0):
 
         self.screen = screen
         self.colour = colour
 
         self.position     = Vector(*position)
+        self.speed        = speed
         self.car_angle    = Angle(car_angle)
-        self.velocity     = Vector(*velocity)
-
         self.wheel_angle  = Angle(0)
         self.heading      = getVector(self.car_angle)
+        self.engine_force = MIN_ENGINE_FORCE
 
-        self.engine_force = 0
-        self.braking      = False
-        self.acceleration = Vector(0, 0)
+        self.braking       = False
+        self.radius        = None
+        self.circle_centre = None
 
         # honda civic
-        self.mass   = 1250
-        self.weight = self.mass * GRAVITY_CONSTANT
+        self.mass       = 1250
+        self.weight     = self.mass * GRAVITY_CONSTANT
+        self.wheel_base = 2.7
 
-        wheel_base       = 2.7
-        centre_to_front  = 1.8
-        centre_to_rear   = 0.9
-        centre_to_ground = 0.7
+        #centre_to_front  = 1.8
+        #centre_to_rear   = 0.9
+        #centre_to_ground = 0.7
 
-        self.front_weight_static = (centre_to_front /wheel_base) * self.weight
-        self.rear_weight_static  = (centre_to_rear  /wheel_base) * self.weight
-        self.hLM                 = (centre_to_ground/wheel_base) * self.mass
+        #self.front_weight_static = (centre_to_front /wheel_base) * self.weight
+        #self.rear_weight_static  = (centre_to_rear  /wheel_base) * self.weight
+        #self.hLM                 = (centre_to_ground/wheel_base) * self.mass
 
         # car shape
         front = self.heading * CAR_LENGTH // 2
         right = self.heading.right90() * CAR_WIDTH // 2
 
         self.front = self.position + front
-        self.back  = self.position - front
+        self.rear  = self.position - front
 
         self.front_left  = self.front - right
         self.front_right = self.front + right
-        self.back_left   = self.back  - right
-        self.back_right  = self.back  + right
+        self.rear_left   = self.rear  - right
+        self.rear_right  = self.rear  + right
 
         # course plotting
         self.instructions = deque()
@@ -187,59 +194,76 @@ class Car:
         self.path_end = Vector(*pos)
 
     def update(self, dt):
-        # update position and velocity
-
-        a_angle, a_magnitude = getPolar(self.acceleration)
-        a_car = a_magnitude * math.cos(abs((a_angle - self.car_angle).value))
-
-        front_weight = abs(self.front_weight_static - self.hLM * a_car)
-        rear_weight  = abs(self.rear_weight_static  + self.hLM * a_car)
-
-        # friction
-        angle, speed = getPolar(self.velocity)
-        drag               = self.velocity * speed * (-DRAG_CONSTANT)
-        rolling_resistance = self.velocity * (-RR_CONSTANT)
+        # driving forwards
+        velocity = self.heading * self.speed
 
         if not self.braking:
-            traction = self.heading * min(self.engine_force, front_weight)
-            force    = traction + drag + rolling_resistance
-
-        elif speed > 0:
-            braking = getVector(angle) * (-min(BRAKING_CONSTANT, self.weight))
-            force   = braking + drag + rolling_resistance
-
+            traction = self.heading * min(self.engine_force, self.weight)
+        elif self.speed > 0:
+            traction = self.heading * (-min(BRAKING_CONSTANT, self.weight))
         else:
-            force = Vector(0, 0)
+            traction = Vector(0, 0)
 
-        self.acceleration = force / self.mass
+        drag               = velocity * self.speed * (-DRAG_CONSTANT)
+        rolling_resistance = velocity              * (-RR_CONSTANT)
+        acceleration       = (traction + drag + rolling_resistance) / self.mass
 
-        self.velocity += self.acceleration  * dt
-        self.position += self.velocity * dt * PIXELS_PER_METRE
+        velocity      += acceleration * dt
+        self.position += velocity     * dt * PIXELS_PER_METRE
 
-        print(self.engine_force, speed, a_magnitude)
+        angle, speed = getPolar(velocity)
+        self.speed   = speed
 
-        self.car_angle += self.wheel_angle * dt
-        self.heading    = getVector(self.car_angle)
+        # turning corners
+        if self.wheel_angle.value == ZERO_ANGLE.value:
+            self.radius        = None
+            self.circle_centre = None
+        else:
+            radius = self.wheel_base / math.sin(self.wheel_angle.value)
+            angular_v   = self.speed / radius # radians per second
+
+            self.car_angle += Angle(angular_v * dt)
+            self.heading    = getVector(self.car_angle)
+            self.radius     = radius * PIXELS_PER_METRE
+
+            angle_to_centre = self.car_angle + self.wheel_angle + ANGLE_90
+            centre_vector   = getVector(angle_to_centre) * self.radius
+
+            if angular_v < 0:
+                self.circle_centre = self.front_left_wheel  + centre_vector
+            else:
+                self.circle_centre = self.front_right_wheel + centre_vector
 
         # update car shape
-        front = self.heading * CAR_LENGTH // 2
+        forward = self.heading * CAR_LENGTH // 2
         right = self.heading.right90() * CAR_WIDTH // 2
 
-        self.front = self.position + front
-        self.back  = self.position - front
+        self.front = self.position + forward
+        self.rear  = self.position - forward
 
         self.front_left  = self.front - right
         self.front_right = self.front + right
-        self.back_left   = self.back  - right
-        self.back_right  = self.back  + right
+        self.rear_left   = self.rear  - right
+        self.rear_right  = self.rear  + right
+
+        axle_forward = self.heading * AXLE_LENGTH // 2
+
+        front_axle = self.position + axle_forward
+        rear_axle  = self.position - axle_forward
+
+        self.front_left_wheel  = front_axle - right
+        self.front_right_wheel = front_axle + right
+        self.rear_left_wheel   = rear_axle  - right
+        self.rear_right_wheel  = rear_axle  + right
 
         # update course
-        angle_change = Angle(math.pi * (dt * 10))
+        angle_change  = Angle(math.pi * dt)
         engine_change = 10000 * dt
 
         # follow instructions
         while self.instructions:
-            angle, magnitude = getPolar(Vector(*self.instructions[0]) - self.position)
+            destination = Vector(*self.instructions[0])
+            angle, magnitude = getPolar(destination - self.position)
 
             if magnitude < WAYPOINT_RADIUS:
                 self.instructions.popleft()
@@ -247,38 +271,55 @@ class Car:
 
             angle_difference = self.car_angle - angle
 
-            coarse_angle = Angle(math.atan((WAYPOINT_RADIUS)/magnitude))
-            fine_angle   = Angle(math.atan((WAYPOINT_RADIUS/2)/magnitude))
+            coarse_angle = Angle(math.atan((WAYPOINT_RADIUS-CAR_WIDTH)/magnitude))
 
-            if abs(angle_difference.value) < fine_angle.value:
+            if abs(angle_difference.value) < coarse_angle.value:
                 if self.wheel_angle > ZERO_ANGLE:
                     self.wheel_angle = max(self.wheel_angle-angle_change, ZERO_ANGLE)
                 elif self.wheel_angle < ZERO_ANGLE:
                     self.wheel_angle = min(self.wheel_angle+angle_change, ZERO_ANGLE)
 
-                if speed > STRAIGHT_SPEED:
+                if self.speed > STRAIGHT_SPEED:
                     self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
-                elif speed < STRAIGHT_SPEED:
+                elif self.speed < STRAIGHT_SPEED:
                     self.engine_force = min(self.engine_force+engine_change, MAX_ENGINE_FORCE)
 
-                self.braking = False
-
             else:
-                if angle_difference > fine_angle:
+
+                if angle_difference > coarse_angle: # left turn
+#                    if self.circle_centre:
+#                        angle, distance_from_circle = getPolar(destination - self.circle_centre)
+#
+#                        diff = distance_from_circle - abs(self.radius)
+#
+#                        if diff < 0:
+#                            self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
+#                        elif diff > 0:
+#                            self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
+#
+#                    else:
                     self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
 
-                elif angle_difference < -fine_angle:
+                elif angle_difference < -coarse_angle: # right turn
+#                    if self.circle_centre:
+#                        angle, distance_from_circle = getPolar(destination - self.circle_centre)
+#
+#                        diff = distance_from_circle - abs(self.radius)
+#
+#                        if diff > 0:
+#                            self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
+#                        elif diff < 0:
+#                            self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
+#
+#                    else:
                     self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
 
-                if abs(angle_difference.value) < coarse_angle.value:
-                    if speed > TURNING_SPEED:
-                        self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
-                    elif speed < TURNING_SPEED:
-                        self.engine_force = min(self.engine_force+engine_change, MAX_ENGINE_FORCE)
+                if self.speed > TURNING_SPEED:
+                    self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
+                elif self.speed < TURNING_SPEED:
+                    self.engine_force = min(self.engine_force+engine_change, MAX_ENGINE_FORCE)
 
-                else:
-                    self.braking = True
-
+            self.braking = False
             break
 
         else:
@@ -294,6 +335,8 @@ class Car:
             self.engine_force = MIN_ENGINE_FORCE
             self.braking = True
 
+        #print(self.engine_force, self.speed, self.car_angle, self.wheel_angle)
+
     def drawCourse(self):
         prev = self.front.coords()
         for instruction in self.instructions:
@@ -307,10 +350,24 @@ class Car:
 
     def drawCar(self):
         # draw car
+        if self.circle_centre and abs(self.radius) < 200:
+            radius = abs(round(self.radius))
+            pygame.draw.line(self.screen, GREY, self.front_left_wheel.coords(), self.circle_centre.coords(), 1)
+            pygame.draw.line(self.screen, GREY, self.front_right_wheel.coords(), self.circle_centre.coords(), 1)
+            pygame.draw.line(self.screen, GREY, self.rear_left_wheel.coords(), self.circle_centre.coords(), 1)
+            pygame.draw.line(self.screen, GREY, self.rear_right_wheel.coords(), self.circle_centre.coords(), 1)
+            pygame.draw.circle(self.screen, GREY, self.circle_centre.coords(), radius, 1)
+
         chassis = [self.front_left.coords(), self.front_right.coords(),
-                   self.back_right.coords(), self.back_left.coords()]
+                   self.rear_right.coords(), self.rear_left.coords()]
         pygame.draw.polygon(self.screen, self.colour, chassis)
         pygame.draw.polygon(self.screen,       BLACK, chassis, 2)
+
+        # draw wheels
+        #forward       = self.heading
+        #right         = self.heading.right90()
+        #wheel_forward = getVector(self.car_angle + self.wheel_angle)
+        #wheel_right   = wheel_forward.right90()
 
     def drawArrow(self):
         forward = self.heading
@@ -341,16 +398,16 @@ def main():
     clock = pygame.time.Clock()
 
     # create car
-    #colours = [RED, GREEN, BLUE]#[RED, YELLOW, GREEN, CYAN, BLUE, MAGENTA]
+    colours = [RED, GREEN, BLUE]#[RED, YELLOW, GREEN, CYAN, BLUE, MAGENTA]
 
-    #cars = []
-    #for colour in colours:
-        #x = random.randint(CAR_LENGTH, WIDTH-CAR_LENGTH-1)
-        #y = random.randint(CAR_LENGTH, HEIGHT-CAR_LENGTH-1)
-        #a = random.random()*math.pi*2
-        #cars.append(Car(screen, colour, (x, y), a))
+    cars = []
+    for colour in colours:
+        x = random.randint(CAR_LENGTH, WIDTH-CAR_LENGTH-1)
+        y = random.randint(CAR_LENGTH, HEIGHT-CAR_LENGTH-1)
+        a = random.random()*math.pi*2
+        cars.append(Car(screen, colour, (x, y), a))
 
-    cars = [Car(screen, BLUE, (CAR_LENGTH, HEIGHT//2), 0)]
+    #cars = [Car(screen, BLUE, (CAR_LENGTH, HEIGHT//2), 0)]
 
     prev_time = pygame.time.get_ticks()
 
