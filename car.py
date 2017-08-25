@@ -21,8 +21,8 @@ MAGENTA    = (255,   0, 255)
 WIDTH  = 1200
 HEIGHT = 800
 
-WAYPOINT_RADIUS    = 30
-WAYPOINT_THRESHOLD = 10
+WAYPOINT_RADIUS    = 50
+WAYPOINT_THRESHOLD = 2
 
 CAR_LENGTH  = 100
 CAR_WIDTH   = 40
@@ -152,13 +152,11 @@ class Car:
         self.engine_force = MIN_ENGINE_FORCE
 
         self.braking       = False
-        self.radius        = None
-        self.circle_centre = None
 
         # honda civic
         self.mass       = 1250
         self.weight     = self.mass * GRAVITY_CONSTANT
-        self.wheel_base = 2.7
+        self.wheel_base = 2.7 * PIXELS_PER_METRE
 
         #centre_to_front  = 1.8
         #centre_to_rear   = 0.9
@@ -173,6 +171,7 @@ class Car:
         # course plotting
         self.instructions = deque()
         self.path_end     = self.front
+        self.path = []
 
     def updateShape(self):
         # car shape
@@ -202,22 +201,28 @@ class Car:
         self.path_end = Vector(*pos)
 
     def plotAngle(self, angle):
-        radius    = self.wheel_base / math.sin(angle.value)
-        angular_v = self.speed / radius # radians per second
+        radius = self.wheel_base / math.sin(angle.value)
 
-        radius_adjusted = radius * PIXELS_PER_METRE
+        centre_vector = getVector(self.car_angle + ANGLE_90) * radius
+        circle_centre = self.position + centre_vector
 
-        angle_to_centre = self.car_angle + angle + ANGLE_90
-        centre_vector   = getVector(angle_to_centre) * radius_adjusted
+        return circle_centre, radius
 
-        if angular_v < 0:
-            circle_centre = self.front_left_wheel + centre_vector
-        else:
-            circle_centre = self.front_right_wheel + centre_vector
+    def fitCircle(self, destination):
+        angle_to_dest, distance_to_dest = getPolar(destination - self.position)
 
-        angle, magnitude = getPolar(self.position - circle_centre)
+        angle_to_centre = self.car_angle + ANGLE_90
+        angle_between   = angle_to_dest - angle_to_centre
 
-        return angular_v, circle_centre, magnitude
+        new_radius = distance_to_dest / (2 * math.cos(angle_between.value))
+        ratio      = self.wheel_base / new_radius
+        if ratio > 1:
+            return ANGLE_90
+
+        elif ratio < -1:
+            return -ANGLE_90
+
+        return Angle(math.asin(ratio))
 
     def control(self, dt):
         angle_change  = Angle(math.pi * dt)
@@ -227,6 +232,7 @@ class Car:
             # follow instructions
             destination = Vector(*self.instructions[0])
             angle, magnitude = getPolar(destination - self.position)
+
 
             if magnitude < WAYPOINT_THRESHOLD:
                 self.instructions.popleft()
@@ -241,7 +247,7 @@ class Car:
 
             if angle_difference > ZERO_ANGLE: # left turn
                 # test if point is too close
-                angular_v, circle_centre, radius = self.plotAngle(LOWER_LIMIT)
+                circle_centre, radius = self.plotAngle(LOWER_LIMIT)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
                 if distance_from_circle < abs(radius):
                     self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
@@ -249,20 +255,19 @@ class Car:
                 elif self.wheel_angle.value >= ZERO_ANGLE.value:
                     self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
 
-                elif abs(angle_difference.value) > ANGLE_15.value:
+                elif abs(angle_difference.value) > ANGLE_45.value:
                     self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
 
                 else:
-                    angle, distance_from_circle = getPolar(destination - self.circle_centre)
-                    diff = distance_from_circle - abs(self.radius)
-                    if diff < 0:
-                        self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
-                    elif diff > 0:
-                        self.wheel_angle = min(self.wheel_angle+angle_change, ZERO_ANGLE)
+                    required_wheel_angle = self.fitCircle(destination)
+                    if self.wheel_angle > required_wheel_angle:
+                        self.wheel_angle = max(self.wheel_angle-angle_change, required_wheel_angle)
+                    elif self.wheel_angle < required_wheel_angle:
+                        self.wheel_angle = min(self.wheel_angle+angle_change, required_wheel_angle)
 
             elif angle_difference < ZERO_ANGLE: # right turn
                 # test if point is too close
-                angular_v, circle_centre, radius = self.plotAngle(UPPER_LIMIT)
+                circle_centre, radius = self.plotAngle(UPPER_LIMIT)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
                 if distance_from_circle < abs(radius):
                     self.wheel_angle = max(self.wheel_angle-angle_change, LOWER_LIMIT)
@@ -270,16 +275,15 @@ class Car:
                 elif self.wheel_angle.value <= ZERO_ANGLE.value:
                     self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
 
-                elif abs(angle_difference.value) > ANGLE_15.value:
+                elif abs(angle_difference.value) > ANGLE_45.value:
                     self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
 
                 else:
-                    angle, distance_from_circle = getPolar(destination - self.circle_centre)
-                    diff = distance_from_circle - abs(self.radius)
-                    if diff < 0:
-                        self.wheel_angle = min(self.wheel_angle+angle_change, UPPER_LIMIT)
-                    elif diff > 0:
-                        self.wheel_angle = max(self.wheel_angle-angle_change, ZERO_ANGLE)
+                    required_wheel_angle = self.fitCircle(destination)
+                    if self.wheel_angle > required_wheel_angle:
+                        self.wheel_angle = max(self.wheel_angle-angle_change, required_wheel_angle)
+                    elif self.wheel_angle < required_wheel_angle:
+                        self.wheel_angle = min(self.wheel_angle+angle_change, required_wheel_angle)
 
             if self.speed > SLOW_SPEED:
                 self.engine_force = max(self.engine_force-engine_change, MIN_ENGINE_FORCE)
@@ -303,6 +307,14 @@ class Car:
             self.braking = True
 
     def update(self, dt):
+        # turning corners
+        if self.wheel_angle.value != ZERO_ANGLE.value:
+            radius    = self.wheel_base / math.sin(self.wheel_angle.value)
+            angular_v = self.speed / radius * PIXELS_PER_METRE
+
+            self.car_angle += Angle(angular_v * dt)
+            self.heading    = getVector(self.car_angle)
+
         # driving forwards
         velocity = self.heading * self.speed
 
@@ -323,29 +335,31 @@ class Car:
         angle, speed = getPolar(velocity)
         self.speed   = speed
 
-        # turning corners
-        if self.wheel_angle.value == ZERO_ANGLE.value:
-            self.radius        = None
-            self.circle_centre = None
-        else:
-            angular_v, circle_centre, radius = self.plotAngle(self.wheel_angle)
-
-            self.car_angle += Angle(angular_v * dt)
-            self.heading    = getVector(self.car_angle)
-
-            self.circle_centre = circle_centre
-            self.radius        = radius
-
         # update car shape
         self.updateShape()
 
     def drawBackground(self):
+        self.path.append(self.position.coords())
+        if len(self.path) > 1:
+            pygame.draw.lines(self.screen, LIGHT_GREY, False, self.path, 1)
+
         # draw course
         prev = self.front.coords()
         for instruction in self.instructions:
             #pygame.draw.line(self.screen,   self.colour, prev, instruction, 1)
             pygame.draw.circle(self.screen, self.colour, instruction, WAYPOINT_RADIUS, 5)
             prev = instruction
+
+        if self.wheel_angle.value != ZERO_ANGLE.value:
+            circle_centre, radius = self.plotAngle(self.wheel_angle)
+            circle_centre = circle_centre.coords()
+            radius = abs(round(radius))
+            if radius < 10000:
+                pygame.draw.circle(self.screen, DARK_GREY, circle_centre, radius, 1)
+                pygame.draw.line(  self.screen, DARK_GREY, circle_centre, self.front_left_wheel.coords(), 1)
+                pygame.draw.line(  self.screen, DARK_GREY, circle_centre, self.front_right_wheel.coords(), 1)
+                pygame.draw.line(  self.screen, DARK_GREY, circle_centre, self.rear_left_wheel.coords(), 1)
+                pygame.draw.line(  self.screen, DARK_GREY, circle_centre, self.rear_right_wheel.coords(), 1)
 
     def drawToMouse(self, mouse):
         pygame.draw.line(self.screen, self.colour, self.path_end.coords(), mouse, 1)
@@ -389,12 +403,12 @@ def main():
     pygame.display.set_caption("Car Simulator | FPS: {}".format(fps))
 
     # create car
-    colours = { "Red": RED,  "Yellow": YELLOW,   "Green": GREEN,
-               "Cyan": CYAN,   "Blue": BLUE,   "Magenta": MAGENTA}
+    #colours = { "Red": RED,  "Yellow": YELLOW,   "Green": GREEN,
+    #           "Cyan": CYAN,   "Blue": BLUE,   "Magenta": MAGENTA}
 
     #colours = {"Red": RED, "Green": GREEN, "Blue": BLUE}
 
-    #colours = {"Blue": BLUE}
+    colours = {"Blue": BLUE}
 
     cars = []
     for colour_name in colours:
@@ -432,13 +446,13 @@ def main():
         if i == 10:
             i = 0
 
-        total = 0.0
-        for frame in frames:
-            total += frame
+            total = 0.0
+            for frame in frames:
+                total += frame
 
-        fps = round(10/total)
+            fps = round(10/total)
 
-        pygame.display.set_caption("Car Simulator | FPS: {}".format(fps))
+            pygame.display.set_caption("Car Simulator | FPS: {}".format(fps))
 
         # find closest car to mouse
         #mouse = pygame.mouse.get_pos()
