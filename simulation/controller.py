@@ -10,6 +10,7 @@ ESTIMATED_UPPER_LIMIT = ANGLE_45
 
 SLOW_SPEED = 10 * PIXELS_PER_METRE
 
+WAYPOINT_BIG_GAP   = SCREEN_UNIT * 25 # 250
 WAYPOINT_INTERVAL  = SCREEN_UNIT * 17 # 170
 WAYPOINT_THRESHOLD = SCREEN_UNIT * 1  # 10
 
@@ -20,7 +21,7 @@ W_MIN_Y = SCREEN_MARGIN
 W_MAX_X = SCREEN_WIDTH  - SCREEN_MARGIN
 W_MAX_Y = SCREEN_HEIGHT - SCREEN_MARGIN
 
-TOTAL_WAYPOINTS    = 100
+MAX_WAYPOINTS      = 100
 STARTING_WAYPOINTS = 3
 
 class CarController:
@@ -69,14 +70,26 @@ class CarController:
             prev_pos   = self.position
             prev_angle = self.car_angle
 
-        angle = prev_angle - ANGLE_15 + ANGLE_30 * random.random()
+        angle = prev_angle - ANGLE_30 + ANGLE_60 * random.random()
         displacement = getVector(angle) * WAYPOINT_INTERVAL
         pos = prev_pos + displacement
 
+        count = 0
+
         while not ((W_MIN_X <= pos.x <= W_MAX_X) and (W_MIN_Y <= pos.y <= W_MAX_Y)):
-            angle = Angle(random.random()*2*math.pi)
-            displacement = getVector(angle) * WAYPOINT_INTERVAL * 1.5
-            pos = prev_pos + displacement
+            if count < 5:
+                angle = prev_angle - ANGLE_30 + ANGLE_60 * random.random()
+                displacement = getVector(angle) * WAYPOINT_INTERVAL
+                pos = prev_pos + displacement
+            elif count < 100:
+                angle = Angle(random.random()*2*math.pi)
+                displacement = getVector(angle) * WAYPOINT_BIG_GAP
+                pos = prev_pos + displacement
+            else:
+                pos = CENTRE_POSITION
+                angle, magnitude = getPolar(pos - prev_pos)
+
+            count += 1
 
         self.addWaypoint(pos, angle)
 
@@ -136,12 +149,16 @@ class CarController:
             angle, magnitude = getPolar(destination - self.position)
             if magnitude < WAYPOINT_THRESHOLD:
 
-                if self.points + len(self.waypoints) < TOTAL_WAYPOINTS:
+                if self.points + len(self.waypoints) < MAX_WAYPOINTS:
                     self.addRandomWaypoint()
 
                 self.waypoints.popleft()
                 self.points += 1
                 self.duration = (self.time - self.start_time) / 1000
+
+                if self.points == MAX_WAYPOINTS:
+                    print(self.name, self.duration)
+
                 continue
 
             if self.projected_speed > SLOW_SPEED:

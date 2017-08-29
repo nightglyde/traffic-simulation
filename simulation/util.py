@@ -1,63 +1,6 @@
 import math
 import random
 
-# grey
-BLACK      = (  0,   0,   0)
-DARK_GREY  = ( 64,  64,  64)
-GREY       = (128, 128, 128)
-LIGHT_GREY = (191, 191, 191)
-WHITE      = (255, 255, 255)
-
-# red
-DARK_RED  = (128,   0,   0)
-RED       = (255,   0,   0)
-LIGHT_RED = (255, 128, 128)
-
-# yellow
-DARK_YELLOW  = (128, 128,   0)
-YELLOW       = (255, 255,   0)
-LIGHT_YELLOW = (255, 255, 128)
-
-# green
-DARK_GREEN  = (  0, 128,   0)
-GREEN       = (  0, 255,   0)
-LIGHT_GREEN = (128, 255, 128)
-
-# cyan
-DARK_CYAN  = (  0, 128, 128)
-CYAN       = (  0, 255, 255)
-LIGHT_CYAN = (128, 255, 255)
-
-# blue
-DARK_BLUE  = (  0,   0, 128)
-BLUE       = (  0,   0, 255)
-LIGHT_BLUE = (128, 128, 255)
-
-# magenta
-DARK_MAGENTA  = (128,   0, 128)
-MAGENTA       = (255,   0, 255)
-LIGHT_MAGENTA = (255, 128, 255)
-
-LIGHTER = {BLACK: DARK_GREY,                               WHITE: WHITE,
-       DARK_GREY: GREY,       GREY: LIGHT_GREY,       LIGHT_GREY: WHITE,
-        DARK_RED: RED,         RED: LIGHT_RED,         LIGHT_RED: WHITE,
-     DARK_YELLOW: YELLOW,   YELLOW: LIGHT_YELLOW,   LIGHT_YELLOW: WHITE,
-      DARK_GREEN: GREEN,     GREEN: LIGHT_GREEN,     LIGHT_GREEN: WHITE,
-       DARK_CYAN: CYAN,       CYAN: LIGHT_CYAN,       LIGHT_CYAN: WHITE,
-       DARK_BLUE: BLUE,       BLUE: LIGHT_BLUE,       LIGHT_BLUE: WHITE,
-    DARK_MAGENTA: MAGENTA, MAGENTA: LIGHT_MAGENTA, LIGHT_MAGENTA: WHITE,
-}
-
-DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
-       LIGHT_GREY: GREY,       GREY: DARK_GREY,       DARK_GREY: BLACK,
-        LIGHT_RED: RED,         RED: DARK_RED,         DARK_RED: BLACK,
-     LIGHT_YELLOW: YELLOW,   YELLOW: DARK_YELLOW,   DARK_YELLOW: BLACK,
-      LIGHT_GREEN: GREEN,     GREEN: DARK_GREEN,     DARK_GREEN: BLACK,
-       LIGHT_CYAN: CYAN,       CYAN: DARK_CYAN,       DARK_CYAN: BLACK,
-       LIGHT_BLUE: BLUE,       BLUE: DARK_BLUE,       DARK_BLUE: BLACK,
-    LIGHT_MAGENTA: MAGENTA, MAGENTA: DARK_MAGENTA, DARK_MAGENTA: BLACK,
-}
-
 SCREEN_UNIT = 10
 WORLD_UNIT  = 0.45
 
@@ -177,4 +120,61 @@ def generateRandomWorldPosition():
     pos = Vector(x, y)
     angle = Angle(random.random()*2*math.pi)
     return pos, angle
+
+# grey
+BLACK      = (  0,   0,   0)
+DARK_GREY  = ( 64,  64,  64)
+GREY       = (128, 128, 128)
+LIGHT_GREY = (191, 191, 191)
+WHITE      = (255, 255, 255)
+
+# red
+DARK_RED  = (128,   0,   0)
+RED       = (255,   0,   0)
+LIGHT_RED = (255, 128, 128)
+
+# yellow
+DARK_YELLOW  = (128, 128,   0)
+YELLOW       = (255, 255,   0)
+LIGHT_YELLOW = (255, 255, 128)
+
+# green
+DARK_GREEN  = (  0, 128,   0)
+GREEN       = (  0, 255,   0)
+LIGHT_GREEN = (128, 255, 128)
+
+# cyan
+DARK_CYAN  = (  0, 128, 128)
+CYAN       = (  0, 255, 255)
+LIGHT_CYAN = (128, 255, 255)
+
+# blue
+DARK_BLUE  = (  0,   0, 128)
+BLUE       = (  0,   0, 255)
+LIGHT_BLUE = (128, 128, 255)
+
+# magenta
+DARK_MAGENTA  = (128,   0, 128)
+MAGENTA       = (255,   0, 255)
+LIGHT_MAGENTA = (255, 128, 255)
+
+LIGHTER = {BLACK: DARK_GREY,                               WHITE: WHITE,
+       DARK_GREY: GREY,       GREY: LIGHT_GREY,       LIGHT_GREY: WHITE,
+        DARK_RED: RED,         RED: LIGHT_RED,         LIGHT_RED: WHITE,
+     DARK_YELLOW: YELLOW,   YELLOW: LIGHT_YELLOW,   LIGHT_YELLOW: WHITE,
+      DARK_GREEN: GREEN,     GREEN: LIGHT_GREEN,     LIGHT_GREEN: WHITE,
+       DARK_CYAN: CYAN,       CYAN: LIGHT_CYAN,       LIGHT_CYAN: WHITE,
+       DARK_BLUE: BLUE,       BLUE: LIGHT_BLUE,       LIGHT_BLUE: WHITE,
+    DARK_MAGENTA: MAGENTA, MAGENTA: LIGHT_MAGENTA, LIGHT_MAGENTA: WHITE,
+}
+
+DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
+       LIGHT_GREY: GREY,       GREY: DARK_GREY,       DARK_GREY: BLACK,
+        LIGHT_RED: RED,         RED: DARK_RED,         DARK_RED: BLACK,
+     LIGHT_YELLOW: YELLOW,   YELLOW: DARK_YELLOW,   DARK_YELLOW: BLACK,
+      LIGHT_GREEN: GREEN,     GREEN: DARK_GREEN,     DARK_GREEN: BLACK,
+       LIGHT_CYAN: CYAN,       CYAN: DARK_CYAN,       DARK_CYAN: BLACK,
+       LIGHT_BLUE: BLUE,       BLUE: DARK_BLUE,       DARK_BLUE: BLACK,
+    LIGHT_MAGENTA: MAGENTA, MAGENTA: DARK_MAGENTA, DARK_MAGENTA: BLACK,
+}
 

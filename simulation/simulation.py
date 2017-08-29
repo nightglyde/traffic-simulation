@@ -14,8 +14,6 @@ CAR_COLOURS = {"RED": RED,  "YEL": YELLOW, "GRN": GREEN,
 WAYPOINT_OUTER = SCREEN_UNIT * 5      # 50
 WAYPOINT_INNER = SCREEN_UNIT * 9 // 2 # 45
 
-print(WAYPOINT_OUTER, WAYPOINT_INNER)
-
 def drawBackground(screen, controller):
     colour          = controller.colour
     darker_colour   = DARKER[colour]
@@ -106,6 +104,8 @@ controllers = []
 num_cars    = 0
 
 for colour_name in CAR_COLOURS:
+    print(colour_name, end=" ")
+
     # create car
     pos, angle = generateRandomWorldPosition()
     car = Car(colour_name, pos, angle, time)
@@ -119,6 +119,8 @@ for colour_name in CAR_COLOURS:
     num_cars += 1
     if num_cars == MAX_CARS:
         break
+
+print()
 
 # update car models
 time = pygame.time.get_ticks()
