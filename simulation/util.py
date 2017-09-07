@@ -1,5 +1,10 @@
 import math
 import random
+import pygame
+
+from collections import deque
+
+FRAMES_PER_SECOND = 120
 
 SCREEN_UNIT = 10
 WORLD_UNIT  = 0.45
@@ -9,21 +14,36 @@ PIXELS_PER_METRE = SCREEN_UNIT / WORLD_UNIT
 SCREEN_WIDTH  = 1200
 SCREEN_HEIGHT = 800
 
-SCREEN_CAR_LENGTH  = SCREEN_UNIT * 10 # 100
-SCREEN_CAR_WIDTH   = SCREEN_UNIT * 4  # 40
-SCREEN_AXLE_LENGTH = SCREEN_UNIT * 6  # 60
-SCREEN_AXLE_WIDTH  = SCREEN_UNIT * 3  # 30
-
 WORLD_WIDTH  = SCREEN_WIDTH  / PIXELS_PER_METRE
 WORLD_HEIGHT = SCREEN_HEIGHT / PIXELS_PER_METRE
+
+SCREEN_CAR_LENGTH  = SCREEN_UNIT * 10
+SCREEN_CAR_WIDTH   = SCREEN_UNIT * 4
+SCREEN_AXLE_LENGTH = SCREEN_UNIT * 6
+SCREEN_AXLE_WIDTH  = SCREEN_UNIT * 4
+
+SCREEN_WHEEL_LENGTH = SCREEN_UNIT * 2
+SCREEN_WHEEL_WIDTH  = SCREEN_UNIT * 0.5
+
+ARROW_LENGTH      = SCREEN_UNIT * 4
+ARROW_WIDTH       = SCREEN_UNIT * 2
+ARROW_STEM_LENGTH = SCREEN_UNIT * 3
+ARROW_STEM_WIDTH  = SCREEN_UNIT * 1
+
+WAYPOINT_OUTER = SCREEN_UNIT * 5
+WAYPOINT_INNER = SCREEN_UNIT * 9 // 2
+
+LEFT   = -1
+RIGHT  = 1
+CENTRE = 0
 
 class Vector:
     def __init__(self, x, y):
         self.x = x
         self.y = y
 
-    def right90(self):
-        return Vector(-self.y, self.x)
+    def left90(self):
+        return Vector(self.y, -self.x)
 
     def coords(self):
         return [round(self.x), round(self.y)]
@@ -49,8 +69,17 @@ class Vector:
 def getVector(angle):
     return Vector(math.cos(angle.value), math.sin(angle.value))
 
-CENTRE_POSITION = Vector(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-VECTOR_0        = Vector(0, 0)
+VECTOR_0 = Vector(0, 0)
+
+SCREEN_LEFT         = Vector(0,              SCREEN_HEIGHT/2)
+SCREEN_RIGHT        = Vector(SCREEN_WIDTH,   SCREEN_HEIGHT/2)
+SCREEN_TOP          = Vector(SCREEN_WIDTH/2, 0)
+SCREEN_BOTTOM       = Vector(SCREEN_WIDTH/2, SCREEN_HEIGHT)
+SCREEN_CENTRE       = Vector(SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
+SCREEN_TOP_LEFT     = Vector(0,              0)
+SCREEN_TOP_RIGHT    = Vector(SCREEN_WIDTH,   0)
+SCREEN_BOTTOM_LEFT  = Vector(0,              SCREEN_HEIGHT)
+SCREEN_BOTTOM_RIGHT = Vector(SCREEN_WIDTH,   SCREEN_HEIGHT)
 
 class Angle:
     def __init__(self, value):
@@ -90,6 +119,22 @@ class Angle:
     def __repr__(self):
         return repr(math.degrees(self.value))
 
+def getAngle(vector):
+    x = vector.x
+
+    if x == 0:
+        angle = math.pi / 2
+    else:
+        angle = math.atan(vector.y / x)
+
+    if x < 0:
+        angle += math.pi
+
+    return Angle(angle)
+
+def getMagnitude(vector):
+    return math.sqrt(vector.x**2 + vector.y**2)
+
 def getPolar(vector):
     x = vector.x
     y = vector.y
@@ -106,13 +151,26 @@ def getPolar(vector):
 
     return Angle(angle), magnitude
 
-ANGLE_0   = Angle(0)
-ANGLE_15  = Angle(math.pi/12)
-ANGLE_30  = Angle(math.pi/6)
-ANGLE_45  = Angle(math.pi/4)
-ANGLE_60  = Angle(math.pi/3)
-ANGLE_90  = Angle(math.pi/2)
-ANGLE_120 = Angle(math.pi*2/3)
+ANGLE_0   = Angle(math.radians(0))
+ANGLE_5   = Angle(math.radians(5))
+ANGLE_10  = Angle(math.radians(10))
+ANGLE_15  = Angle(math.radians(15))
+ANGLE_20  = Angle(math.radians(20))
+ANGLE_25  = Angle(math.radians(25))
+ANGLE_30  = Angle(math.radians(30))
+ANGLE_35  = Angle(math.radians(35))
+ANGLE_40  = Angle(math.radians(40))
+ANGLE_45  = Angle(math.radians(45))
+ANGLE_50  = Angle(math.radians(50))
+ANGLE_55  = Angle(math.radians(55))
+ANGLE_60  = Angle(math.radians(60))
+ANGLE_65  = Angle(math.radians(65))
+ANGLE_70  = Angle(math.radians(70))
+ANGLE_75  = Angle(math.radians(75))
+ANGLE_80  = Angle(math.radians(80))
+ANGLE_85  = Angle(math.radians(85))
+ANGLE_90  = Angle(math.radians(90))
+ANGLE_120 = Angle(math.radians(120))
 
 def generateRandomWorldPosition():
     x = random.random() * WORLD_WIDTH
@@ -177,4 +235,7 @@ DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
        LIGHT_BLUE: BLUE,       BLUE: DARK_BLUE,       DARK_BLUE: BLACK,
     LIGHT_MAGENTA: MAGENTA, MAGENTA: DARK_MAGENTA, DARK_MAGENTA: BLACK,
 }
+
+def sign(n):
+    return (n > 0) - (n < 0)
 

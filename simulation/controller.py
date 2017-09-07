@@ -1,32 +1,30 @@
-import math
-import random
-
-from collections import deque
-
 from util import *
 
-ESTIMATED_LOWER_LIMIT = -ANGLE_45
-ESTIMATED_UPPER_LIMIT = ANGLE_45
+#TODO - gravitational approach to steering
 
-SLOW_SPEED = 10 * PIXELS_PER_METRE
+ESTIMATED_ANGLE  = ANGLE_45
+ESTIMATED_RADIUS = SCREEN_UNIT * 6 / math.sin(ESTIMATED_ANGLE.value)# 12 #17 // 2
 
-WAYPOINT_BIG_GAP   = SCREEN_UNIT * 25 # 250
-WAYPOINT_INTERVAL  = SCREEN_UNIT * 17 # 170
-WAYPOINT_THRESHOLD = SCREEN_UNIT * 1  # 10
+WAYPOINT_BIG_GAP   = ESTIMATED_RADIUS * 5#SCREEN_UNIT * 36
+WAYPOINT_INTERVAL  = ESTIMATED_RADIUS * 4#SCREEN_UNIT * 24
+WAYPOINT_THRESHOLD = SCREEN_UNIT * 5
 
-SCREEN_MARGIN = SCREEN_UNIT * 5 # 50
+SCREEN_MARGIN = SCREEN_UNIT * 5
 
 W_MIN_X = SCREEN_MARGIN
 W_MIN_Y = SCREEN_MARGIN
 W_MAX_X = SCREEN_WIDTH  - SCREEN_MARGIN
 W_MAX_Y = SCREEN_HEIGHT - SCREEN_MARGIN
 
+SLOW_SPEED = 10 * PIXELS_PER_METRE
+
 MAX_WAYPOINTS      = 100
 STARTING_WAYPOINTS = 3
 
 class CarController:
-    def __init__(self, name, colour):
+    def __init__(self, name, screen, colour):
         self.name   = name
+        self.screen = screen
         self.colour = colour
 
         self.position  = None # pixels
@@ -130,24 +128,24 @@ class CarController:
 
         self.projected_position = self.position + displacement
 
-    def plotAngle(self, angle):
-        radius = SCREEN_AXLE_LENGTH / math.sin(angle.value)
-
-        centre_vector = getVector(self.car_angle + ANGLE_90) * radius
+    def getTurningCircle(self, direction):
+        if direction == LEFT:
+            centre_vector = getVector(self.car_angle - ANGLE_90) * ESTIMATED_RADIUS
+        else:
+            centre_vector = getVector(self.car_angle + ANGLE_90) * ESTIMATED_RADIUS
         circle_centre = self.position + centre_vector
-
-        return circle_centre, radius
+        return circle_centre, ESTIMATED_RADIUS
 
     def control(self):
         engine_control   = 0
-        steering_control = 0
+        steering_control = CENTRE
         braking_control  = None
 
         while self.waypoints:
-            destination, w_angle = self.waypoints[0]
+            destination, angle = self.waypoints[0]
 
-            angle, magnitude = getPolar(destination - self.position)
-            if magnitude < WAYPOINT_THRESHOLD:
+            now_angle, now_magnitude = getPolar(destination - self.position)
+            if now_magnitude < WAYPOINT_THRESHOLD:
 
                 if self.points + len(self.waypoints) < MAX_WAYPOINTS:
                     self.addRandomWaypoint()
@@ -167,30 +165,35 @@ class CarController:
             elif self.projected_speed < SLOW_SPEED:
                 engine_control  = 1
 
+            # seek mouse (temporary)
+            #destination = Vector(*pygame.mouse.get_pos())
+
             angle, magnitude = getPolar(destination - self.projected_position)
             angle_difference = self.projected_angle - angle
+
+            focus_angle = Angle(math.atan(WAYPOINT_THRESHOLD/4/now_magnitude))
 
             if angle_difference > ANGLE_0: # left turn
 
                 # test if point is too close
-                circle_centre, radius = self.plotAngle(ESTIMATED_LOWER_LIMIT)
+                circle_centre, radius = self.getTurningCircle(LEFT)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
                 if distance_from_circle < abs(radius):
-                    steering_control = 1
+                    steering_control = RIGHT
 
-                else:
-                    steering_control = -1
+                elif angle_difference > focus_angle:
+                    steering_control = LEFT
 
             elif angle_difference < ANGLE_0: # right turn
 
                 # test if point is too close
-                circle_centre, radius = self.plotAngle(ESTIMATED_UPPER_LIMIT)
+                circle_centre, radius = self.getTurningCircle(RIGHT)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
                 if distance_from_circle < abs(radius):
-                    steering_control = -1
+                    steering_control = LEFT
 
-                else:
-                    steering_control = 1
+                elif angle_difference < -focus_angle:
+                    steering_control = RIGHT
 
             braking_control = False
             break
@@ -202,4 +205,71 @@ class CarController:
             braking_control  = True
 
         return engine_control, steering_control, braking_control
+
+    def draw(self):
+        colour         = self.colour
+        darker_colour  = DARKER[colour]
+        lighter_colour = LIGHTER[colour]
+
+        prev = self.position
+        for waypoint in self.waypoints:
+            pos, angle = waypoint
+            pygame.draw.line(self.screen, darker_colour, pos.coords(), prev.coords(), 1)
+            prev = pos
+
+        for waypoint in self.waypoints:
+            pos, angle = waypoint
+
+            centre = pos.coords()
+            pygame.draw.circle(self.screen, colour,         centre, WAYPOINT_OUTER)
+            pygame.draw.circle(self.screen, lighter_colour, centre, WAYPOINT_INNER)
+            pygame.draw.circle(self.screen, darker_colour,  centre, WAYPOINT_OUTER, 1)
+            pygame.draw.circle(self.screen, darker_colour,  centre, WAYPOINT_INNER, 1)
+
+            front = pos + getVector(angle)             * WAYPOINT_INNER
+            right = pos + getVector(angle + ANGLE_120) * WAYPOINT_INNER
+            left  = pos + getVector(angle - ANGLE_120) * WAYPOINT_INNER
+
+            arrow = [pos.coords(),   right.coords(),
+                     front.coords(), left.coords()]
+            pygame.draw.polygon(self.screen, colour, arrow)
+            pygame.draw.polygon(self.screen, darker_colour, arrow, 1)
+
+        #circle_centre, radius = self.getTurningCircle(LEFT)
+        #pygame.draw.circle(self.screen, DARK_GREY, circle_centre.coords(), radius, 1)
+
+        #circle_centre, radius = self.getTurningCircle(RIGHT)
+        #pygame.draw.circle(self.screen, DARK_GREY, circle_centre.coords(), radius, 1)
+
+    def drawCar(self):
+        pos = self.position
+
+        forward = getVector(self.car_angle)
+        left    = forward.left90()
+
+        # draw car
+        car_front = forward * SCREEN_CAR_LENGTH / 2
+        car_left  = left   * SCREEN_CAR_WIDTH / 2
+
+        chassis = [(pos + car_front + car_left).coords(),
+                   (pos + car_front - car_left).coords(),
+                   (pos - car_front - car_left).coords(),
+                   (pos - car_front + car_left).coords()]
+        pygame.draw.polygon(self.screen, self.colour, chassis)
+        pygame.draw.polygon(self.screen, BLACK, chassis, 2)
+
+        # draw arrow
+        stem_front = forward * ARROW_STEM_LENGTH
+        stem_left  = left    * ARROW_STEM_WIDTH / 2
+        head_front = forward * ARROW_LENGTH
+        head_left  = left    * ARROW_WIDTH / 2
+
+        arrow = [(pos              + stem_left).coords(),
+                 (pos + stem_front + stem_left).coords(),
+                 (pos + stem_front + head_left).coords(),
+                 (pos + head_front             ).coords(),
+                 (pos + stem_front - head_left).coords(),
+                 (pos + stem_front - stem_left).coords(),
+                 (pos              - stem_left).coords()]
+        pygame.draw.polygon(self.screen, BLACK, arrow, 1)
 
