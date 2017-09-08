@@ -1,11 +1,11 @@
 import pygame
 
 from util import *
-from working_car import Car
+from car import Car
 from controller import CarController
 
 INCLUDE_CAPTION   = True
-MAX_CARS          = 3
+MAX_CARS          = 6
 
 CAR_COLOURS = {"RED": RED,  "YEL": YELLOW, "GRN": GREEN,
                "CYA": CYAN, "BLU": BLUE,   "MAG": MAGENTA}
@@ -32,9 +32,6 @@ for colour_name in CAR_COLOURS:
 
     # create car
     pos, angle = generateRandomWorldPosition()
-    #pos   = CENTRE_POSITION / PIXELS_PER_METRE
-    #angle = ANGLE_0
-    #angle = Angle(random.random()*2*math.pi)
     car = Car(colour_name, screen, colour, pos, angle, time)
     cars.append(car)
 
@@ -54,13 +51,13 @@ time = pygame.time.get_ticks()
 
 updates = []
 for i in range(num_cars):
-    position, car_angle = cars[i].update(time)
+    position, angle = cars[i].update(time)
     position *= PIXELS_PER_METRE
-    updates.append((position, car_angle))
+    updates.append((position, angle))
 
 for i in range(num_cars):
-    position, car_angle = updates[i]
-    controllers[i].firstUpdate(position, car_angle, time)
+    position, angle = updates[i]
+    controllers[i].firstUpdate(position, angle, time)
 
 # set up for FPS
 if INCLUDE_CAPTION:
@@ -118,13 +115,22 @@ while not done:
 
     updates = []
     for i in range(num_cars):
-        position, car_angle = cars[i].update(time)
+        position, angle = cars[i].update(time)
         position *= PIXELS_PER_METRE
-        updates.append((position, car_angle))
+        updates.append((position, angle))
 
     for i in range(num_cars):
-        position, car_angle = updates[i]
-        controllers[i].update(position, car_angle, time)
+        position, angle = updates[i]
+        controllers[i].update(position, angle, time)
+
+    # check for crashes
+    for i in range(num_cars):
+        for j in range(i+1, num_cars):
+            if controllers[i].checkCollision(controllers[j]):
+                controllers[i].stop()
+                controllers[j].stop()
+                cars[i].stop()
+                cars[j].stop()
 
     # send controller instructions to cars
     controls = []

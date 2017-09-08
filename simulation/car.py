@@ -38,7 +38,7 @@ STEERING_RATE = 1
 SHOW_WHEELS = True
 
 class Car:
-    def __init__(self, name, screen, colour, position, car_angle, time):
+    def __init__(self, name, screen, colour, position, angle, time):
         self.name   = name
         self.screen = screen
         self.colour = colour
@@ -48,16 +48,21 @@ class Car:
         self.acceleration = VECTOR_0         # metres per second^2
         self.engine_force = MIN_ENGINE_FORCE # newtons
 
-        self.car_angle        = car_angle # radians
-        self.angular_velocity = 0.0       # radians per second
-        self.wheel_angle      = ANGLE_0   # radians
+        self.angle            = angle   # radians
+        self.angular_velocity = 0.0     # radians per second
+        self.wheel_angle      = ANGLE_0 # radians
 
         self.braking = False
+
+        self.stopped = False
 
         self.control_time = time
         self.update_time  = time
 
     def update(self, time):
+        if self.stopped:
+            return self.position, self.angle
+
         dt               = (time - self.update_time) / 1000
         self.update_time = time
 
@@ -70,15 +75,15 @@ class Car:
             radius                = AXLE_LENGTH / math.sin(self.wheel_angle.value)
             self.angular_velocity = speed / radius
 
-            self.car_angle += Angle(self.angular_velocity * dt)
+            self.angle += Angle(self.angular_velocity * dt)
 
-        heading        = getVector(self.car_angle)
-        self.velocity  = heading * speed
+        heading       = getVector(self.angle)
+        self.velocity = heading * speed
 
         force = VECTOR_0
 
         angle, magnitude = getPolar(self.acceleration)
-        a_car = magnitude * math.cos(abs((angle - self.car_angle).value))
+        a_car = magnitude * math.cos(abs((angle - self.angle).value))
 
         front_weight = STATIC_FRONT_WEIGHT - HLM * a_car
         rear_weight  = STATIC_REAR_WEIGHT  + HLM * a_car
@@ -105,11 +110,12 @@ class Car:
         self.velocity     += self.acceleration  * dt
         self.position     += self.velocity * dt
 
-        print(self.engine_force, speed)
-
-        return self.position, self.car_angle
+        return self.position, self.angle
 
     def control(self, engine_control, steering_control, braking_control, time):
+        if self.stopped:
+            return
+
         dt                = (time - self.control_time) / 1000
         self.control_time = time
 
@@ -143,10 +149,13 @@ class Car:
         else:
             self.braking = False
 
+    def stop(self):
+        self.stopped = True
+
     def draw(self):
         pos = self.position * PIXELS_PER_METRE
 
-        forward = getVector(self.car_angle)
+        forward = getVector(self.angle)
         left    = forward.left90()
 
         # draw car
@@ -157,8 +166,12 @@ class Car:
                    (pos + car_front - car_left).coords(),
                    (pos - car_front - car_left).coords(),
                    (pos - car_front + car_left).coords()]
-        pygame.draw.polygon(self.screen, self.colour, chassis)
-        pygame.draw.polygon(self.screen, BLACK,       chassis, 1)
+
+        if self.stopped:
+            pygame.draw.polygon(self.screen, DARKER[self.colour], chassis)
+        else:
+            pygame.draw.polygon(self.screen, self.colour, chassis)
+        pygame.draw.polygon(self.screen, BLACK, chassis, 1)
 
         # draw arrow
         stem_front = forward * ARROW_STEM_LENGTH
@@ -177,7 +190,7 @@ class Car:
 
         if SHOW_WHEELS:
             # draw wheels
-            wheel_forward = getVector(self.car_angle + self.wheel_angle)
+            wheel_forward = getVector(self.angle + self.wheel_angle)
 
             f_wheel_front = wheel_forward          * SCREEN_WHEEL_LENGTH / 2
             f_wheel_left  = wheel_forward.left90() * SCREEN_WHEEL_WIDTH  / 2
@@ -227,7 +240,7 @@ class Car:
         #if self.wheel_angle.value != 0.0:
         #    radius = AXLE_LENGTH / math.sin(self.wheel_angle.value) * PIXELS_PER_METRE
 
-        #    centre_vector = getVector(self.car_angle + ANGLE_90) * radius
+        #    centre_vector = getVector(self.angle + ANGLE_90) * radius
         #    circle_centre = (pos + centre_vector).coords()
         #    radius = abs(round(radius))
 

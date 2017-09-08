@@ -1,11 +1,11 @@
 import pygame
 
 from util import *
-from car import Car
+from working_car import Car
 from controller import CarController
 
 INCLUDE_CAPTION   = True
-MAX_CARS          = 1
+MAX_CARS          = 3
 
 CAR_COLOURS = {"RED": RED,  "YEL": YELLOW, "GRN": GREEN,
                "CYA": CYAN, "BLU": BLUE,   "MAG": MAGENTA}
@@ -31,9 +31,9 @@ for colour_name in CAR_COLOURS:
     colour = CAR_COLOURS[colour_name]
 
     # create car
-    #pos, angle = generateRandomWorldPosition()
-    pos   = SCREEN_LEFT / PIXELS_PER_METRE
-    angle = ANGLE_0
+    pos, angle = generateRandomWorldPosition()
+    #pos   = CENTRE_POSITION / PIXELS_PER_METRE
+    #angle = ANGLE_0
     #angle = Angle(random.random()*2*math.pi)
     car = Car(colour_name, screen, colour, pos, angle, time)
     cars.append(car)
