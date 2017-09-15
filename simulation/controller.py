@@ -1,21 +1,6 @@
 from util import *
 
-ESTIMATED_ANGLE  = ANGLE_45
-ESTIMATED_RADIUS = AXLE_LENGTH / math.sin(ESTIMATED_ANGLE.value)
-
-WAYPOINT_BIG_GAP   = ESTIMATED_RADIUS * 5
-WAYPOINT_INTERVAL  = ESTIMATED_RADIUS * 4
-
-DESIRED_SPEED = 10
-
-MAX_WAYPOINTS      = 100
-STARTING_WAYPOINTS = 10
-
-class Waypoint:
-    def __init__(self, position, angle):
-        self.position = position
-        self.angle    = angle
-        self.time     = None
+DESIRED_SPEED = 15
 
 class CarController:
     def __init__(self, name, colour, screen, zoom):
@@ -63,7 +48,7 @@ class CarController:
         else:
             prev = self
 
-        pos, angle = generateRandomWorldPosition(prev.position)
+        pos, angle = generateRandomWaypointPosition(prev.position)
 
         if self.waypoints:
             diff = angle - prev.angle
@@ -107,9 +92,14 @@ class CarController:
                      pos - car_front - car_left,
                      pos + car_front - car_left]
 
-    def stop(self):
-        self.stopped = True
-        self.waypoints.clear()
+    def stop(self, other):
+        if not self.stopped:
+            self.stopped = True
+            self.waypoints.clear()
+            self.duration = (self.time - self.start_time) / 1000
+
+            print(self.name, "crashed into", other.name,
+                  "at time", self.duration)
 
     def checkCollision(self, other):
         num_points_self  = len(self.hull)
@@ -135,14 +125,6 @@ class CarController:
             else:
                 return False
 
-        if not self.stopped:
-            print(self.name, "crashed into", other.name)
-
-        elif not other.stopped:
-            print(other.name, "crashed into", self.name)
-
-        self.stop()
-        other.stop()
         return True
 
     def firstUpdate(self, position, angle, time):
@@ -188,9 +170,9 @@ class CarController:
 
     def getTurningCircle(self, direction, position, angle):
         if direction == LEFT:
-            centre_vector = getVector(angle - ANGLE_90) * ESTIMATED_RADIUS
+            centre_vector = getVector(angle - ANGLE_90) * TURNING_RADIUS
         else:
-            centre_vector = getVector(angle + ANGLE_90) * ESTIMATED_RADIUS
+            centre_vector = getVector(angle + ANGLE_90) * TURNING_RADIUS
         circle_centre = position + centre_vector
         return circle_centre
 
@@ -218,7 +200,7 @@ class CarController:
                 self.duration = (self.time - self.start_time) / 1000
 
                 if self.points == MAX_WAYPOINTS:
-                    print(self.name, self.duration)
+                    print(self.name, "finished at time", self.duration)
 
                 continue
 
@@ -230,12 +212,13 @@ class CarController:
 
             angle, magnitude = getPolar(destination - self.projected_position)
             angle_difference = angle - self.projected_angle
+
             if angle_difference < ANGLE_0: # left turn
 
                 # test if point is too close
                 circle_centre = self.getTurningCircle(LEFT, self.position, self.angle)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
-                if distance_from_circle < ESTIMATED_RADIUS - WAYPOINT_THRESHOLD:
+                if distance_from_circle < TURNING_RADIUS - WAYPOINT_THRESHOLD:
                     steering_control = RIGHT
 
                 else:
@@ -246,7 +229,7 @@ class CarController:
                 # test if point is too close
                 circle_centre = self.getTurningCircle(RIGHT, self.position, self.angle)
                 angle, distance_from_circle = getPolar(destination - circle_centre)
-                if distance_from_circle < ESTIMATED_RADIUS - WAYPOINT_THRESHOLD:
+                if distance_from_circle < TURNING_RADIUS - WAYPOINT_THRESHOLD:
                     steering_control = LEFT
 
                 else:

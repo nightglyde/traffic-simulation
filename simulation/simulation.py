@@ -1,5 +1,3 @@
-import pygame
-
 from util import *
 from car import Car
 from controller import CarController
@@ -8,7 +6,7 @@ SCREEN_WIDTH      = 1200
 SCREEN_HEIGHT     = 800
 FRAMES_PER_SECOND = 60
 INCLUDE_CAPTION   = True
-MAX_CARS          = 12
+MAX_CARS          = 100
 
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
@@ -35,7 +33,9 @@ for colour_name in CAR_COLOURS:
     colour = CAR_COLOURS[colour_name]
 
     # create car
-    pos, angle = generateRandomWorldPosition(WORLD_CENTRE)
+    pos, angle = generateRandomWaypointPosition(WORLD_CENTRE)
+    angle = Angle(random.random()*2*math.pi)
+
     car = Car(colour_name, colour, screen, zoom, pos, angle, time)
     cars.append(car)
 
@@ -168,8 +168,12 @@ while not done:
 
         # check for crashes
         for i in range(num_cars):
+            controller_i = controllers[i]
             for j in range(i+1, num_cars):
-                if controllers[i].checkCollision(controllers[j]):
+                controller_j = controllers[j]
+                if controller_i.checkCollision(controller_j):
+                    controller_i.stop(controller_j)
+                    controller_j.stop(controller_i)
                     cars[i].stop()
                     cars[j].stop()
 
