@@ -7,6 +7,9 @@ from collections import deque
 SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
+WORLD_WIDTH  = 50 # metres
+WORLD_HEIGHT = 50
+
 CAR_LENGTH  = 4.5 # metres
 CAR_WIDTH   = 1.8
 AXLE_LENGTH = 2.7
@@ -106,6 +109,12 @@ class Angle:
     def __neg__(self):
         return Angle(-self.value)
 
+    def __abs__(self):
+        if self.value < 0:
+            return self.value + math.pi*2
+
+        return self.value
+
     def __lt__(self, other):
         return self.value < other.value
 
@@ -167,13 +176,11 @@ ANGLE_80  = Angle(math.radians(80))
 ANGLE_85  = Angle(math.radians(85))
 ANGLE_90  = Angle(math.radians(90))
 ANGLE_120 = Angle(math.radians(120))
+ANGLE_180 = Angle(math.radians(180))
 
 #########
 # WORLD #
 #########
-
-WORLD_WIDTH  = 120 # metres
-WORLD_HEIGHT = 80
 
 WORLD_MIN_X = 0
 WORLD_MIN_Y = 0
@@ -216,16 +223,19 @@ def checkWorldBoundary(point):
 #############
 
 ESTIMATED_ANGLE = ANGLE_45
-TURNING_RADIUS  = AXLE_LENGTH / math.sin(ESTIMATED_ANGLE.value)
+TURN_RADIUS     = AXLE_LENGTH / math.sin(ESTIMATED_ANGLE.value)
+
+MAX_WAYPOINTS      = 100
+STARTING_WAYPOINTS = 3
 
 WAYPOINT_OUTER     = 2.5
 WAYPOINT_INNER     = 2.25
-WAYPOINT_THRESHOLD = 1
+WAYPOINT_THRESHOLD = 0.5
 
-WORLD_MARGIN = WAYPOINT_OUTER + TURNING_RADIUS
+WORLD_MARGIN = WAYPOINT_OUTER + TURN_RADIUS
 
-WAYPOINT_INTERVAL = TURNING_RADIUS * 3
-WAYPOINT_BIG_GAP  = TURNING_RADIUS * 4
+WAYPOINT_INTERVAL = TURN_RADIUS * 3
+WAYPOINT_BIG_GAP  = TURN_RADIUS * 4
 
 WAYPOINT_MIN_X = WORLD_MIN_X + WORLD_MARGIN
 WAYPOINT_MIN_Y = WORLD_MIN_Y + WORLD_MARGIN
@@ -247,21 +257,28 @@ def checkWaypointBoundary(point):
 
     return True
 
-def generateRandomWaypointPosition(prev):
+def generateRandomWaypointPosition():
     x = WAYPOINT_MIN_X + random.random()*(WAYPOINT_MAX_X - WAYPOINT_MIN_X)
     y = WAYPOINT_MIN_Y + random.random()*(WAYPOINT_MAX_Y - WAYPOINT_MIN_Y)
-    pos = Vector(x, y)
-    angle = getAngle(pos - prev)
-    return pos, angle
-
-MAX_WAYPOINTS      = 100
-STARTING_WAYPOINTS = 5
+    return Vector(x, y)
 
 class Waypoint:
-    def __init__(self, position, angle):
+    def __init__(self, position, angle, time, turn, arcs, tans):
         self.position = position
         self.angle    = angle
-        self.time     = None
+        self.time     = time
+
+        self.turn = turn
+        self.arcs = arcs
+        self.tans = tans
+
+    def update(self, angle, time, turn, arcs, tans):
+        self.angle = angle
+        self.time  = time
+
+        self.turn = turn
+        self.arcs = arcs
+        self.tans = tans
 
 ################
 # PAN AND ZOOM #
@@ -269,7 +286,7 @@ class Waypoint:
 
 SCALE_START  = min(SCREEN_HEIGHT / WORLD_HEIGHT * 0.9,
                    SCREEN_WIDTH  / WORLD_WIDTH  * 0.9)
-SCALE_CHANGE = 1.5
+SCALE_CHANGE = 1.25
 
 SCALE_MIN = min(SCREEN_HEIGHT / WORLD_HEIGHT * 0.4,
                 SCREEN_WIDTH  / WORLD_WIDTH  * 0.4)
@@ -446,11 +463,12 @@ DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
 # MISCELLANEOUS #
 #################
 
-def generateRect(circle_centre, radius):
-    left  = round(circle_centre.x - radius)
-    top   = round(circle_centre.y - radius)
-    width = round(radius * 2)
-    return [left, top, width, width]
+def generateRect(circle_centre, radius, zoom):
+    top_left = zoom.getDrawable(circle_centre - Vector(radius, radius))
+
+    top, left = top_left
+    width = zoom.scaleDistance(radius) * 2
+    return [top, left, width, width]
 
 def sign(n):
     return (n > 0) - (n < 0)

@@ -6,7 +6,7 @@ SCREEN_WIDTH      = 1200
 SCREEN_HEIGHT     = 800
 FRAMES_PER_SECOND = 60
 INCLUDE_CAPTION   = True
-MAX_CARS          = 100
+MAX_CARS          = 1
 
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
@@ -33,7 +33,7 @@ for colour_name in CAR_COLOURS:
     colour = CAR_COLOURS[colour_name]
 
     # create car
-    pos, angle = generateRandomWaypointPosition(WORLD_CENTRE)
+    pos = generateRandomWaypointPosition()
     angle = Angle(random.random()*2*math.pi)
 
     car = Car(colour_name, colour, screen, zoom, pos, angle, time)
@@ -196,6 +196,9 @@ while not done:
 
     for controller in controllers:
         controller.draw()
+
+    #for controller in controllers:
+    #    controller.drawCar()
 
     for car in cars:
         car.draw()
