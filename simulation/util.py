@@ -4,23 +4,24 @@ import pygame
 
 from collections import deque
 
-SCREEN_WIDTH  = 1200 # pixels
+SCREEN_WIDTH  = 800#1200 # pixels
 SCREEN_HEIGHT = 800
 
-WORLD_WIDTH  = 50 # metres
-WORLD_HEIGHT = 50
+WORLD_WIDTH  = 100 # metres
+WORLD_HEIGHT = 100 # must be at least 30
 
-CAR_LENGTH  = 4.5 # metres
-CAR_WIDTH   = 1.8
-AXLE_LENGTH = 2.7
-AXLE_WIDTH  = 1.8
+ROAD_WIDTH = 3.5
 
+CAR_LENGTH   = 4.5
+CAR_WIDTH    = 1.8
 WHEEL_LENGTH = 0.9
 WHEEL_WIDTH  = 0.225
+AXLE_LENGTH  = 2.7
+AXLE_WIDTH   = CAR_WIDTH - WHEEL_WIDTH#1.8
 
-ARROW_LENGTH      = 1.8
+ARROW_LENGTH      = 2.25#1.35#0.9#1.8
 ARROW_WIDTH       = 0.9
-ARROW_STEM_LENGTH = 1.35
+ARROW_STEM_LENGTH = 0.675#1.8#2.7#1.35
 ARROW_STEM_WIDTH  = 0.45
 
 LEFT   = -1
@@ -57,6 +58,9 @@ class Vector:
     def __floordiv__(self, scalar):
         return Vector(self.x // scalar, self.y // scalar)
 
+    def __lt__(self, other):
+        return (self.x, self.y) < (other.x, other.y)
+
     def __neg__(self):
         return Vector(-self.x, -self.y)
 
@@ -66,7 +70,8 @@ class Vector:
 def getVector(angle):
     return Vector(math.cos(angle.value), math.sin(angle.value))
 
-VECTOR_0 = Vector(0, 0)
+VECTOR_0      = Vector(0, 0)
+SCREEN_CENTRE = Vector(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
 
 #########
 # ANGLE #
@@ -178,183 +183,8 @@ ANGLE_90  = Angle(math.radians(90))
 ANGLE_120 = Angle(math.radians(120))
 ANGLE_180 = Angle(math.radians(180))
 
-#########
-# WORLD #
-#########
-
-WORLD_MIN_X = 0
-WORLD_MIN_Y = 0
-WORLD_MAX_X = WORLD_WIDTH
-WORLD_MAX_Y = WORLD_HEIGHT
-WORLD_MID_X = (WORLD_MIN_X + WORLD_MAX_X) / 2
-WORLD_MID_Y = (WORLD_MIN_Y + WORLD_MAX_Y) / 2
-
-WORLD_CENTRE = Vector(WORLD_MID_X, WORLD_MID_Y)
-WORLD_TOP    = Vector(WORLD_MID_X, WORLD_MIN_Y)
-WORLD_BOTTOM = Vector(WORLD_MID_X, WORLD_MAX_Y)
-WORLD_LEFT   = Vector(WORLD_MIN_X, WORLD_MID_Y)
-WORLD_RIGHT  = Vector(WORLD_MAX_X, WORLD_MID_Y)
-
-WORLD_TOP_LEFT     = Vector(WORLD_MIN_X, WORLD_MIN_Y)
-WORLD_TOP_RIGHT    = Vector(WORLD_MAX_X, WORLD_MIN_Y)
-WORLD_BOTTOM_LEFT  = Vector(WORLD_MIN_X, WORLD_MAX_Y)
-WORLD_BOTTOM_RIGHT = Vector(WORLD_MAX_X, WORLD_MAX_Y)
-
-WORLD_BOX = [WORLD_TOP_LEFT,     WORLD_TOP_RIGHT,
-             WORLD_BOTTOM_RIGHT, WORLD_BOTTOM_LEFT]
-
-def checkWorldBoundary(point):
-    if point.x < WORLD_MIN_X:
-        return False
-
-    if point.x > WORLD_MAX_X:
-        return False
-
-    if point.y < WORLD_MIN_Y:
-        return False
-
-    if point.y > WORLD_MAX_Y:
-        return False
-
-    return True
-
-#############
-# WAYPOINTS #
-#############
-
 ESTIMATED_ANGLE = ANGLE_45
 TURN_RADIUS     = AXLE_LENGTH / math.sin(ESTIMATED_ANGLE.value)
-
-MAX_WAYPOINTS      = 100
-STARTING_WAYPOINTS = 3
-
-WAYPOINT_OUTER     = 2.5
-WAYPOINT_INNER     = 2.25
-WAYPOINT_THRESHOLD = 0.5
-
-WORLD_MARGIN = WAYPOINT_OUTER + TURN_RADIUS
-
-WAYPOINT_INTERVAL = TURN_RADIUS * 3
-WAYPOINT_BIG_GAP  = TURN_RADIUS * 4
-
-WAYPOINT_MIN_X = WORLD_MIN_X + WORLD_MARGIN
-WAYPOINT_MIN_Y = WORLD_MIN_Y + WORLD_MARGIN
-WAYPOINT_MAX_X = WORLD_MAX_X - WORLD_MARGIN
-WAYPOINT_MAX_Y = WORLD_MAX_Y - WORLD_MARGIN
-
-def checkWaypointBoundary(point):
-    if point.x < WAYPOINT_MIN_X:
-        return False
-
-    if point.x > WAYPOINT_MAX_X:
-        return False
-
-    if point.y < WAYPOINT_MIN_Y:
-        return False
-
-    if point.y > WAYPOINT_MAX_Y:
-        return False
-
-    return True
-
-def generateRandomWaypointPosition():
-    x = WAYPOINT_MIN_X + random.random()*(WAYPOINT_MAX_X - WAYPOINT_MIN_X)
-    y = WAYPOINT_MIN_Y + random.random()*(WAYPOINT_MAX_Y - WAYPOINT_MIN_Y)
-    return Vector(x, y)
-
-class Waypoint:
-    def __init__(self, position, angle, time, turn, arcs, tans):
-        self.position = position
-        self.angle    = angle
-        self.time     = time
-
-        self.turn = turn
-        self.arcs = arcs
-        self.tans = tans
-
-    def update(self, angle, time, turn, arcs, tans):
-        self.angle = angle
-        self.time  = time
-
-        self.turn = turn
-        self.arcs = arcs
-        self.tans = tans
-
-################
-# PAN AND ZOOM #
-################
-
-SCALE_START  = min(SCREEN_HEIGHT / WORLD_HEIGHT * 0.9,
-                   SCREEN_WIDTH  / WORLD_WIDTH  * 0.9)
-SCALE_CHANGE = 1.25
-
-SCALE_MIN = min(SCREEN_HEIGHT / WORLD_HEIGHT * 0.4,
-                SCREEN_WIDTH  / WORLD_WIDTH  * 0.4)
-SCALE_MAX = min(SCREEN_HEIGHT / CAR_LENGTH * 0.5,
-                SCREEN_WIDTH  / CAR_LENGTH * 0.5)
-
-OFFSET_START = Vector((SCREEN_WIDTH  / SCALE_START - WORLD_WIDTH)  / 2,
-                      (SCREEN_HEIGHT / SCALE_START - WORLD_HEIGHT) / 2)
-class Zoom:
-    def __init__(self):
-        self.starting_position = None
-        self.starting_offset   = None
-
-        self.offset = OFFSET_START
-        self.scale  = SCALE_START
-
-    def scaleDistance(self, distance):
-        return round(distance * self.scale)
-
-    def getScreenPosition(self, true_position):
-        return (true_position + self.offset) * self.scale
-
-    def getDrawable(self, point):
-        point = self.getScreenPosition(point)
-        return [round(point.x), round(point.y)]
-
-    def getTruePosition(self, screen_position):
-        return screen_position/self.scale - self.offset
-
-    def zoomIn(self, mouse_position):
-        true_mouse_position = self.getTruePosition(mouse_position)
-        if not checkWorldBoundary(true_mouse_position):
-            return
-
-        new_scale = min(self.scale * SCALE_CHANGE, SCALE_MAX)
-
-        self.offset = mouse_position/new_scale - true_mouse_position
-        self.scale  = new_scale
-
-    def zoomOut(self, mouse_position):
-        true_mouse_position = self.getTruePosition(mouse_position)
-        if not checkWorldBoundary(true_mouse_position):
-            return
-
-        new_scale = max(self.scale / SCALE_CHANGE, SCALE_MIN)
-
-        self.offset = mouse_position/new_scale - true_mouse_position
-        self.scale  = new_scale
-
-    def startPan(self, mouse_position):
-        true_mouse_position = self.getTruePosition(mouse_position)
-        if not checkWorldBoundary(true_mouse_position):
-            return False
-
-        self.starting_position = mouse_position
-        self.starting_offset   = self.offset
-        return True
-
-    def updatePan(self, mouse_position):
-        if self.starting_position == None:
-            return
-
-        diff = (mouse_position - self.starting_position) / self.scale
-        self.offset = self.starting_offset + diff
-
-    def stopPan(self):
-        self.starting_position = None
-        self.starting_offset   = None
 
 ###########
 # COLOURS #
@@ -503,4 +333,23 @@ def rightTurn(a, b):
         return 2*math.pi - angle
 
     return angle
+
+predefined_grass = [
+    # outside boundary
+    [Vector( 0,  0), Vector(100,  0), Vector(100,  10), Vector( 0,  10)],
+    [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
+    [Vector(90,  0), Vector(100,  0), Vector(100, 100), Vector(90, 100)],
+    [Vector( 0, 90), Vector(100, 90), Vector(100, 100), Vector( 0, 100)],
+
+    # internal squares
+    [Vector(15, 15), Vector(35, 15), Vector(35, 35), Vector(15, 35)],
+    [Vector(40, 15), Vector(60, 15), Vector(60, 35), Vector(40, 35)],
+    [Vector(65, 15), Vector(85, 15), Vector(85, 35), Vector(65, 35)],
+    [Vector(15, 40), Vector(35, 40), Vector(35, 60), Vector(15, 60)],
+    [Vector(40, 40), Vector(60, 40), Vector(60, 60), Vector(40, 60)],
+    [Vector(65, 40), Vector(85, 40), Vector(85, 60), Vector(65, 60)],
+    [Vector(15, 65), Vector(35, 65), Vector(35, 85), Vector(15, 85)],
+    [Vector(40, 65), Vector(60, 65), Vector(60, 85), Vector(40, 85)],
+    [Vector(65, 65), Vector(85, 65), Vector(85, 85), Vector(65, 85)],
+]
 

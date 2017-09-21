@@ -1,9 +1,7 @@
 from util import *
-from car import Car
-from controller import CarController
 
-SCREEN_WIDTH      = 1200
-SCREEN_HEIGHT     = 800
+from world import World
+
 FRAMES_PER_SECOND = 60
 INCLUDE_CAPTION   = True
 MAX_CARS          = 1
@@ -20,49 +18,28 @@ size   = [SCREEN_WIDTH, SCREEN_HEIGHT]
 screen = pygame.display.set_mode(size)
 clock  = pygame.time.Clock()
 
-zoom = Zoom()
+world = World(screen, WORLD_WIDTH, WORLD_HEIGHT)
+
+# create grass
+for points in predefined_grass:
+    world.addGrass(points)
 
 # create cars
-time = pygame.time.get_ticks()
-
-cars        = []
-controllers = []
-num_cars    = 0
-
+time  = pygame.time.get_ticks()
+count = 0
 for colour_name in CAR_COLOURS:
-    colour = CAR_COLOURS[colour_name]
-
-    # create car
-    pos = generateRandomWaypointPosition()
-    angle = Angle(random.random()*2*math.pi)
-
-    car = Car(colour_name, colour, screen, zoom, pos, angle, time)
-    cars.append(car)
-
-    # create car controller
-    controller = CarController(colour_name, colour, screen, zoom)
-    controllers.append(controller)
+    world.addCar(colour_name, CAR_COLOURS[colour_name], time)
 
     print(colour_name, end=" ")
 
-    # count the number of cars
-    num_cars += 1
-    if num_cars == MAX_CARS:
+    count += 1
+    if count == MAX_CARS:
         break
 
 print()
 
 # update car models
-time = pygame.time.get_ticks()
-
-updates = []
-for i in range(num_cars):
-    position, angle = cars[i].update(time)
-    updates.append((position, angle))
-
-for i in range(num_cars):
-    position, angle = updates[i]
-    controllers[i].firstUpdate(position, angle, time)
+world.firstUpdate(pygame.time.get_ticks())
 
 # set up for FPS
 if INCLUDE_CAPTION:
@@ -74,16 +51,15 @@ if INCLUDE_CAPTION:
     prev_time = time
 
 # loop until the user clicks the close button
-paused  = False
-panning = False
-done    = False
+done = False
 
 while not done:
 
     # limit the frames per second
     clock.tick(FRAMES_PER_SECOND)
-    time = pygame.time.get_ticks()
 
+    # generate caption
+    time = pygame.time.get_ticks()
     if INCLUDE_CAPTION:
         # find time between frames
         dt = (time - prev_time) / 1000
@@ -100,16 +76,23 @@ while not done:
             total += frame
         fps = round(10/total)
 
-        # get car points
-        pairs = []
-        for controller in controllers:
-            pairs.append((-controller.points, controller.duration, controller.name))
-        pairs.sort()
+        # get car scores
+        scores = []
+        for controller in world.controllers:
+            scores.append((-controller.score,
+                            controller.duration,
+                            controller.name))
+        scores.sort()
 
         # generate screen caption
         string = "Car Simulator | FPS: {}".format(fps)
-        for points, duration, name in pairs:
-            string += " | {:3} {:4}".format(name, -points)
+
+        for score, duration, name in scores:
+            string += " | {:3} {:3}".format(name, -score)
+
+        if world.paused:
+            string += " | PAUSED"
+
         pygame.display.set_caption(string)
 
     # deal with events
@@ -119,91 +102,29 @@ while not done:
             done = True
 
         elif event.type == pygame.MOUSEBUTTONUP:
-
             if event.button == 1:
-                panning = False
-                zoom.stopPan()
+                world.stopPan()
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
-
             if event.button == 1:
-                panning = zoom.startPan(Vector(*event.pos))
+                world.startPan(Vector(*event.pos))
 
             elif event.button == 4:
-                zoom.zoomIn(Vector(*event.pos))
+                world.zoomIn(Vector(*event.pos))
 
             elif event.button == 5:
-                zoom.zoomOut(Vector(*event.pos))
+                world.zoomOut(Vector(*event.pos))
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
+                world.pause(pygame.time.get_ticks())
 
-                time = pygame.time.get_ticks()
-                if paused:
-                    paused = False
-                    for i in range(num_cars):
-                        cars[i].unpause(time)
-                        controllers[i].unpause(time)
-                else:
-                    paused = True
-                    for i in range(num_cars):
-                        cars[i].pause(time)
-                        controllers[i].pause(time)
-
-    if panning == True:
-        zoom.updatePan(Vector(*pygame.mouse.get_pos()))
-
-    if paused == False:
-        # provide controllers with updated information
-        time = pygame.time.get_ticks()
-
-        updates = []
-        for i in range(num_cars):
-            position, angle = cars[i].update(time)
-            updates.append((position, angle))
-
-        for i in range(num_cars):
-            position, angle = updates[i]
-            controllers[i].update(position, angle, time)
-
-        # check for crashes
-        for i in range(num_cars):
-            controller_i = controllers[i]
-            for j in range(i+1, num_cars):
-                controller_j = controllers[j]
-                if controller_i.checkCollision(controller_j):
-                    controller_i.stop(controller_j)
-                    controller_j.stop(controller_i)
-                    cars[i].stop()
-                    cars[j].stop()
-
-        # send controller instructions to cars
-        controls = []
-        for i in range(num_cars):
-            engine, steering, braking = controllers[i].control()
-            controls.append((engine, steering, braking))
-
-        time = pygame.time.get_ticks()
-        for i in range(num_cars):
-            engine, steering, braking = controls[i]
-            cars[i].control(engine, steering, braking, time)
+    # update world
+    world.update(pygame.time.get_ticks())
 
     # draw to screen
     screen.fill(WHITE)
-
-    world_box = [zoom.getDrawable(point) for point in WORLD_BOX]
-    pygame.draw.polygon(screen, BLACK, world_box, 1)
-
-    for controller in controllers:
-        controller.draw()
-
-    #for controller in controllers:
-    #    controller.drawCar()
-
-    for car in cars:
-        car.draw()
-
-    # update the screen
+    world.draw()
     pygame.display.flip()
 
 pygame.quit()

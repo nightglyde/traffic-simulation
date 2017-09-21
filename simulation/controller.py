@@ -1,16 +1,23 @@
 from util import *
 
+from obstacle import Obstacle
+from waypoint import Waypoint
+
+WAYPOINT_RADIUS    = ROAD_WIDTH / 2
+WAYPOINT_THRESHOLD = 0.5
+
+WAYPOINT_INTERVAL = TURN_RADIUS * 3
+
+MAX_WAYPOINTS      = 1000
+STARTING_WAYPOINTS = 3
+
 DESIRED_SPEED = 10
 
-PATH_HISTORY = 500
-GREY_HISTORY = 3
-
-class CarController:
-    def __init__(self, name, colour, screen, zoom):
+class CarController(Obstacle):
+    def __init__(self, world, name, colour):
+        self.world  = world
         self.name   = name
         self.colour = colour
-        self.screen = screen
-        self.zoom   = zoom
 
         self.position = None # pixels
         self.angle    = None # radians
@@ -32,12 +39,19 @@ class CarController:
         self.hull = []
 
         self.waypoints = deque()
-        self.points    = 0
+        self.score     = 0
+        self.duration  = 0.0
 
-        self.duration = 0.0
+    def generateHull(self):
+        heading = getVector(self.angle)
 
-        self.path       = deque()
-        self.greypoints = deque()
+        car_front = heading          * CAR_LENGTH / 2
+        car_left  = heading.left90() * CAR_WIDTH  / 2
+
+        self.hull = [self.position + car_front + car_left,
+                     self.position - car_front + car_left,
+                     self.position - car_front - car_left,
+                     self.position + car_front - car_left]
 
     def pause(self, time):
         self.pause_time = time
@@ -57,16 +71,18 @@ class CarController:
         circle_centre = position + centre_vector
         return circle_centre
 
-    def plotTurn(self, car_pos, car_angle, destination):
-        turn_distances = []
+    def plotTurn(self, a, b):
+        destination = b.position
 
-        left_circle = self.getTurningCircle(LEFT, car_pos, car_angle)
+        left_circle = self.getTurningCircle(LEFT, a.position, a.angle)
         left_angle, left_dist = getPolar(destination - left_circle)
-        left_car = car_pos - left_circle
+        left_car = a.position - left_circle
 
-        right_circle = self.getTurningCircle(RIGHT, car_pos, car_angle)
+        right_circle = self.getTurningCircle(RIGHT, a.position, a.angle)
         right_angle, right_dist = getPolar(destination - right_circle)
-        right_car = car_pos - right_circle
+        right_car = a.position - right_circle
+
+        turn_distances = []
 
         # plot left turn
         if left_dist >= TURN_RADIUS:
@@ -141,29 +157,17 @@ class CarController:
         turn_distances.sort()
         return turn_distances[0]
 
-    def adjustWaypoints(self):
-        prev = self
-        for waypoint in self.waypoints:
-            distance, angle, turn, arcs, tans = self.plotTurn(prev.position,
-                                                              prev.angle,
-                                                              waypoint.position)
-
-            time = distance / DESIRED_SPEED
-            waypoint.update(angle, time, turn, arcs, tans)
-
-            prev = waypoint
-
-    def addWaypoint(self, pos):
+    def addWaypoint(self, waypoint):
         if self.waypoints:
             prev = self.waypoints[-1]
         else:
             prev = self
 
-        distance, angle, turn, arcs, tans = self.plotTurn(prev.position,
-                                                          prev.angle, pos)
-
+        distance, angle, turn, arcs, tans = self.plotTurn(prev, waypoint)
         time = distance / DESIRED_SPEED
-        self.waypoints.append(Waypoint(pos, angle, time, turn, arcs, tans))
+
+        waypoint.update(angle, time, turn, arcs, tans)
+        self.waypoints.append(waypoint)
 
     def addRandomWaypoint(self):
         if self.waypoints:
@@ -171,14 +175,22 @@ class CarController:
         else:
             prev = self
 
-        angle = prev.angle - ANGLE_30 + ANGLE_60 * random.random()
-        pos   = prev.position + getVector(angle) * WAYPOINT_INTERVAL
+        angle_range = ANGLE_30
 
-        while not checkWaypointBoundary(pos):
-            angle = Angle(random.random()*2*math.pi)
-            pos   = prev.position + getVector(angle) * WAYPOINT_BIG_GAP
+        count = 0
+        while True:
+            angle = prev.angle - angle_range + angle_range * 2 * random.random()
+            pos   = prev.position + getVector(angle) * WAYPOINT_INTERVAL
 
-        self.addWaypoint(pos)
+            waypoint = Waypoint(self, pos, WAYPOINT_RADIUS)
+
+            if self.world.checkObject(waypoint):
+                self.addWaypoint(waypoint)
+                break
+
+            count += 1
+            if count % 10 == 0:
+                angle_range += ANGLE_5
 
     def firstUpdate(self, position, angle, time):
         self.position = position
@@ -191,19 +203,17 @@ class CarController:
 
         # generate initial waypoints
         for i in range(STARTING_WAYPOINTS):
-            #self.addRandomWaypoint()
-            self.addWaypoint(generateRandomWaypointPosition())
+            self.addRandomWaypoint()
 
         self.generateHull()
-        self.path.append(self.position)
 
     def update(self, position, angle, time):
+        self.dt = (time - self.time) / 1000
+
         if self.stopped:
             return
 
-        self.dt = (time - self.time) / 1000
-
-        angle, position_change = getPolar(position - self.position)
+        position_change = getMagnitude(position - self.position)
         speed = position_change / self.dt
 
         speed_change = speed - self.speed
@@ -226,10 +236,6 @@ class CarController:
         self.projected_position = self.position + displacement
 
         self.generateHull()
-        self.path.append(self.position)
-
-        if len(self.path) > PATH_HISTORY:
-            self.path.popleft()
 
     def control(self):
         engine_control   = 0
@@ -240,43 +246,55 @@ class CarController:
             return engine_control, steering_control, braking_control
 
         while self.waypoints:
-            waypoint = self.waypoints[0]
+            waypoint    = self.waypoints[0]
+            destination = waypoint.position
 
-            angle, distance = getPolar(waypoint.position - self.position)
+            angle, distance = getPolar(destination - self.position)
             if distance <= WAYPOINT_THRESHOLD:
 
-                if self.points + len(self.waypoints) < MAX_WAYPOINTS:
-                    #self.addRandomWaypoint()
-                    self.addWaypoint(generateRandomWaypointPosition())
-
-                self.greypoints.append(waypoint)
-
-                if len(self.greypoints) > GREY_HISTORY:
-                    self.greypoints.popleft()
+                if self.score + len(self.waypoints) < MAX_WAYPOINTS:
+                    self.addRandomWaypoint()
 
                 self.waypoints.popleft()
-                self.adjustWaypoints()
 
-                self.points += 1
+                self.score += 1
                 self.duration = (self.time - self.start_time) / 1000
 
-                if self.points == MAX_WAYPOINTS:
+                if self.score == MAX_WAYPOINTS:
                     print(self.name, "finished at time", self.duration)
 
                 duration = (self.time - self.waypoint_time) / 1000
-                print("{} {} e_time: {:.4}, a_time: {:.4}".format(
-                      self.name, self.points,
-                      waypoint.time, duration))
+                print("{} {} time_offset: {:.4}".format(
+                      self.name, self.score,
+                      duration - waypoint.time))
                 self.waypoint_time = self.time
 
                 continue
 
-            distance, angle, turn, arcs, tans = self.plotTurn(self.position,
-                                                              self.angle,
-                                                              waypoint.position)
+            # adjust angle
+            angle, magnitude = getPolar(destination - self.projected_position)
+            angle_difference = angle - self.projected_angle
+            if angle_difference < ANGLE_0: # left turn
 
-            steering_control = sign(turn)
+                # test if point is too close
+                circle_centre = self.getTurningCircle(LEFT, self.position, self.angle)
+                angle, distance_from_circle = getPolar(destination - circle_centre)
+                if distance_from_circle < TURN_RADIUS - WAYPOINT_THRESHOLD:
+                    steering_control = RIGHT
+                else:
+                    steering_control = LEFT
 
+            elif angle_difference > ANGLE_0: # right turn
+
+                # test if point is too close
+                circle_centre = self.getTurningCircle(RIGHT, self.position, self.angle)
+                angle, distance_from_circle = getPolar(destination - circle_centre)
+                if distance_from_circle < TURN_RADIUS - WAYPOINT_THRESHOLD:
+                    steering_control = LEFT
+                else:
+                    steering_control = RIGHT
+
+            # adjust speed
             if self.projected_speed > DESIRED_SPEED:
                 engine_control -= 1
 
@@ -294,20 +312,6 @@ class CarController:
 
         return engine_control, steering_control, braking_control
 
-    def generateHull(self):
-        pos = self.position
-
-        forward = getVector(self.angle)
-        left    = forward.left90()
-
-        car_front = forward * CAR_LENGTH / 2
-        car_left  = left    * CAR_WIDTH  / 2
-
-        self.hull = [pos + car_front + car_left,
-                     pos - car_front + car_left,
-                     pos - car_front - car_left,
-                     pos + car_front - car_left]
-
     def stop(self, other):
         if not self.stopped:
             self.stopped = True
@@ -317,141 +321,10 @@ class CarController:
             print(self.name, "crashed into", other.name,
                   "at time", self.duration)
 
-    def checkCollision(self, other):
-        num_points_self  = len(self.hull)
-        num_points_other = len(self.hull)
-
-        for i in range(num_points_self):
-            point_i = self.hull[i]
-            point_k = self.hull[(i+1) % num_points_self]
-
-            for point_j in other.hull:
-                if ccw(point_i, point_j, point_k) <= 0:
-                    break
-            else:
-                return False
-
-        for i in range(num_points_other):
-            point_i = other.hull[i]
-            point_k = other.hull[(i+1) % num_points_other]
-
-            for point_j in self.hull:
-                if ccw(point_i, point_j, point_k) <= 0:
-                    break
-            else:
-                return False
-
-        return True
-
     def draw(self):
-        colour         = self.colour
-        darker_colour  = DARKER[colour]
-        lighter_colour = LIGHTER[colour]
-
-        thres_radius = self.zoom.scaleDistance(WAYPOINT_THRESHOLD)
-        inner_radius = self.zoom.scaleDistance(WAYPOINT_INNER)
-        outer_radius = self.zoom.scaleDistance(WAYPOINT_OUTER)
-
-        path = [self.zoom.getDrawable(point) for point in self.path]
-        pygame.draw.lines(self.screen, LIGHT_GREY, False, path, 1)
-
-        for waypoint in self.greypoints:
-            for circle_centre, angle_1, angle_2 in waypoint.arcs:
-                rect = generateRect(circle_centre, TURN_RADIUS, self.zoom)
-                angle_1 = angle_1.norm()
-                angle_2 = angle_2.norm()
-                pygame.draw.arc(self.screen, GREY,
-                                rect, angle_1, angle_2, 1)
-
-            for point_1, point_2 in waypoint.tans:
-                point_1 = self.zoom.getDrawable(point_1)
-                point_2 = self.zoom.getDrawable(point_2)
-                pygame.draw.line(self.screen, GREY,
-                                 point_1, point_2, 1)
+        for waypoint in self.waypoints:
+            waypoint.drawPath()
 
         for waypoint in self.waypoints:
-            for circle_centre, angle_1, angle_2 in waypoint.arcs:
-                rect = generateRect(circle_centre, TURN_RADIUS, self.zoom)
-                angle_1 = angle_1.norm()
-                angle_2 = angle_2.norm()
-                pygame.draw.arc(self.screen, darker_colour,
-                                rect, angle_1, angle_2, 1)
-
-            for point_1, point_2 in waypoint.tans:
-                point_1 = self.zoom.getDrawable(point_1)
-                point_2 = self.zoom.getDrawable(point_2)
-                pygame.draw.line(self.screen, darker_colour,
-                                 point_1, point_2, 1)
-
-        for waypoint in self.greypoints:
-            pos   = waypoint.position
-            angle = waypoint.angle
-
-            centre = self.zoom.getDrawable(pos)
-            pygame.draw.circle(self.screen, DARK_GREY, centre, thres_radius, 1)
-            pygame.draw.circle(self.screen, DARK_GREY, centre, outer_radius, 1)
-
-            front = pos + getVector(angle)             * WAYPOINT_INNER
-            right = pos + getVector(angle + ANGLE_120) * WAYPOINT_INNER
-            left  = pos + getVector(angle - ANGLE_120) * WAYPOINT_INNER
-
-            arrow = [centre,
-                self.zoom.getDrawable(right),
-                self.zoom.getDrawable(front),
-                self.zoom.getDrawable(left)
-            ]
-            pygame.draw.polygon(self.screen, DARK_GREY, arrow, 1)
-
-        for waypoint in self.waypoints:
-            pos   = waypoint.position
-            angle = waypoint.angle
-
-            centre = self.zoom.getDrawable(pos)
-            pygame.draw.circle(self.screen, colour,         centre, outer_radius)
-            pygame.draw.circle(self.screen, lighter_colour, centre, inner_radius)
-            pygame.draw.circle(self.screen, darker_colour,  centre, outer_radius, 1)
-            pygame.draw.circle(self.screen, darker_colour,  centre, inner_radius, 1)
-
-
-            front = pos + getVector(angle)             * WAYPOINT_INNER
-            right = pos + getVector(angle + ANGLE_120) * WAYPOINT_INNER
-            left  = pos + getVector(angle - ANGLE_120) * WAYPOINT_INNER
-
-            arrow = [centre,
-                self.zoom.getDrawable(right),
-                self.zoom.getDrawable(front),
-                self.zoom.getDrawable(left)
-            ]
-            pygame.draw.polygon(self.screen, colour, arrow)
-            pygame.draw.polygon(self.screen, darker_colour, arrow, 1)
-
-    def drawCar(self):
-        # draw car
-        chassis = [self.zoom.getDrawable(point) for point in self.hull]
-        if self.stopped:
-            pygame.draw.polygon(self.screen, DARKER[self.colour], chassis)
-        else:
-            pygame.draw.polygon(self.screen, self.colour, chassis)
-
-        pygame.draw.polygon(self.screen, BLACK, chassis, 2)
-
-        # draw arrow
-        forward = getVector(self.angle)
-        left    = forward.left90()
-
-        stem_front = forward * ARROW_STEM_LENGTH
-        stem_left  = left    * ARROW_STEM_WIDTH / 2
-        head_front = forward * ARROW_LENGTH
-        head_left  = left    * ARROW_WIDTH / 2
-
-        arrow = [
-            self.zoom.getDrawable(self.position              + stem_left),
-            self.zoom.getDrawable(self.position + stem_front + stem_left),
-            self.zoom.getDrawable(self.position + stem_front + head_left),
-            self.zoom.getDrawable(self.position + head_front            ),
-            self.zoom.getDrawable(self.position + stem_front - head_left),
-            self.zoom.getDrawable(self.position + stem_front - stem_left),
-            self.zoom.getDrawable(self.position              - stem_left)
-        ]
-        pygame.draw.polygon(self.screen, BLACK, arrow, 1)
+            waypoint.draw()
 

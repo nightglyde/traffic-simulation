@@ -1,0 +1,5 @@
+1 lower level waypoints for obstacle avoidance - just a guide, don't actually have to hit the waypoint
+2 higher level waypoints - probably random point from a list of preset points
+3 path finding (middle level waypoints)
+4 reading and writing - look up obstacle avoidance
+
