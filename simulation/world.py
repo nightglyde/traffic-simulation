@@ -21,30 +21,36 @@ class World(Obstacle):
         self.obstacles = []
         self.grass     = []
 
+        self.starting_positions = []
+        self.waypoint_options   = []
+
         self.cars        = []
         self.controllers = []
         self.num_cars = 0
-
-        self.paused = False
 
         # pan and zoom
         self.scale = min(SCREEN_WIDTH  / self.width  * 0.9,
                          SCREEN_HEIGHT / self.height * 0.9)
 
-        self.scale_min = min(SCREEN_WIDTH  / self.width * 0.4,
+        self.scale_min = min(SCREEN_WIDTH  / self.width * 0.5,
                              SCREEN_HEIGHT / self.width * 0.5)
 
-        self.scale_max = max(SCREEN_WIDTH  / CAR_LENGTH * 0.5,
+        self.scale_max = min(SCREEN_WIDTH  / CAR_LENGTH * 0.5,
                              SCREEN_HEIGHT / CAR_LENGTH * 0.5)
 
         self.offset = Vector((SCREEN_WIDTH  / self.scale - self.width)  / 2,
                              (SCREEN_HEIGHT / self.scale - self.height) / 2)
 
-        self.starting_position = None
-        self.starting_offset   = None
+        self.pan_position = None
+        self.pan_offset   = None
 
         self.panning = False
         self.selected_car = None
+
+        self.min_x = None
+        self.max_x = None
+        self.min_y = None
+        self.max_y = None
 
     def checkObject(self, world_object):
         for point in world_object.hull:
@@ -74,6 +80,33 @@ class World(Obstacle):
         obstacle = Obstacle(self, name, colour, points)
         self.obstacles.append(obstacle)
 
+    def addStartingPosition(self, point):
+        self.starting_positions.append(point)
+
+    def addWaypointOption(self, point):
+        self.waypoint_options.append(point)
+
+    def getWaypointOptions(self, waypoints):
+        waypoint = waypoints[-1]
+
+        good_options = []
+        for pos in self.waypoint_options:
+            if pos is waypoint.position:
+                continue
+
+            vec = pos - waypoint.position
+            magnitude = getMagnitude(vec)
+            if magnitude > 10:#16:
+                continue
+
+            diff = angleBetween(vec, getVector(waypoint.angle))
+            if diff > math.pi/3:
+                continue
+
+            good_options.append(pos)
+
+        return good_options
+
     def addCar(self, name, colour, time):
         self.num_cars += 1
 
@@ -89,71 +122,38 @@ class World(Obstacle):
                     if car.checkCollision(other_car):
                         break
                 else:
+                    controller = CarController(car)
+                    self.controllers.append(controller)
                     self.cars.append(car)
-                    break
+                    return
 
         # create car controller
         controller = CarController(self, name, colour)
         self.controllers.append(controller)
 
-    def pause(self, time):
-        self.paused = not self.paused
-        if self.paused:
-            for car in self.cars:
-                car.pause(time)
-
-            for controller in self.controllers:
-                controller.pause(time)
-
-        else:
-            for car in self.cars:
-                car.unpause(time)
-
-            for controller in self.controllers:
-                controller.unpause(time)
-
-    def firstUpdate(self, time):
-        for i in range(self.num_cars):
-            position, angle = self.cars[i].update(time)
-            self.controllers[i].firstUpdate(position, angle, time)
-
     def update(self, time):
-        if self.panning:
-            self.updatePan(Vector(*pygame.mouse.get_pos()))
-
-        if self.paused:
-            return
+        for car in self.cars:
+            car.update(time)
 
         for i in range(self.num_cars):
-            position, angle = self.cars[i].update(time)
-            self.controllers[i].update(position, angle, time)
-
-        if self.selected_car:
-            if self.selected_car.stopped:
-                self.selected_car = None
-            else:
-                self.followCar(self.selected_car)
-
-        for i in range(self.num_cars):
-            controller_i = self.controllers[i]
+            car_i = self.cars[i]
 
             for j in range(i+1, self.num_cars):
-                controller_j = self.controllers[j]
+                car_j = self.cars[j]
 
-                if controller_i.checkCollision(controller_j):
-                    controller_i.stop(controller_j)
-                    controller_j.stop(controller_i)
-                    self.cars[i].stop()
-                    self.cars[j].stop()
+                if car_i.checkCollision(car_j):
+                    car_i.stop(car_j)
+                    car_j.stop(car_i)
+                    self.controllers[i].clearWaypoints()
+                    self.controllers[j].clearWaypoints()
 
             for obstacle in self.obstacles:
-                if controller_i.checkCollision(obstacle):
-                    controller_i.stop(obstacle)
-                    self.cars[i].stop()
+                if car_i.checkCollision(obstacle):
+                    car_i.stop(obstacle)
+                    self.controllers[i].clearWaypoints()
 
-        for i in range(self.num_cars):
-            engine, steering, braking = self.controllers[i].control()
-            self.cars[i].control(engine, steering, braking)
+        for controller in self.controllers:
+            controller.update()
 
     def scaleDistance(self, distance):
         return round(distance * self.scale)
@@ -171,10 +171,11 @@ class World(Obstacle):
     def zoomIn(self, mouse_position):
         if self.selected_car != None:
             mouse_position = SCREEN_CENTRE
-
-        true_mouse_position = self.getTruePosition(mouse_position)
-        if not self.checkInside(true_mouse_position):
-            return
+            true_mouse_position = self.selected_car.position
+        else:
+            true_mouse_position = self.getTruePosition(mouse_position)
+            if not self.checkInside(true_mouse_position):
+                return
 
         new_scale = min(self.scale * SCALE_CHANGE, self.scale_max)
 
@@ -184,10 +185,11 @@ class World(Obstacle):
     def zoomOut(self, mouse_position):
         if self.selected_car != None:
             mouse_position = SCREEN_CENTRE
-
-        true_mouse_position = self.getTruePosition(mouse_position)
-        if not self.checkInside(true_mouse_position):
-            return
+            true_mouse_position = self.selected_car.position
+        else:
+            true_mouse_position = self.getTruePosition(mouse_position)
+            if not self.checkInside(true_mouse_position):
+                return
 
         new_scale = max(self.scale / SCALE_CHANGE, self.scale_min)
 
@@ -206,26 +208,36 @@ class World(Obstacle):
         for car in self.cars:
             if car.checkInside(true_mouse_position):
                 self.selected_car = car
+                print("Selected car:", car.name)
                 self.panning = False
                 return
 
         self.selected_car = None
 
-        self.starting_position = mouse_position
-        self.starting_offset   = self.offset
+        self.pan_position = mouse_position
+        self.pan_offset   = self.offset
         self.panning = True
 
     def updatePan(self, mouse_position):
         if not self.panning:
             return
 
-        diff = (mouse_position - self.starting_position) / self.scale
-        self.offset = self.starting_offset + diff
+        diff = (mouse_position - self.pan_position) / self.scale
+        self.offset = self.pan_offset + diff
 
     def stopPan(self):
         self.panning = False
 
     def draw(self):
+        if self.panning:
+            self.updatePan(Vector(*pygame.mouse.get_pos()))
+
+        if self.selected_car:
+            if self.selected_car.stopped:
+                self.selected_car = None
+            else:
+                self.followCar(self.selected_car)
+
         for grass in self.grass:
             grass.draw()
 
@@ -236,14 +248,11 @@ class World(Obstacle):
             obstacle.draw()
 
         for controller in self.controllers:
-            controller.draw()
+            controller.drawWaypoints()
+
+        for controller in self.controllers:
+            controller.drawPath()
 
         for car in self.cars:
-            car.drawWheelPaths()
-
-        for car in self.cars:
-            if car is self.selected_car:
-                car.draw(True)
-            else:
-                car.draw()
+            car.draw(car is self.selected_car)
 

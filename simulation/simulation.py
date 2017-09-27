@@ -2,10 +2,9 @@ from util import *
 
 from world import World
 
-FRAMES_PER_SECOND = 60
-INCLUDE_CAPTION   = True
-MAX_CARS          = 1
+INCLUDE_CAPTION = True
 
+MAX_CARS    = 1
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
                "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
@@ -24,22 +23,38 @@ world = World(screen, WORLD_WIDTH, WORLD_HEIGHT)
 for points in predefined_grass:
     world.addGrass(points)
 
+# create starting positions
+#for point in starting_positions:
+#    world.addStartingPosition(point)
+
+# create waypoint options
+for point in waypoint_options:
+    world.addWaypointOption(point)
+
+world_time = 0
+prev_time  = pygame.time.get_ticks()
+
+expected_time_step = 1000 // FRAMES_PER_SECOND
+
 # create cars
-time  = pygame.time.get_ticks()
 count = 0
-for colour_name in CAR_COLOURS:
-    world.addCar(colour_name, CAR_COLOURS[colour_name], time)
+for i in range(1000):
+    for colour_name in CAR_COLOURS:
+        name   = colour_name + "_" + str(i)
+        colour = CAR_COLOURS[colour_name]
 
-    print(colour_name, end=" ")
+        world.addCar(name, colour, world_time)
 
-    count += 1
-    if count == MAX_CARS:
-        break
+        print(name)
+
+        count += 1
+        if count == MAX_CARS:
+            break
+    else:
+        continue
+    break
 
 print()
-
-# update car models
-world.firstUpdate(pygame.time.get_ticks())
 
 # set up for FPS
 if INCLUDE_CAPTION:
@@ -48,24 +63,24 @@ if INCLUDE_CAPTION:
 
     frames = [0 for f in range(10)]
     f = 0
-    prev_time = time
 
 # loop until the user clicks the close button
-done = False
-
+paused = False
+done   = False
 while not done:
 
     # limit the frames per second
     clock.tick(FRAMES_PER_SECOND)
 
-    # generate caption
-    time = pygame.time.get_ticks()
-    if INCLUDE_CAPTION:
-        # find time between frames
-        dt = (time - prev_time) / 1000
-        prev_time = time
+    time      = pygame.time.get_ticks()
+    time_step = time - prev_time
+    prev_time = time
 
-        frames[f] = dt
+    # generate caption
+    if INCLUDE_CAPTION:
+
+        # find time between frames
+        frames[f] = time_step / 1000
         f += 1
         if f == 10:
             f = 0
@@ -80,24 +95,18 @@ while not done:
         scores = []
         for controller in world.controllers:
             scores.append((-controller.score,
-                            controller.duration,
-                            controller.name))
+                            controller.waypoint_time,
+                            controller.car.name))
         scores.sort()
 
         # generate screen caption
         string = "Car Simulator | FPS: {}".format(fps)
-
-        for score, duration, name in scores:
-            string += " | {:3} {:3}".format(name, -score)
-
-        if world.paused:
-            string += " | PAUSED"
-
+        for score, time, name in scores:
+            string += " | {:4} {:3}".format(name, -score)
         pygame.display.set_caption(string)
 
     # deal with events
     for event in pygame.event.get():
-
         if event.type == pygame.QUIT:
             done = True
 
@@ -117,10 +126,12 @@ while not done:
 
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                world.pause(pygame.time.get_ticks())
+                paused = not paused
 
     # update world
-    world.update(pygame.time.get_ticks())
+    if not paused:
+        world_time += expected_time_step#min(time_step, expected_time_step)
+        world.update(world_time)
 
     # draw to screen
     screen.fill(WHITE)

@@ -4,6 +4,8 @@ import pygame
 
 from collections import deque
 
+FRAMES_PER_SECOND = 60
+
 SCREEN_WIDTH  = 800#1200 # pixels
 SCREEN_HEIGHT = 800
 
@@ -17,12 +19,27 @@ CAR_WIDTH    = 1.8
 WHEEL_LENGTH = 0.9
 WHEEL_WIDTH  = 0.225
 AXLE_LENGTH  = 2.7
-AXLE_WIDTH   = CAR_WIDTH - WHEEL_WIDTH#1.8
+AXLE_WIDTH   = CAR_WIDTH - WHEEL_WIDTH
 
-ARROW_LENGTH      = 2.25#1.35#0.9#1.8
+PIVOT_TO_FRONT = CAR_LENGTH/2 + AXLE_LENGTH/2 # 3.6
+PIVOT_TO_REAR  = CAR_LENGTH - PIVOT_TO_FRONT
+
+ARROW_LENGTH      = 2.7
 ARROW_WIDTH       = 0.9
-ARROW_STEM_LENGTH = 0.675#1.8#2.7#1.35
+ARROW_STEM_LENGTH = 2.2
 ARROW_STEM_WIDTH  = 0.45
+
+# physics constants
+DRAG_CONSTANT    = 0.761
+RR_CONSTANT      = DRAG_CONSTANT * 30
+BRAKING_CONSTANT = 10000
+GRAVITY_CONSTANT = 9.807
+
+MIN_ENGINE_FORCE = 0
+MAX_ENGINE_FORCE = 10000
+
+CAR_MASS   = 1250
+CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
 
 LEFT   = -1
 RIGHT  = 1
@@ -73,27 +90,27 @@ def getVector(angle):
 VECTOR_0      = Vector(0, 0)
 SCREEN_CENTRE = Vector(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
 
+SCREEN_TOP_LEFT     = Vector(0,            0)
+SCREEN_TOP_RIGHT    = Vector(SCREEN_WIDTH, 0)
+SCREEN_BOTTOM_LEFT  = Vector(0,            SCREEN_HEIGHT)
+SCREEN_BOTTOM_RIGHT = Vector(SCREEN_WIDTH, SCREEN_HEIGHT)
+
 #########
 # ANGLE #
 #########
 
 class Angle:
     def __init__(self, value):
-
         if value > math.pi:
             value -= math.pi*2
-
         elif value < -math.pi:
             value += math.pi*2
-
         self.value = value
 
     def norm(self):
         value = -self.value
-
         if value < 0:
             value += math.pi*2
-
         return value
 
     def __add__(self, other):
@@ -114,12 +131,6 @@ class Angle:
     def __neg__(self):
         return Angle(-self.value)
 
-    def __abs__(self):
-        if self.value < 0:
-            return self.value + math.pi*2
-
-        return self.value
-
     def __lt__(self, other):
         return self.value < other.value
 
@@ -131,15 +142,17 @@ class Angle:
 
 def getAngle(vector):
     x = vector.x
-
+    y = vector.y
     if x == 0:
-        angle = math.pi / 2
+        if y < 0:
+            angle = -math.pi / 2
+        else:
+            angle = math.pi / 2
     else:
-        angle = math.atan(vector.y / x)
+        angle = math.atan(y / x)
 
     if x < 0:
         angle += math.pi
-
     return Angle(angle)
 
 def getMagnitude(vector):
@@ -148,43 +161,45 @@ def getMagnitude(vector):
 def getPolar(vector):
     x = vector.x
     y = vector.y
-
     magnitude = math.sqrt(x**2 + y**2)
-
     if x == 0:
-        angle = math.pi / 2
+        if y < 0:
+            angle = -math.pi / 2
+        else:
+            angle = math.pi / 2
     else:
         angle = math.atan(y / x)
 
     if x < 0:
         angle += math.pi
-
     return Angle(angle), magnitude
 
-ANGLE_0   = Angle(math.radians(0))
-ANGLE_5   = Angle(math.radians(5))
-ANGLE_10  = Angle(math.radians(10))
-ANGLE_15  = Angle(math.radians(15))
-ANGLE_20  = Angle(math.radians(20))
-ANGLE_25  = Angle(math.radians(25))
-ANGLE_30  = Angle(math.radians(30))
-ANGLE_35  = Angle(math.radians(35))
-ANGLE_40  = Angle(math.radians(40))
-ANGLE_45  = Angle(math.radians(45))
-ANGLE_50  = Angle(math.radians(50))
-ANGLE_55  = Angle(math.radians(55))
-ANGLE_60  = Angle(math.radians(60))
-ANGLE_65  = Angle(math.radians(65))
-ANGLE_70  = Angle(math.radians(70))
-ANGLE_75  = Angle(math.radians(75))
-ANGLE_80  = Angle(math.radians(80))
-ANGLE_85  = Angle(math.radians(85))
-ANGLE_90  = Angle(math.radians(90))
+ANGLE_0  = Angle(math.radians(0))
+ANGLE_1  = Angle(math.radians(1))
+ANGLE_5  = Angle(math.radians(5))
+ANGLE_10 = Angle(math.radians(10))
+ANGLE_15 = Angle(math.radians(15))
+ANGLE_20 = Angle(math.radians(20))
+ANGLE_25 = Angle(math.radians(25))
+ANGLE_30 = Angle(math.radians(30))
+ANGLE_35 = Angle(math.radians(35))
+ANGLE_40 = Angle(math.radians(40))
+ANGLE_45 = Angle(math.radians(45))
+ANGLE_50 = Angle(math.radians(50))
+ANGLE_55 = Angle(math.radians(55))
+ANGLE_60 = Angle(math.radians(60))
+ANGLE_65 = Angle(math.radians(65))
+ANGLE_70 = Angle(math.radians(70))
+ANGLE_75 = Angle(math.radians(75))
+ANGLE_80 = Angle(math.radians(80))
+ANGLE_85 = Angle(math.radians(85))
+ANGLE_90 = Angle(math.radians(90))
+
 ANGLE_120 = Angle(math.radians(120))
 ANGLE_180 = Angle(math.radians(180))
 
-ESTIMATED_ANGLE = ANGLE_45
-TURN_RADIUS     = AXLE_LENGTH / math.sin(ESTIMATED_ANGLE.value)
+MAX_WHEEL_ANGLE = ANGLE_30
+TURN_RADIUS     = AXLE_LENGTH / math.sin(MAX_WHEEL_ANGLE.value)
 
 ###########
 # COLOURS #
@@ -289,14 +304,25 @@ DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
        LIGHT_ROSE: ROSE,       ROSE: DARK_ROSE,       DARK_ROSE: BLACK,
 }
 
+ALL_COLOURS = [
+    RED,   ORANGE, YELLOW,  LIME,
+    GREEN, SPRING, CYAN,    AZURE,
+    BLUE,  VIOLET, MAGENTA, ROSE,
+]
+
 #################
 # MISCELLANEOUS #
 #################
 
-def generateRect(circle_centre, radius, zoom):
-    top_left = zoom.getDrawable(circle_centre - Vector(radius, radius))
+def getTurningCircle(direction, car):
+    if direction == LEFT:
+        centre_vector = getVector(car.angle - ANGLE_90) * TURN_RADIUS
+    else:
+        centre_vector = getVector(car.angle + ANGLE_90) * TURN_RADIUS
+    return car.position + centre_vector
 
-    top, left = top_left
+def generateRect(circle_centre, radius, zoom):
+    top, left = zoom.getDrawable(circle_centre - Vector(radius, radius))
     width = zoom.scaleDistance(radius) * 2
     return [top, left, width, width]
 
@@ -308,10 +334,8 @@ def ccw(a, b, c):
 
 def angleBetween(a, b):
     dot_product = (a.x * b.x) + (a.y * b.y)
-
     ratio = dot_product / (getMagnitude(a) * getMagnitude(b))
     ratio = max(min(ratio, 1), -1)
-
     return math.acos(ratio)
 
 def turnDirection(a, b):
@@ -320,21 +344,17 @@ def turnDirection(a, b):
 
 def leftTurn(a, b):
     angle = angleBetween(a, b)
-
     if turnDirection(a, b) == RIGHT:
         return 2*math.pi - angle
-
     return angle
 
 def rightTurn(a, b):
     angle = angleBetween(a, b)
-
     if turnDirection(a, b) == LEFT:
         return 2*math.pi - angle
-
     return angle
 
-predefined_grass = [
+predefined_grass_old = [
     # outside boundary
     [Vector( 0,  0), Vector(100,  0), Vector(100,  10), Vector( 0,  10)],
     [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
@@ -351,5 +371,75 @@ predefined_grass = [
     [Vector(15, 65), Vector(35, 65), Vector(35, 85), Vector(15, 85)],
     [Vector(40, 65), Vector(60, 65), Vector(60, 85), Vector(40, 85)],
     [Vector(65, 65), Vector(85, 65), Vector(85, 85), Vector(65, 85)],
+]
+
+predefined_grass = [
+    # outside boundary
+    [Vector( 0,  0), Vector(100,  0), Vector(100,  10), Vector( 0,  10)],
+    [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
+    [Vector(90,  0), Vector(100,  0), Vector(100, 100), Vector(90, 100)],
+    [Vector( 0, 90), Vector(100, 90), Vector(100, 100), Vector( 0, 100)],
+
+    # internal squares
+    [Vector(15, 17), Vector(17, 15), Vector(33, 15), Vector(35, 17),
+     Vector(35, 33), Vector(33, 35), Vector(17, 35), Vector(15, 33)],
+    [Vector(40, 17), Vector(42, 15), Vector(58, 15), Vector(60, 17),
+     Vector(60, 33), Vector(58, 35), Vector(42, 35), Vector(40, 33)],
+    [Vector(65, 17), Vector(67, 15), Vector(83, 15), Vector(85, 17),
+     Vector(85, 33), Vector(83, 35), Vector(67, 35), Vector(65, 33)],
+
+    [Vector(15, 42), Vector(17, 40), Vector(33, 40), Vector(35, 42),
+     Vector(35, 58), Vector(33, 60), Vector(17, 60), Vector(15, 58)],
+    [Vector(40, 42), Vector(42, 40), Vector(58, 40), Vector(60, 42),
+     Vector(60, 58), Vector(58, 60), Vector(42, 60), Vector(40, 58)],
+    [Vector(65, 42), Vector(67, 40), Vector(83, 40), Vector(85, 42),
+     Vector(85, 58), Vector(83, 60), Vector(67, 60), Vector(65, 58)],
+
+    [Vector(15, 67), Vector(17, 65), Vector(33, 65), Vector(35, 67),
+     Vector(35, 83), Vector(33, 85), Vector(17, 85), Vector(15, 83)],
+    [Vector(40, 67), Vector(42, 65), Vector(58, 65), Vector(60, 67),
+     Vector(60, 83), Vector(58, 85), Vector(42, 85), Vector(40, 83)],
+    [Vector(65, 67), Vector(67, 65), Vector(83, 65), Vector(85, 67),
+     Vector(85, 83), Vector(83, 85), Vector(67, 85), Vector(65, 83)],
+]
+
+starting_positions = [
+    Vector(12.5,12.5), Vector(37.5,12.5), Vector(62.5,12.5), Vector(87.5,12.5),
+    Vector(12.5,37.5), Vector(37.5,37.5), Vector(62.5,37.5), Vector(87.5,37.5),
+    Vector(12.5,62.5), Vector(37.5,62.5), Vector(62.5,62.5), Vector(87.5,62.5),
+    Vector(12.5,87.5), Vector(37.5,87.5), Vector(62.5,87.5), Vector(87.5,87.5),
+]
+
+waypoint_options = [
+                                          Vector(12.5,17.5), Vector(17.5,12.5),
+    Vector(32.5,12.5),                    Vector(37.5,17.5), Vector(42.5,12.5),
+    Vector(57.5,12.5),                    Vector(62.5,17.5), Vector(67.5,12.5),
+    Vector(82.5,12.5),                    Vector(87.5,17.5),
+
+                       Vector(12.5,32.5), Vector(12.5,42.5), Vector(17.5,37.5),
+    Vector(32.5,37.5), Vector(37.5,32.5), Vector(37.5,42.5), Vector(42.5,37.5),
+    Vector(57.5,37.5), Vector(62.5,32.5), Vector(62.5,42.5), Vector(67.5,37.5),
+    Vector(82.5,37.5), Vector(87.5,32.5), Vector(87.5,42.5),
+
+                       Vector(12.5,57.5), Vector(12.5,67.5), Vector(17.5,62.5),
+    Vector(32.5,62.5), Vector(37.5,57.5), Vector(37.5,67.5), Vector(42.5,62.5),
+    Vector(57.5,62.5), Vector(62.5,57.5), Vector(62.5,67.5), Vector(67.5,62.5),
+    Vector(82.5,62.5), Vector(87.5,57.5), Vector(87.5,67.5),
+
+                       Vector(12.5,82.5),                    Vector(17.5,87.5),
+    Vector(32.5,87.5), Vector(37.5,82.5),                    Vector(42.5,87.5),
+    Vector(57.5,87.5), Vector(62.5,82.5),                    Vector(67.5,87.5),
+    Vector(82.5,87.5), Vector(87.5,82.5),
+
+    Vector(25, 12.5), Vector(50, 12.5), Vector(75, 12.5),
+    Vector(25, 37.5), Vector(50, 37.5), Vector(75, 37.5),
+    Vector(25, 62.5), Vector(50, 62.5), Vector(75, 62.5),
+    Vector(25, 87.5), Vector(50, 87.5), Vector(75, 87.5),
+
+    Vector(12.5, 25), Vector(12.5, 50), Vector(12.5, 75),
+    Vector(37.5, 25), Vector(37.5, 50), Vector(37.5, 75),
+    Vector(62.5, 25), Vector(62.5, 50), Vector(62.5, 75),
+    Vector(87.5, 25), Vector(87.5, 50), Vector(87.5, 75),
+
 ]
 
