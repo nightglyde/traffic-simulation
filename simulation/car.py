@@ -79,7 +79,7 @@ class Car(Obstacle):
 
         # cornering
         if self.wheel_angle.value != ANGLE_0.value:
-            radius           = AXLE_LENGTH / math.sin(self.wheel_angle.value)
+            radius           = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
             angular_velocity = self.speed / radius
 
             angle_change = Angle(angular_velocity * dt)
@@ -163,7 +163,7 @@ class Car(Obstacle):
             new_wheel_angle = ANGLE_0
         else:
             radius = self.speed / angular_velocity
-            ratio  = min(max(-1, AXLE_LENGTH / radius), 1)
+            ratio  = min(max(-1, PIVOT_TO_AXLE / radius), 1)
             new_wheel_angle = Angle(math.asin(ratio))
 
         angle_change = Angle(2*math.pi * dt * 2)
@@ -221,7 +221,8 @@ class Car(Obstacle):
             r_wheel_front = forward * WHEEL_LENGTH / 2
             r_wheel_left  = left    * WHEEL_WIDTH  / 2
 
-            axle_front = forward * AXLE_LENGTH
+            axle_front = forward * PIVOT_TO_AXLE
+            axle_rear  = forward * (PIVOT_TO_AXLE - AXLE_LENGTH)
             axle_left  = left    * AXLE_WIDTH / 2
 
             # front left wheel
@@ -247,7 +248,7 @@ class Car(Obstacle):
             pygame.draw.polygon(screen, BLACK,     front_right_wheel, 1)
 
             # rear left wheel
-            r_l = pos + axle_left
+            r_l = pos + axle_rear + axle_left
             rear_left_wheel = [
                 self.world.getDrawable(r_l - r_wheel_left + r_wheel_front),
                 self.world.getDrawable(r_l + r_wheel_left + r_wheel_front),
@@ -258,7 +259,7 @@ class Car(Obstacle):
             pygame.draw.polygon(screen, BLACK,     rear_left_wheel, 1)
 
             # rear right wheel
-            r_r = pos - axle_left
+            r_r = pos + axle_rear - axle_left
             rear_right_wheel = [
                 self.world.getDrawable(r_r - r_wheel_left + r_wheel_front),
                 self.world.getDrawable(r_r + r_wheel_left + r_wheel_front),

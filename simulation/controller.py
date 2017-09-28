@@ -33,6 +33,32 @@ class CarController(Obstacle):
         self.path = deque()
         self.path.append(self.car.position)
 
+        self.car_side_paths = [deque() for i in range(6)]
+        self.updateCarSidePaths()
+
+    def updateCarSidePaths(self):
+        car_left = getVector(self.car.angle).left90() * CAR_WIDTH/2
+
+        front_left = self.car.hull[1]
+        pivot_left = self.car.position + car_left
+        rear_left  = self.car.hull[2]
+
+        front_right = self.car.hull[0]
+        pivot_right = self.car.position - car_left
+        rear_right  = self.car.hull[3]
+
+        self.car_side_paths[0].append(front_left)
+        self.car_side_paths[1].append(pivot_left)
+        self.car_side_paths[2].append(rear_left)
+
+        self.car_side_paths[3].append(front_right)
+        self.car_side_paths[4].append(pivot_right)
+        self.car_side_paths[5].append(rear_right)
+
+        if len(self.car_side_paths[0]) > PATH_MEMORY:
+            for path in self.car_side_paths:
+                path.popleft()
+
     def clearWaypoints(self):
         self.waypoints.clear()
         self.waypoint_time = self.car.time
@@ -57,7 +83,7 @@ class CarController(Obstacle):
             if i % 20 == 0:
                 path.append(sim_car.position)
 
-            distance = getMagnitude(destination - sim_car.position)
+            distance = getMagnitude(destination - sim_car.front)
             if distance <= WAYPOINT_THRESHOLD:
                 break
 
@@ -139,7 +165,7 @@ class CarController(Obstacle):
 
             offset = (self.car.time - self.waypoint_time) - waypoint.time
 
-            distance = getMagnitude(waypoint.position - self.car.position)
+            distance = getMagnitude(waypoint.position - self.car.front)
             if distance <= WAYPOINT_THRESHOLD:
 
                 self.waypoints.popleft()
@@ -166,6 +192,8 @@ class CarController(Obstacle):
         if len(self.path) > PATH_MEMORY:
             self.path.popleft()
 
+        self.updateCarSidePaths()
+
         if self.waypoints:
             self.control(self.car, self.waypoints[0])
         else:
@@ -179,9 +207,18 @@ class CarController(Obstacle):
             line, dist, vec = grass.findNearestLine(car.front)
             if line and dist < ROAD_WIDTH/2:
                 total_vec += vec
+                total_vec = vec
                 self.red_lines.append(line)
                 self.red_lines.append((line[0], car.front))
                 self.red_lines.append((line[1], car.front))
+
+            #line, dist, vec = grass.findNearestLine(car.position)
+            #if line and dist < ROAD_WIDTH/4:
+            #    total_vec += vec
+            #    total_vec = vec
+            #    self.red_lines.append(line)
+            #    self.red_lines.append((line[0], car.position))
+            #    self.red_lines.append((line[1], car.position))
 
         if self.red_lines:
             self.destination = car.position + getVector(getAngle(total_vec)) * 4
@@ -236,9 +273,19 @@ class CarController(Obstacle):
             self.destination = car.position
 
     def drawPath(self):
-        if len(self.path) > 1:
-            path = [self.world.getDrawable(point) for point in self.path]
-            pygame.draw.lines(self.world.screen, GREY, False, path, 1)
+        #if len(self.path) > 1:
+        #    path = [self.world.getDrawable(point) for point in self.path]
+        #    pygame.draw.lines(self.world.screen, GREY, False, path, 1)
+
+        colours = [MAGENTA, RED,  YELLOW,
+                   GREEN,   CYAN, BLUE]
+
+        if len(self.car_side_paths[0]) > 1:
+            for i in range(6):
+                colour = colours[i]
+                path = self.car_side_paths[i]
+                path = [self.world.getDrawable(point) for point in path]
+                pygame.draw.lines(self.world.screen, colour, False, path, 1)
 
     def drawWaypoints(self):
         for waypoint in self.waypoints:
@@ -260,6 +307,6 @@ class CarController(Obstacle):
         dest = self.world.getDrawable(self.destination)
         pygame.draw.circle(self.world.screen, BLACK, dest, thres, 1)
 
-        pos = self.world.getDrawable(self.car.position)
-        pygame.draw.line(self.world.screen, self.colour, pos, dest, 1)
+        #pos = self.world.getDrawable(self.car.position)
+        #pygame.draw.line(self.world.screen, self.colour, pos, dest, 1)
 
