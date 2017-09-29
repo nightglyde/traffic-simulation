@@ -12,7 +12,7 @@ TOTAL_WAYPOINTS = 1000
 
 DESIRED_SPEED = 10
 
-PATH_MEMORY = 200
+PATH_MEMORY = 300
 
 class CarController(Obstacle):
     def __init__(self, car):
@@ -83,7 +83,7 @@ class CarController(Obstacle):
             if i % 20 == 0:
                 path.append(sim_car.position)
 
-            distance = getMagnitude(destination - sim_car.front)
+            distance = getMagnitude(destination - sim_car.centre)
             if distance <= WAYPOINT_THRESHOLD:
                 break
 
@@ -165,7 +165,7 @@ class CarController(Obstacle):
 
             offset = (self.car.time - self.waypoint_time) - waypoint.time
 
-            distance = getMagnitude(waypoint.position - self.car.front)
+            distance = getMagnitude(waypoint.position - self.car.centre)
             if distance <= WAYPOINT_THRESHOLD:
 
                 self.waypoints.popleft()

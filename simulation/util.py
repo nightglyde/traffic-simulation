@@ -6,7 +6,7 @@ from collections import deque
 
 FRAMES_PER_SECOND = 60
 
-SCREEN_WIDTH  = 800#1200 # pixels
+SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
 WORLD_WIDTH  = 100 # metres
@@ -21,7 +21,7 @@ WHEEL_WIDTH  = 0.225
 AXLE_LENGTH  = 2.7
 AXLE_WIDTH   = CAR_WIDTH - WHEEL_WIDTH
 
-PIVOT_TO_FRONT = CAR_LENGTH/2 #+ AXLE_LENGTH/2 # 3.6
+PIVOT_TO_FRONT = CAR_LENGTH/2 + AXLE_LENGTH/2 # 3.6
 PIVOT_TO_REAR  = CAR_LENGTH - PIVOT_TO_FRONT
 
 PIVOT_TO_AXLE = PIVOT_TO_FRONT - (CAR_LENGTH - AXLE_LENGTH) / 2
@@ -30,18 +30,6 @@ ARROW_LENGTH      = PIVOT_TO_AXLE #1.35 #2.7
 ARROW_WIDTH       = 0.9
 ARROW_STEM_LENGTH = ARROW_LENGTH - 0.5
 ARROW_STEM_WIDTH  = 0.45
-
-# physics constants
-DRAG_CONSTANT    = 0.761
-RR_CONSTANT      = DRAG_CONSTANT * 30
-BRAKING_CONSTANT = 10000
-GRAVITY_CONSTANT = 9.807
-
-MIN_ENGINE_FORCE = 0
-MAX_ENGINE_FORCE = 10000
-
-CAR_MASS   = 1250
-CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
 
 LEFT   = -1
 RIGHT  = 1
@@ -200,7 +188,7 @@ ANGLE_90 = Angle(math.radians(90))
 ANGLE_120 = Angle(math.radians(120))
 ANGLE_180 = Angle(math.radians(180))
 
-MAX_WHEEL_ANGLE = ANGLE_15
+MAX_WHEEL_ANGLE = ANGLE_30
 TURN_RADIUS     = PIVOT_TO_AXLE / math.sin(MAX_WHEEL_ANGLE.value)
 
 ###########
@@ -316,11 +304,11 @@ ALL_COLOURS = [
 # MISCELLANEOUS #
 #################
 
-def getTurningCircle(direction, car):
+def getTurningCircle(direction, car, radius=TURN_RADIUS):
     if direction == LEFT:
-        centre_vector = getVector(car.angle - ANGLE_90) * TURN_RADIUS
+        centre_vector = getVector(car.angle - ANGLE_90) * radius
     else:
-        centre_vector = getVector(car.angle + ANGLE_90) * TURN_RADIUS
+        centre_vector = getVector(car.angle + ANGLE_90) * radius
     return car.position + centre_vector
 
 def generateRect(circle_centre, radius, zoom):

@@ -171,7 +171,7 @@ class World(Obstacle):
     def zoomIn(self, mouse_position):
         if self.selected_car != None:
             mouse_position = SCREEN_CENTRE
-            true_mouse_position = self.selected_car.position
+            true_mouse_position = self.selected_car.centre
         else:
             true_mouse_position = self.getTruePosition(mouse_position)
             if not self.checkInside(true_mouse_position):
@@ -185,7 +185,7 @@ class World(Obstacle):
     def zoomOut(self, mouse_position):
         if self.selected_car != None:
             mouse_position = SCREEN_CENTRE
-            true_mouse_position = self.selected_car.position
+            true_mouse_position = self.selected_car.centre
         else:
             true_mouse_position = self.getTruePosition(mouse_position)
             if not self.checkInside(true_mouse_position):
@@ -198,7 +198,7 @@ class World(Obstacle):
 
     def followCar(self, car):
         screen_centre = self.getTruePosition(SCREEN_CENTRE)
-        self.offset  += screen_centre - car.position
+        self.offset  += screen_centre - car.centre
 
     def startPan(self, mouse_position):
         true_mouse_position = self.getTruePosition(mouse_position)

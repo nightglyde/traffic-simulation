@@ -2,7 +2,18 @@ from util import *
 
 from obstacle import Obstacle
 
-PATH_HISTORY = 100
+# physics constants
+DRAG_CONSTANT    = 0.761
+RR_CONSTANT      = DRAG_CONSTANT * 30
+BRAKING_CONSTANT = 10000
+GRAVITY_CONSTANT = 9.807
+
+MIN_ENGINE_FORCE = 0
+MAX_ENGINE_FORCE = 10000
+
+CAR_MASS   = 1250
+CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
+
 SHOW_WHEELS  = True
 
 class Car(Obstacle):
@@ -60,6 +71,8 @@ class Car(Obstacle):
         self.hull = [self.front - left, self.front + left,
                      self.rear  + left, self.rear  - left]
 
+        self.centre = (self.front + self.rear) / 2
+
     def stop(self, other):
         if not self.stopped:
             self.stopped = True
@@ -82,7 +95,7 @@ class Car(Obstacle):
             radius           = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
             angular_velocity = self.speed / radius
 
-            angle_change = Angle(angular_velocity * dt)
+            angle_change = Angle(angular_velocity * dt / 2)
             if self.reverse:
                 angle_change = -angle_change
             self.angle += angle_change
@@ -116,9 +129,24 @@ class Car(Obstacle):
         self.velocity += acceleration  * dt
         self.position += self.velocity * dt
 
-        self.generateHull()
-
         self.speed = getMagnitude(self.velocity)
+
+        # cornering
+        if self.wheel_angle.value != ANGLE_0.value:
+            radius           = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
+            angular_velocity = self.speed / radius
+
+            angle_change = Angle(angular_velocity * dt / 2)
+            if self.reverse:
+                angle_change = -angle_change
+            self.angle += angle_change
+
+        heading = getVector(self.angle)
+        if self.reverse:
+            heading = -heading
+        self.velocity = heading * self.speed
+
+        self.generateHull()
 
     def controlSpeed(self, new_speed, reverse):
         if self.time <= self.speed_time:
@@ -166,7 +194,7 @@ class Car(Obstacle):
             ratio  = min(max(-1, PIVOT_TO_AXLE / radius), 1)
             new_wheel_angle = Angle(math.asin(ratio))
 
-        angle_change = Angle(2*math.pi * dt * 2)
+        angle_change = Angle(2*math.pi * dt * 0.5)
         if new_wheel_angle < self.wheel_angle:
             self.wheel_angle = max(self.wheel_angle-angle_change,
                                    new_wheel_angle, -MAX_WHEEL_ANGLE)
@@ -269,17 +297,58 @@ class Car(Obstacle):
             pygame.draw.polygon(screen, DARK_GREY, rear_right_wheel)
             pygame.draw.polygon(screen, BLACK,     rear_right_wheel, 1)
 
-        #radius = self.world.scaleDistance(TURN_RADIUS)
-        #left_centre  = self.world.getDrawable(getTurningCircle(LEFT,  self))
-        #right_centre = self.world.getDrawable(getTurningCircle(RIGHT, self))
-        #pygame.draw.circle(self.world.screen, GREY, left_centre,  radius, 1)
-        #pygame.draw.circle(self.world.screen, GREY, right_centre, radius, 1)
+        if abs(self.wheel_angle.value) > ANGLE_1.value / 4:
+            radius       = PIVOT_TO_AXLE / abs(math.sin(self.wheel_angle.value))
+            radius_inner = radius - CAR_WIDTH/2
+
+            if self.wheel_angle.value < 0:
+                circle_centre = getTurningCircle(LEFT, self, radius)
+                radius_outer  = getMagnitude(self.hull[1] - circle_centre)
+
+            elif radius > 0:
+                circle_centre = getTurningCircle(RIGHT, self, radius)
+                radius_outer  = getMagnitude(self.hull[0] - circle_centre)
+
+            rad_out = self.world.scaleDistance(radius_outer)
+            rad_in  = self.world.scaleDistance(radius_inner)
+            centre  = self.world.getDrawable(circle_centre)
+
+            pygame.draw.circle(screen, GREY, centre, rad_out, 1)
+            pygame.draw.circle(screen, GREY, centre, rad_in, 1)
+
+        else:
+            front_left  = self.world.getDrawable(self.hull[1] + forward * 20)
+            rear_left   = self.world.getDrawable(self.hull[2] - forward * 20)
+            front_right = self.world.getDrawable(self.hull[0] + forward * 20)
+            rear_right  = self.world.getDrawable(self.hull[3] - forward * 20)
+
+            pygame.draw.line(screen, GREY, rear_left,  front_left,  1)
+            pygame.draw.line(screen, GREY, rear_right, front_right, 1)
+
+        #rad    = self.world.scaleDistance(TURN_RADIUS)
+        #left_centre  = getTurningCircle(LEFT,  self)
+        #right_centre = getTurningCircle(RIGHT, self)
+        #l_c = self.world.getDrawable(left_centre)
+        #r_c = self.world.getDrawable(right_centre)
+        #pygame.draw.circle(screen, GREY, l_c, rad, 1)
+        #pygame.draw.circle(screen, GREY, r_c, rad, 1)
 
         #pos = self.world.getDrawable(pos)
         #f_r = self.world.getDrawable(f_r)
         #f_l = self.world.getDrawable(f_l)
-        #pygame.draw.line(self.world.screen, GREY, pos, left_centre,  1)
-        #pygame.draw.line(self.world.screen, GREY, pos, right_centre, 1)
-        #pygame.draw.line(self.world.screen, GREY, f_r, left_centre,  1)
-        #pygame.draw.line(self.world.screen, GREY, f_l, right_centre, 1)
+        #pygame.draw.line(screen, GREY, pos, l_c, 1)
+        #pygame.draw.line(screen, GREY, pos, r_c, 1)
+        #pygame.draw.line(screen, GREY, f_r, l_c, 1)
+        #pygame.draw.line(screen, GREY, f_l, r_c, 1)
+
+        #radius_outer = getMagnitude(self.hull[1] - left_centre)
+        #radius_inner = TURN_RADIUS - CAR_WIDTH/2
+
+        #rad_out = self.world.scaleDistance(radius_outer)
+        #rad_in  = self.world.scaleDistance(radius_inner)
+
+        #pygame.draw.circle(screen, GREY, l_c, rad_out, 1)
+        #pygame.draw.circle(screen, GREY, l_c, rad_in,  1)
+        #pygame.draw.circle(screen, GREY, r_c, rad_out, 1)
+        #pygame.draw.circle(screen, GREY, r_c, rad_in,  1)
 
