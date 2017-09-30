@@ -50,6 +50,13 @@ class Vector:
     def right90(self):
         return Vector(self.y, -self.x)
 
+    def mag(self):
+        return math.sqrt(self.x**2 + self.y**2)
+
+    def norm(self):
+        mag = self.mag()
+        return Vector(self.x/mag, self.y/mag)
+
     def __add__(self, other):
         return Vector(self.x + other.x, self.y + other.y)
 
@@ -145,8 +152,8 @@ def getAngle(vector):
         angle += math.pi
     return Angle(angle)
 
-def getMagnitude(vector):
-    return math.sqrt(vector.x**2 + vector.y**2)
+#def getMagnitude(vector):
+#    return math.sqrt(vector.x**2 + vector.y**2)
 
 def getPolar(vector):
     x = vector.x
@@ -321,6 +328,9 @@ def sign(n):
 
 def ccw(a, b, c):
     return (b.x-a.x) * (c.y-a.y) - (b.y-a.y) * (c.x-a.x)
+
+def dotProduct(a, b):
+    return a.x * b.x + a.y * b.y
 
 def angleBetween(a, b):
     dot_product = (a.x * b.x) + (a.y * b.y)

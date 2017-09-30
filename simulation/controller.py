@@ -26,9 +26,7 @@ class CarController(Obstacle):
         self.waypoint_time = None
         self.limited_mode  = False
 
-        self.destination = None
-        self.red_lines   = []
-        self.options     = []
+        self.options = []
 
         self.path = deque()
         self.path.append(self.car.position)
@@ -83,12 +81,11 @@ class CarController(Obstacle):
             if i % 20 == 0:
                 path.append(sim_car.position)
 
-            distance = getMagnitude(destination - sim_car.centre)
+            distance = (destination - sim_car.centre).mag()
             if distance <= WAYPOINT_THRESHOLD:
                 break
 
-            self.control(sim_car, waypoint)
-
+            sim_car.control(waypoint)
             time += time_step
             sim_car.update(time)
 
@@ -165,7 +162,7 @@ class CarController(Obstacle):
 
             offset = (self.car.time - self.waypoint_time) - waypoint.time
 
-            distance = getMagnitude(waypoint.position - self.car.centre)
+            distance = (waypoint.position - self.car.centre).mag()
             if distance <= WAYPOINT_THRESHOLD:
 
                 self.waypoints.popleft()
@@ -195,82 +192,9 @@ class CarController(Obstacle):
         self.updateCarSidePaths()
 
         if self.waypoints:
-            self.control(self.car, self.waypoints[0])
+            self.car.control(self.waypoints[0])
         else:
-            self.control(self.car, None)
-
-    def control(self, car, waypoint):
-        # look for nearby collisions
-        total_vec = VECTOR_0
-        self.red_lines = []
-        for grass in self.world.grass:
-            line, dist, vec = grass.findNearestLine(car.front)
-            if line and dist < ROAD_WIDTH/2:
-                total_vec += vec
-                total_vec = vec
-                self.red_lines.append(line)
-                self.red_lines.append((line[0], car.front))
-                self.red_lines.append((line[1], car.front))
-
-            #line, dist, vec = grass.findNearestLine(car.position)
-            #if line and dist < ROAD_WIDTH/4:
-            #    total_vec += vec
-            #    total_vec = vec
-            #    self.red_lines.append(line)
-            #    self.red_lines.append((line[0], car.position))
-            #    self.red_lines.append((line[1], car.position))
-
-        if self.red_lines:
-            self.destination = car.position + getVector(getAngle(total_vec)) * 4
-
-            angle = getAngle(self.destination - car.position)
-            angle_difference = angle - car.angle
-            #if angle_difference < ANGLE_0:
-            #    car.controlAngle(-MAX_WHEEL_ANGLE)
-            #else:
-            #    car.controlAngle(MAX_WHEEL_ANGLE)
-            car.controlAngle(angle_difference)
-
-            car.controlSpeed(DESIRED_SPEED, False)
-
-        elif waypoint:
-            self.destination = waypoint.position
-
-            # adjust wheel angle using destination point
-            angle, magnitude = getPolar(self.destination - car.position)
-            angle_difference = angle - car.angle
-
-            #if abs(angle_difference.value) < ANGLE_1.value:
-            #    car.controlAngle(ANGLE_0)
-
-            #if angle_difference < ANGLE_0: # left turn
-                # test if point is too close
-                #centre = getTurningCircle(LEFT, car)
-                #dist_from_centre = getMagnitude(self.destination - centre)
-                #if dist_from_centre < TURN_RADIUS - WAYPOINT_THRESHOLD:
-                #    car.controlAngle(ANGLE_90)#MAX_WHEEL_ANGLE)
-                #else:
-                    #car.controlAngle(-MAX_WHEEL_ANGLE)
-                #    car.controlAngle(angle_difference)
-
-            #elif angle_difference > ANGLE_0: # right turn
-                # test if point is too close
-                #centre = getTurningCircle(RIGHT, car)
-                #dist_from_centre = getMagnitude(self.destination - centre)
-                #if dist_from_centre < TURN_RADIUS - WAYPOINT_THRESHOLD:
-                #    car.controlAngle(-ANGLE_90)#-MAX_WHEEL_ANGLE)
-                #else:
-                    #car.controlAngle(MAX_WHEEL_ANGLE)
-                #    car.controlAngle(angle_difference)
-
-            car.controlAngle(angle_difference)
-
-            car.controlSpeed(DESIRED_SPEED, False)
-
-        else:
-            car.controlAngle(ANGLE_0)
-            car.controlSpeed(0, False)
-            self.destination = car.position
+            self.car.control(None)
 
     def drawPath(self):
         #if len(self.path) > 1:
@@ -294,18 +218,18 @@ class CarController(Obstacle):
         for waypoint in self.waypoints:
             waypoint.draw()
 
-        for point_1, point_2 in self.red_lines:
-            point_1 = self.world.getDrawable(point_1)
-            point_2 = self.world.getDrawable(point_2)
-            pygame.draw.line(self.world.screen, self.colour, point_1, point_2, 3)
+        #for point_1, point_2 in self.red_lines:
+        #    point_1 = self.world.getDrawable(point_1)
+        #    point_2 = self.world.getDrawable(point_2)
+        #    pygame.draw.line(self.world.screen, self.colour, point_1, point_2, 3)
 
         thres = self.world.scaleDistance(WAYPOINT_THRESHOLD)
         for option in self.options:
             point = self.world.getDrawable(option)
             pygame.draw.circle(self.world.screen, self.colour, point, thres, 1)
 
-        dest = self.world.getDrawable(self.destination)
-        pygame.draw.circle(self.world.screen, BLACK, dest, thres, 1)
+        #dest = self.world.getDrawable(self.destination)
+        #pygame.draw.circle(self.world.screen, BLACK, dest, thres, 1)
 
         #pos = self.world.getDrawable(self.car.position)
         #pygame.draw.line(self.world.screen, self.colour, pos, dest, 1)

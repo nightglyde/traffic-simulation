@@ -71,9 +71,9 @@ class Obstacle:
         for i in range(len(self.hull)):
             point_i = self.hull[i]
             point_k = self.hull[(i+1) % len(self.hull)]
-            dist_ij  = getMagnitude(point_i - point)
-            dist_kj  = getMagnitude(point_k - point)
-            dist_ik  = getMagnitude(point_i - point_k)
+            dist_ij  = (point_i - point).mag()
+            dist_kj  = (point_k - point).mag()
+            dist_ik  = (point_i - point_k).mag()
             if max(dist_ij, dist_kj)**2 - safe_dist**2 <= dist_ik**2:
                 dist = ccw(point_i, point, point_k) / dist_ik
             else:
@@ -84,12 +84,83 @@ class Obstacle:
                 best_line = (point_i, point_k)
 
         if best_line:
-            angle, mag = getPolar((point - best_line[1]))
+            angle, mag = getPolar(point - best_line[1])
             angle_away = Angle(math.acos(best_dist/mag)) + angle
             vec = getVector(angle_away)
         else:
             vec = None
         return best_line, best_dist, vec
+
+    def crashCircle(self, circle_centre, direction, radii, angles, speeds):
+        least_time = -1
+        results    = (None, None, None)
+
+        for i in range(len(self.hull)):
+            point_i = self.hull[i]
+            point_j = self.hull[(i+1) % len(self.hull)]
+
+            i_j      = point_j - point_i
+            i_j_dist = i_j.mag()
+            i_j_norm = i_j / i_j_dist
+
+            c_i      = circle_centre - point_i
+            c_j      = circle_centre - point_j
+            c_i_dist = c_i.mag()
+            c_j_dist = c_j.mag()
+
+            if max(c_i_dist, c_j_dist) < radii[-1]:
+                continue
+
+            near_dist = dotProduct(c_i, i_j_norm)
+            nearest   = point_i + i_j_norm * near_dist
+            circ_dist = (nearest - circle_centre).mag()
+
+            if near_dist <= 0:
+                if c_i_dist > radii[0]:
+                    continue
+            elif near_dist >= i_j_dist:
+                if c_j_dist > radii[0]:
+                    continue
+            else:
+                if circ_dist > radii[0]:
+                    continue
+
+            for i in range(len(radii)):
+                radius = radii[i]
+                if circ_dist > radius:
+                    break
+                angle  = angles[i]
+                speed  = speeds[i]
+
+                offset = math.sqrt(radius**2 - circ_dist**2)
+                dists  = [near_dist - offset, near_dist + offset]
+
+                for dist in dists:
+                    if 0 <= dist <= i_j_dist:
+                        point     = point_i + i_j_norm * dist
+                        abs_angle = getAngle(point - circle_centre)
+                        if direction == LEFT:
+                            rel_angle = (abs_angle - angle).norm()
+                        else:
+                            rel_angle = (angle - abs_angle).norm()
+
+                        time = rel_angle * radius / speed
+                        if time < least_time or least_time == -1:
+                            least_time = time
+                            results = (i, point, time)
+        return results
+
+    def crashLine(self, left_point, right_point, forward):
+        least_time = -1
+        results    = (None, None, None)
+
+        # go through all the lines in the hull, and see where they interect
+        # the lines cast by left_point and right_point in the forwards
+        # direction
+
+        # maybe use dot product like in the other function
+
+        return results
 
     def draw(self):
         polygon = [self.world.getDrawable(point) for point in self.hull]

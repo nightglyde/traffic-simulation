@@ -255,4 +255,5 @@ class World(Obstacle):
 
         for car in self.cars:
             car.draw(car is self.selected_car)
+            car.drawExtra()
 
