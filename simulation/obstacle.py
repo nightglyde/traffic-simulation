@@ -28,12 +28,11 @@ def convexHull(points):
     return hull
 
 class Obstacle:
-    def __init__(self, world, name, colour, points, outline=True):
+    def __init__(self, world, name, colour, points):
         self.world   = world
         self.name    = name
         self.colour  = colour
         self.hull    = convexHull(points)
-        self.outline = outline
 
     def checkCollision(self, other):
         for i in range(len(self.hull)):
@@ -91,6 +90,38 @@ class Obstacle:
             vec = None
         return best_line, best_dist, vec
 
+    def withinRadius(self, centre, radius):
+        for i in range(len(self.hull)):
+            point_i = self.hull[i]
+            point_j = self.hull[(i+1) % len(self.hull)]
+
+            i_j      = point_j - point_i
+            i_j_dist = i_j.mag()
+            i_j_norm = i_j / i_j_dist
+
+            c_i      = centre - point_i
+            c_j      = centre - point_j
+            c_i_dist = c_i.mag()
+            c_j_dist = c_j.mag()
+
+            if min(c_i_dist, c_j_dist) <= radius:
+                return True
+
+            near_dist = dotProduct(c_i, i_j_norm)
+            if near_dist <= 0:
+                if c_i_dist > radius:
+                    continue
+            elif near_dist >= i_j_dist:
+                if c_j_dist > radius:
+                    continue
+            else:
+                nearest   = point_i + i_j_norm * near_dist
+                circ_dist = (nearest - centre).mag()
+                if circ_dist > radius:
+                    continue
+            return True
+        return False
+
     def crashCircle(self, circle_centre, direction, radii, angles, speeds):
         least_time = -1
         results    = (None, None, None)
@@ -144,28 +175,77 @@ class Obstacle:
                         else:
                             rel_angle = (angle - abs_angle).norm()
 
-                        time = rel_angle * radius / speed
-                        if time < least_time or least_time == -1:
-                            least_time = time
-                            results = (i, point, time)
+                        arc_len = rel_angle * radius
+                        if arc_len <= COLLISION_DISTANCE:
+                            time = arc_len / speed
+                            if time < least_time or least_time == -1:
+                                least_time = time
+                                results    = (i, point, time)
         return results
 
-    def crashLine(self, left_point, right_point, forward):
+    def crashLine(self, car_points, forward, speed):
         least_time = -1
         results    = (None, None, None)
 
-        # go through all the lines in the hull, and see where they interect
-        # the lines cast by left_point and right_point in the forwards
-        # direction
+        for i in range(len(self.hull)):
+            point_i = self.hull[i]
+            point_j = self.hull[(i+1) % len(self.hull)]
 
-        # maybe use dot product like in the other function
+            i_j = point_j - point_i
+            f_cross_ij = crossProduct(forward, i_j)
 
+            if f_cross_ij == 0.0:
+                # lines are parallel
+                print("Z")
+
+                for car_point in car_points:
+                    c_i = point_i - car_point
+
+                    ci_cross_f = crossProduct(c_i, forward)
+                    if ci_cross_f == 0.0:
+                        # collinear
+                        ij_dot_f = dotProduct(i_j, forward)
+
+                        if ij_dot_f > 0:
+                            crash_point = point_i
+                            print("A")
+                        else:
+                            crash_point = point_j
+                            print("B")
+
+                        c_i = crash_point - car_point
+                        f_dot_f = dotProduct(forward, forward)
+                        ray_dist = dotProduct(c_i, forward) / f_dot_f
+
+                        if 0 <= ray_dist <= COLLISION_DISTANCE:
+                            time = ray_dist / speed
+                            if time < least_time or least_time == -1:
+                                least_time = time
+                                results    = (car_point, crash_point, time)
+            else:
+                # lines are not parallel
+                for car_point in car_points:
+                    c_i = point_i - car_point
+
+                    ij_dist  = crossProduct(c_i, forward) / f_cross_ij
+                    if 0 <= ij_dist <= 1:
+
+                        ray_dist = crossProduct(c_i, i_j)     / f_cross_ij
+                        if 0 <= ray_dist <= COLLISION_DISTANCE:
+                            time = ray_dist / speed
+                            if time < least_time or least_time == -1:
+                                least_time  = time
+                                crash_point = car_point + forward * ray_dist
+                                results     = (car_point, crash_point, time)
         return results
 
-    def draw(self):
+    def draw(self, outline=False):
         polygon = [self.world.getDrawable(point) for point in self.hull]
         pygame.draw.polygon(self.world.screen, self.colour, polygon)
-
-        if self.outline:
+        if outline:
             pygame.draw.polygon(self.world.screen, BLACK, polygon, 1)
+
+    def drawOutline(self):
+        polygon = [self.world.getDrawable(point) for point in self.hull]
+        pygame.draw.polygon(self.world.screen, BLACK, polygon, 1)
 

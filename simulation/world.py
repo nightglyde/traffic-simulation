@@ -73,7 +73,7 @@ class World(Obstacle):
         return Vector(x, y)
 
     def addGrass(self, points):
-        grass = Obstacle(self, "grass", LIGHT_GREEN, points, False)
+        grass = Obstacle(self, "grass", LIGHT_GREEN, points)
         self.grass.append(grass)
 
     def addObstacle(self, name, colour, points):
@@ -245,7 +245,7 @@ class World(Obstacle):
         pygame.draw.polygon(self.screen, BLACK, box, 1)
 
         for obstacle in self.obstacles:
-            obstacle.draw()
+            obstacle.draw(True)
 
         for controller in self.controllers:
             controller.drawWaypoints()

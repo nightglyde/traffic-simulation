@@ -6,13 +6,14 @@ from collections import deque
 
 FRAMES_PER_SECOND = 60
 
-SCREEN_WIDTH  = 1200 # pixels
+SCREEN_WIDTH  = 800#1200 # pixels
 SCREEN_HEIGHT = 800
 
 WORLD_WIDTH  = 100 # metres
 WORLD_HEIGHT = 100 # must be at least 30
 
 ROAD_WIDTH = 3.5
+COLLISION_DISTANCE = 20
 
 CAR_LENGTH   = 4.5
 CAR_WIDTH    = 1.8
@@ -332,15 +333,17 @@ def ccw(a, b, c):
 def dotProduct(a, b):
     return a.x * b.x + a.y * b.y
 
+def crossProduct(a, b):
+    return a.x * b.y - a.y * b.x
+
 def angleBetween(a, b):
-    dot_product = (a.x * b.x) + (a.y * b.y)
+    dot_product = dotProduct(a, b)
     ratio = dot_product / (getMagnitude(a) * getMagnitude(b))
     ratio = max(min(ratio, 1), -1)
     return math.acos(ratio)
 
 def turnDirection(a, b):
-    cross_product = (a.x * b.y) - (a.y * b.x)
-    return sign(cross_product)
+    return sign(crossProduct(a, b))
 
 def leftTurn(a, b):
     angle = angleBetween(a, b)

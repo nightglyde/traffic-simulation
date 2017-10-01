@@ -128,6 +128,9 @@ while not done:
             if event.key == pygame.K_SPACE:
                 paused = not paused
 
+        elif event.type == pygame.USEREVENT:
+            paused = True
+
     # update world
     if not paused:
         world_time += expected_time_step#min(time_step, expected_time_step)
