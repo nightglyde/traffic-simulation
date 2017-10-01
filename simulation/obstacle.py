@@ -122,9 +122,8 @@ class Obstacle:
             return True
         return False
 
-    def crashCircle(self, circle_centre, direction, radii, angles, speeds):
-        least_time = -1
-        results    = (None, None, None)
+    def crashCircle(self, circle_centre, direction, details):
+        closest_crash = None
 
         for i in range(len(self.hull)):
             point_i = self.hull[i]
@@ -139,7 +138,7 @@ class Obstacle:
             c_i_dist = c_i.mag()
             c_j_dist = c_j.mag()
 
-            if max(c_i_dist, c_j_dist) < radii[-1]:
+            if max(c_i_dist, c_j_dist) < details[-1][0]: # smallest radius
                 continue
 
             near_dist = dotProduct(c_i, i_j_norm)
@@ -147,45 +146,43 @@ class Obstacle:
             circ_dist = (nearest - circle_centre).mag()
 
             if near_dist <= 0:
-                if c_i_dist > radii[0]:
+                if c_i_dist > details[0][0]: # biggest radius
                     continue
             elif near_dist >= i_j_dist:
-                if c_j_dist > radii[0]:
+                if c_j_dist > details[0][0]:
                     continue
             else:
-                if circ_dist > radii[0]:
+                if circ_dist > details[0][0]:
                     continue
 
-            for i in range(len(radii)):
-                radius = radii[i]
+            for i in range(len(details)):
+                radius, car_angle, speed, car_point = details[i]
+
                 if circ_dist > radius:
                     break
-                angle  = angles[i]
-                speed  = speeds[i]
 
                 offset = math.sqrt(radius**2 - circ_dist**2)
                 dists  = [near_dist - offset, near_dist + offset]
 
                 for dist in dists:
                     if 0 <= dist <= i_j_dist:
-                        point     = point_i + i_j_norm * dist
-                        abs_angle = getAngle(point - circle_centre)
+                        crash_point = point_i + i_j_norm * dist
+                        abs_angle   = getAngle(crash_point - circle_centre)
                         if direction == LEFT:
-                            rel_angle = (abs_angle - angle).norm()
+                            rel_angle = (abs_angle - car_angle).norm()
                         else:
-                            rel_angle = (angle - abs_angle).norm()
+                            rel_angle = (car_angle - abs_angle).norm()
 
                         arc_len = rel_angle * radius
                         if arc_len <= COLLISION_DISTANCE:
                             time = arc_len / speed
-                            if time < least_time or least_time == -1:
-                                least_time = time
-                                results    = (i, point, time)
-        return results
+                            crash = (time, car_point, crash_point)
+                            if closest_crash is None or crash < closest_crash:
+                                closest_crash = crash
+        return closest_crash
 
     def crashLine(self, car_points, forward, speed):
-        least_time = -1
-        results    = (None, None, None)
+        closest_crash = None
 
         for i in range(len(self.hull)):
             point_i = self.hull[i]
@@ -218,10 +215,10 @@ class Obstacle:
                         ray_dist = dotProduct(c_i, forward) / f_dot_f
 
                         if 0 <= ray_dist <= COLLISION_DISTANCE:
-                            time = ray_dist / speed
-                            if time < least_time or least_time == -1:
-                                least_time = time
-                                results    = (car_point, crash_point, time)
+                            time  = ray_dist / speed
+                            crash = (time, car_point, crash_point)
+                            if closest_crash is None or crash < closest_crash:
+                                closest_crash = crash
             else:
                 # lines are not parallel
                 for car_point in car_points:
@@ -232,12 +229,12 @@ class Obstacle:
 
                         ray_dist = crossProduct(c_i, i_j)     / f_cross_ij
                         if 0 <= ray_dist <= COLLISION_DISTANCE:
-                            time = ray_dist / speed
-                            if time < least_time or least_time == -1:
-                                least_time  = time
-                                crash_point = car_point + forward * ray_dist
-                                results     = (car_point, crash_point, time)
-        return results
+                            time        = ray_dist / speed
+                            crash_point = car_point + forward * ray_dist
+                            crash       = (time, car_point, crash_point)
+                            if closest_crash is None or crash < closest_crash:
+                                closest_crash = crash
+        return closest_crash
 
     def draw(self, outline=False):
         polygon = [self.world.getDrawable(point) for point in self.hull]

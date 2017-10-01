@@ -5,8 +5,9 @@ import pygame
 from collections import deque
 
 FRAMES_PER_SECOND = 60
+TIME_STEP         = 1000 // FRAMES_PER_SECOND
 
-SCREEN_WIDTH  = 800#1200 # pixels
+SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
 WORLD_WIDTH  = 100 # metres
@@ -14,6 +15,7 @@ WORLD_HEIGHT = 100 # must be at least 30
 
 ROAD_WIDTH = 3.5
 COLLISION_DISTANCE = 20
+BUBBLE_SIZE = 0.5
 
 CAR_LENGTH   = 4.5
 CAR_WIDTH    = 1.8
@@ -338,7 +340,7 @@ def crossProduct(a, b):
 
 def angleBetween(a, b):
     dot_product = dotProduct(a, b)
-    ratio = dot_product / (getMagnitude(a) * getMagnitude(b))
+    ratio = dot_product / a.mag() * b.mag()
     ratio = max(min(ratio, 1), -1)
     return math.acos(ratio)
 

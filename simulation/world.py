@@ -95,8 +95,7 @@ class World(Obstacle):
                 continue
 
             vec = pos - waypoint.position
-            magnitude = getMagnitude(vec)
-            if magnitude > 10:#16:
+            if vec.mag() > 10:#16:
                 continue
 
             diff = angleBetween(vec, getVector(waypoint.angle))
@@ -112,8 +111,19 @@ class World(Obstacle):
 
         # create car
         while True:
-            pos   = self.generateRandomPosition()
-            angle = Angle(random.random()*2*math.pi)
+            pos = random.choice(self.starting_positions)
+
+            #pos = self.generateRandomPosition()
+
+            for option in waypoint_options:
+                vec = option - pos
+                if vec.mag() > 10:
+                    continue
+
+                angle = getAngle(vec)
+                break
+
+            #angle = Angle(random.random()*2*math.pi)
 
             car = Car(self, name, colour, pos, angle, time)
             if self.checkObject(car):

@@ -24,8 +24,8 @@ for points in predefined_grass:
     world.addGrass(points)
 
 # create starting positions
-#for point in starting_positions:
-#    world.addStartingPosition(point)
+for point in starting_positions:
+    world.addStartingPosition(point)
 
 # create waypoint options
 for point in waypoint_options:
@@ -33,8 +33,6 @@ for point in waypoint_options:
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
-
-expected_time_step = 1000 // FRAMES_PER_SECOND
 
 # create cars
 count = 0
@@ -133,7 +131,7 @@ while not done:
 
     # update world
     if not paused:
-        world_time += expected_time_step#min(time_step, expected_time_step)
+        world_time += TIME_STEP #min(time_step, TIME_STEP)
         world.update(world_time)
 
     # draw to screen
