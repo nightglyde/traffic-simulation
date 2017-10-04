@@ -16,15 +16,16 @@ CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
 
 SHOW_WHEELS  = True
 
-SLOW_SPEED    = 5
-DESIRED_SPEED = 10
+SLOW_SPEED = 0
+MAX_SPEED  = 10
 
 STEERING_RATE = 0.5#2
 
-def getCrashTime(crash):
-    if crash is None:
-        return 1000 # a big number
-    return crash[0]
+def calculateMaxSpeed(distance):
+    max_force    = -min(BRAKING_CONSTANT, CAR_WEIGHT)
+    acceleration = max_force / CAR_MASS
+    speed        = math.sqrt(-2 * acceleration * distance) + SLOW_SPEED
+    return min(speed, MAX_SPEED)
 
 class Car(Obstacle):
     def __init__(self, world, name, colour, position, angle, time):
@@ -32,70 +33,104 @@ class Car(Obstacle):
         self.name   = name
         self.colour = colour
 
+        # status
         self.position = position # metres
         self.angle    = angle    # radians
         self.time     = time     # miliseconds
+        self.stopped  = False
 
-        self.engine_force = MIN_ENGINE_FORCE # newtons
-        self.wheel_angle  = ANGLE_0          # radians
-        self.velocity     = VECTOR_0         # metres per second
-        self.speed        = 0.0              # metres per second
+        # motion
+        self.engine_force     = MIN_ENGINE_FORCE # newtons
+        self.wheel_angle      = ANGLE_0          # radians
+        self.speed            = 0.0              # metres per second
+        self.angular_velocity = 0.0              # radians per second
 
-        self.braking = False
-        self.reverse = False
-        self.stopped = False
-
-        self.angular_vel = 0.0
+        # control
+        self.desired_angle = ANGLE_0
+        self.desired_speed = 0.0
 
         self.generateHull()
 
-        self.speed_time = time
-        self.angle_time = time
-
-        self.destination  = None
-        self.red_lines    = []
+        self.destination = None
+        self.red_lines   = []
+        self.crash       = None
 
         self.circle_centre = None
-        self.crash         = None
+        self.bubble        = []
 
     def copy(self):
         car = Car(self.world, self.name, self.colour,
                   self.position, self.angle, self.time)
 
-        car.engine_force = self.engine_force
-        car.wheel_angle  = self.wheel_angle
-        car.velocity     = self.velocity
-        car.speed        = self.speed
-
-        car.braking = self.braking
-        car.reverse = self.reverse
-        car.stopped = self.stopped
-
-        car.speed_time = self.speed_time
-        car.angle_time = self.angle_time
+        car.stopped          = self.stopped
+        car.engine_force     = self.engine_force
+        car.wheel_angle      = self.wheel_angle
+        car.speed            = self.speed
+        car.angular_velocity = self.angular_velocity
+        car.desired_angle    = self.desired_angle
+        car.desired_speed    = self.desired_speed
 
         car.generateHull()
-
         return car
 
     def generateHull(self):
-        heading = getVector(self.angle)
+        forward  = getVector(self.angle)
+        left     = forward.left90()
+        car_left = left * CAR_WIDTH/2
 
-        self.front = self.position + heading * PIVOT_TO_FRONT
-        self.rear  = self.position - heading * PIVOT_TO_REAR
-
-        left = heading.left90() * CAR_WIDTH / 2
-
-        self.hull = [self.front - left, self.front + left,
-                     self.rear  + left, self.rear  - left]
-
+        self.front  = self.position + forward * PIVOT_TO_FRONT
+        self.rear   = self.position - forward * PIVOT_TO_REAR
         self.centre = (self.front + self.rear) / 2
 
-        if self.wheel_angle.value != 0.0:
+        self.hull = [self.front - car_left, self.front + car_left,
+                     self.rear  + car_left, self.rear  - car_left]
+
+    def generateBubble(self):
+        forward  = getVector(self.angle)
+        left     = forward.left90()
+        car_left = left * CAR_WIDTH/2
+
+        bubble_forward = forward * BUBBLE_SIZE
+        bubble_left    = left    * BUBBLE_SIZE
+        diag_forward   = forward * BUBBLE_DIAG
+        diag_left      = left    * BUBBLE_DIAG
+
+        front_left  = self.front    + car_left
+        pivot_left  = self.position + car_left
+        mid_left    = self.centre   + car_left
+        rear_left   = self.rear     + car_left
+
+        front_right = self.front    - car_left
+        mid_right   = self.centre   - car_left
+        pivot_right = self.position - car_left
+        rear_right  = self.rear     - car_left
+
+        self.bubble = [
+            front_right + diag_forward - diag_left,
+            front_right + bubble_forward,
+            self.front  + bubble_forward,
+            front_left  + bubble_forward,
+            front_left  + diag_forward + diag_left,
+            front_left  + bubble_left,
+            mid_left    + bubble_left,
+            pivot_left  + bubble_left,
+            rear_left   + bubble_left,
+            rear_left   - diag_forward + diag_left,
+            rear_left   - bubble_forward,
+            self.rear   - bubble_forward,
+            rear_right  - bubble_forward,
+            rear_right  - diag_forward - diag_left,
+            rear_right  - bubble_left,
+            pivot_right - bubble_left,
+            mid_right   - bubble_left,
+            front_right - bubble_left,
+        ]
+
+        if abs(self.wheel_angle.value) > TINY_ANGLE:
             radius = PIVOT_TO_AXLE / abs(math.sin(self.wheel_angle.value))
-            if radius > 1000:
+
+            if radius > 50:
                 self.circle_centre = None
-                return
 
             if self.wheel_angle < ANGLE_0:
                 self.circle_centre = getTurningCircle(LEFT, self, radius)
@@ -103,7 +138,9 @@ class Car(Obstacle):
             else:
                 self.circle_centre = getTurningCircle(RIGHT, self, radius)
                 self.outer_radius  = (self.hull[0] - self.circle_centre).mag()
+
             self.inner_radius = radius - CAR_WIDTH/2
+
         else:
             self.circle_centre = None
 
@@ -124,362 +161,199 @@ class Car(Obstacle):
         dt = (time - self.time) / 1000
         self.time = time
 
-        # cornering
+        # steering
+        ang_diff = (self.desired_angle - self.angle).value
+        if ang_diff == 0.0 or self.speed == 0.0:
+            desired_wheel_angle = ANGLE_0
+        else:
+            radius  = self.speed / (ang_diff / dt)
+            ratio   = min(max(-1, PIVOT_TO_AXLE / radius), 1)
+            desired_wheel_angle = Angle(math.asin(ratio))
+
+        angle_change = Angle(2*math.pi * dt * STEERING_RATE)
+        if desired_wheel_angle < self.wheel_angle:
+            self.wheel_angle = max(self.wheel_angle - angle_change,
+                                   desired_wheel_angle, -MAX_WHEEL_ANGLE)
+        elif desired_wheel_angle > self.wheel_angle:
+            self.wheel_angle = min(self.wheel_angle + angle_change,
+                                   desired_wheel_angle, MAX_WHEEL_ANGLE)
+
+        # cornering (part 1)
         if self.wheel_angle.value != ANGLE_0.value:
-            radius           = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
-            self.angular_vel = self.speed / radius
+            radius  = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
+            ang_vel = self.speed / radius
+            self.angle += Angle(ang_vel * dt / 2)
 
-            angle_change = Angle(self.angular_vel * dt / 2)
-            if self.reverse:
-                angle_change = -angle_change
-            self.angle += angle_change
+        # speed control
+        acceleration   = (self.desired_speed - self.speed) / dt
+        desired_force  = CAR_MASS * acceleration
+        desired_force += self.speed**2 * DRAG_CONSTANT
+        desired_force += self.speed    * RR_CONSTANT
+
+        engine_change = 10000 * dt
+        if desired_force < self.engine_force:
+            self.engine_force = max(self.engine_force - engine_change,
+                                    desired_force, MIN_ENGINE_FORCE)
+        elif desired_force > self.engine_force:
+            self.engine_force = min(self.engine_force + engine_change,
+                                    desired_force, MAX_ENGINE_FORCE)
+
+        # forces acting on car
+        if desired_force < 0:
+            force = -min(BRAKING_CONSTANT, CAR_WEIGHT) # brakes
         else:
-            self.angular_vel = 0.0
+            force = min(self.engine_force, CAR_WEIGHT/2)
+        force -= self.speed**2 * DRAG_CONSTANT
+        force -= self.speed    * RR_CONSTANT
 
-        heading = getVector(self.angle)
-        if self.reverse:
-            heading = -heading
-        self.velocity = heading * self.speed
-
-        force = VECTOR_0
-        if not self.braking:
-            # traction force
-            force += heading * min(self.engine_force, CAR_WEIGHT)
-
-        elif self.speed > 0.01:
-            # braking force
-            force += heading * (-min(BRAKING_CONSTANT, CAR_WEIGHT))
-
-        else:
-            self.velocity = VECTOR_0
-            self.speed    = 0.0
-
-        # drag / air resistance
-        force += self.velocity * self.speed * (-DRAG_CONSTANT)
-
-        # rolling resistance
-        force += self.velocity * (-RR_CONSTANT)
-
-        # convert force to acceleration
+        # forwards motion of car
         acceleration   = force / CAR_MASS
-        self.velocity += acceleration  * dt
-        self.position += self.velocity * dt
+        self.speed    += acceleration * dt
+        self.position += getVector(self.angle) * self.speed * dt
 
-        self.speed = self.velocity.mag()
-
-        # cornering
+        # cornering (part 2)
         if self.wheel_angle.value != ANGLE_0.value:
-            radius           = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
-            self.angular_vel = self.speed / radius
+            radius  = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
+            ang_vel = self.speed / radius
+            self.angle += Angle(ang_vel * dt / 2)
 
-            angle_change = Angle(self.angular_vel * dt / 2)
-            if self.reverse:
-                angle_change = -angle_change
-            self.angle += angle_change
+            self.angular_velocity = abs(ang_vel)
         else:
-            self.angular_vel = 0.0
-
-        heading = getVector(self.angle)
-        if self.reverse:
-            heading = -heading
-        self.velocity = heading * self.speed
+            self.angular_velocity = 0.0
 
         self.generateHull()
 
-    def controlSpeed(self, new_speed, reverse):
-        if self.time <= self.speed_time:
-            print("BAD SPEED CONTROL")
-            return
-
-        dt = (self.time - self.speed_time) / 1000
-        self.speed_time = self.time
-
-        # calculate desired engine force
-        speed = self.velocity.mag()
-        acceleration = (new_speed - speed) / dt
-        force  = CAR_MASS * acceleration
-        force -= speed**2 * (-DRAG_CONSTANT)
-        force -= speed    * (-RR_CONSTANT)
-
-        # adjust engine force
-        engine_change = 10000 * dt
-        if force < self.engine_force:
-            self.engine_force = max(self.engine_force-engine_change,
-                                    force, MIN_ENGINE_FORCE)
-            if force < 0:
-                self.braking = True
-            else:
-                self.braking = False
-
-        elif force > self.engine_force:
-            self.engine_force = min(self.engine_force+engine_change,
-                                    force, MAX_ENGINE_FORCE)
-            self.braking = False
-
-    def controlAngle(self, angle_difference):#new_angle):
-        if self.time <= self.angle_time:
-            print("BAD ANGLE CONTROL")
-            return
-
-        dt = (self.time - self.angle_time) / 1000
-        self.angle_time = self.time
-
-        angular_velocity = angle_difference.value / dt
-        if angular_velocity == 0.0 or self.speed == 0.0:
-            new_wheel_angle = ANGLE_0
-        else:
-            radius = self.speed / angular_velocity
-            ratio  = min(max(-1, PIVOT_TO_AXLE / radius), 1)
-            new_wheel_angle = Angle(math.asin(ratio))
-
-        angle_change = Angle(2*math.pi * dt * STEERING_RATE)
-        if new_wheel_angle < self.wheel_angle:
-            self.wheel_angle = max(self.wheel_angle-angle_change,
-                                   new_wheel_angle, -MAX_WHEEL_ANGLE)
-
-        elif new_wheel_angle > self.wheel_angle:
-            self.wheel_angle = min(self.wheel_angle+angle_change,
-                                   new_wheel_angle, MAX_WHEEL_ANGLE)
-
-    def alt_controlAngle(self, new_wheel_angle):
-        if self.time <= self.angle_time:
-            print("BAD ANGLE CONTROL")
-            return
-
-        dt = (self.time - self.angle_time) / 1000
-        self.angle_time = self.time
-
-        angle_change = Angle(2*math.pi * dt * STEERING_RATE)
-        if new_wheel_angle < self.wheel_angle:
-            self.wheel_angle = max(self.wheel_angle-angle_change,
-                                   new_wheel_angle, -MAX_WHEEL_ANGLE)
-
-        elif new_wheel_angle > self.wheel_angle:
-            self.wheel_angle = min(self.wheel_angle+angle_change,
-                                   new_wheel_angle, MAX_WHEEL_ANGLE)
-
-    def predictCrash(self, wheel_angle, speed, obstacles):
+    def predictCrash(self, obstacles):
         result = None
 
-        if wheel_angle.value != ANGLE_0.value:
-            radius  = PIVOT_TO_AXLE / abs(math.sin(wheel_angle.value))
-            ang_vel = speed / radius
-
-            if wheel_angle < ANGLE_0:
+        if abs(self.wheel_angle.value) > TINY_ANGLE:
+            if self.wheel_angle < ANGLE_0:
                 turn_direction = LEFT
-                circle_centre  = getTurningCircle(LEFT, self, radius)
             else:
                 turn_direction = RIGHT
-                circle_centre  = getTurningCircle(RIGHT, self, radius)
 
             details = []
+            for point in self.bubble:
+                for obstacle in obstacles:
+                    if obstacle.checkInside(point):
+                        break
+                else:
+                    angle, radius = getPolar(point - self.circle_centre)
+                    speed         = self.angular_velocity * radius
+                    details.append((radius, angle, speed, point))
 
-            forward  = getVector(self.angle) * BUBBLE_SIZE
-            left     = forward.left90()
-            car_left = left.norm() * CAR_WIDTH/2
-
-            front_left  = self.hull[1]
-            rear_left   = self.hull[2]
-            mid_left    = (front_left + rear_left) / 2
-            pivot_left  = self.position + car_left
-
-            front_right = self.hull[0]
-            rear_right  = self.hull[3]
-            mid_right   = (front_right + rear_right) / 2
-            pivot_right = self.position - car_left
-
-            car_points = [
-                #front_left,  mid_left,  pivot_left,  rear_left,
-                #front_right, mid_right, pivot_right, rear_right,
-                #self.front,  self.rear,
-
-                # bubble
-                front_left  + forward, front_left  + left,
-                front_right + forward, front_right - left,
-                rear_left   - forward, rear_left   + left,
-                rear_right  - forward, rear_right  - left,
-                self.front  + forward, self.rear   - forward,
-                mid_left    + left,    mid_right   - left,
-                pivot_left  + left,    pivot_right - left
-            ]
-
-            #car_points  = [self.hull[1], self.hull[2],
-            #               self.hull[0], self.hull[3],
-            #               self.position + car_left,
-            #               self.position - car_left,
-            #               (self.hull[1] + self.hull[2]) / 2,
-            #               (self.hull[0] + self.hull[3]) / 2]
-
-            for point in car_points:
-                #for obstacle in obstacles:
-                #    if obstacle.checkInside(point):
-                #        break
-                #else:
-                angle, radius = getPolar(point - circle_centre)
-                speed         = ang_vel * radius
-                details.append((radius, angle, speed, point))
-
-            #if not details:
-            #    return result
-
+            if not details:
+                return result
             details.sort(reverse=True)
 
             for obstacle in obstacles:
-                crash = obstacle.crashCircle(circle_centre, turn_direction,
+                crash = obstacle.crashCircle(self.circle_centre, turn_direction,
                                              details)
                 if crash:
                     if result is None or crash < result:
                         result = crash
         else:
-            forward  = getVector(self.angle) * BUBBLE_SIZE
-            car_points = [self.hull[0] + forward, self.hull[1] + forward]
+            valid_points = []
+            for point in self.bubble:
+                for obstacle in obstacles:
+                    if obstacle.checkInside(point):
+                        break
+                else:
+                    valid_points.append(point)
 
-            #valid_points = []
-            #for point in car_points:
-            #    for obstacle in obstacles:
-            #        if obstacle.checkInside(point):
-            #            break
-            #    else:
-            #        valid_points.append(point)
-
-            #if not valid_points:
-            #    return result
+            if not valid_points:
+                return result
 
             for obstacle in obstacles:
-                crash = obstacle.crashLine(car_points, getVector(self.angle),
-                                           speed)
+                crash = obstacle.crashLine(valid_points, getVector(self.angle),
+                                           self.speed)
                 if crash:
                     if result is None or crash < result:
                         result = crash
         return result
 
     def control(self, waypoint):
+        self.generateBubble()
+
+        destination = waypoint.position
+
         self.crash = None
 
-        avoiding_collision = False
-        if self.speed > 0.0:# and self.world.checkObject(self):
+        if self.speed > 0.0:
             obstacles = []
             for grass in self.world.grass:
                 if grass.withinRadius(self.front, COLLISION_DISTANCE):
                     obstacles.append(grass)
 
-            crash = self.predictCrash(self.wheel_angle, self.speed, obstacles)
+            crash = self.predictCrash(obstacles)
 
             if crash:
                 time, car_point, crash_point = crash
 
-                if time < 0.25:
-                    avoiding_collision = True
+                if time < ACTION_TIME:
                     self.crash = crash
 
-                    #forward = getVector(self.angle)
+                    self.desired_speed = calculateMaxSpeed(self.speed * time)
 
-                    #if ccw(self.front, car_point, self.rear) < 0:#crash_point, self.rear) < 0:
-                    #if ccw(car_point + forward, crash_point, car_point) < 0:
-                    #if ccw(car_point, crash_point, self.position) < 0:
-                    if ccw(self.front, crash_point, self.rear) < 0:
-                        away = getVector(self.angle).left90()
+                    left_sim = self.copy()
+                    left_sim.desired_angle = self.angle - ANGLE_90
+
+                    right_sim = self.copy()
+                    right_sim.desired_angle = self.angle + ANGLE_90
+
+                    start_time = self.time
+                    end_time   = start_time + ACTION_DELAY
+
+                    left_time = start_time
+                    while left_time < end_time:
+                        left_time += TIME_STEP
+                        left_sim.update(left_time)
+
+                        if not self.world.checkObject(left_sim):
+                            break
+
+                    right_time = start_time
+                    while right_time < end_time:
+                        right_time += TIME_STEP
+                        right_sim.update(right_time)
+
+                        if not self.world.checkObject(right_sim):
+                            break
+
+                    if left_time > right_time:
+                        self.desired_angle = left_sim.desired_angle
+                        self.destination   = left_sim.front
+                    elif right_time > left_time:
+                        self.desired_angle = right_sim.desired_angle
+                        self.destination   = right_sim.front
                     else:
-                        away = getVector(self.angle).right90()
+                        left_dist  = (destination - left_sim.centre).mag()
+                        right_dist = (destination - right_sim.centre).mag()
 
-                    destination = self.centre + away * 4
-                    angle = getAngle(destination - self.position)
-                    angle_difference = angle - self.angle
+                        if left_dist < right_dist:
+                            self.desired_angle = left_sim.desired_angle
+                            self.destination   = left_sim.front
+                        else:
+                            self.desired_angle = right_sim.desired_angle
+                            self.destination   = right_sim.front
 
-                    self.controlAngle(angle_difference)
-                    self.controlSpeed(DESIRED_SPEED, False)
+                    self.desired_speed = MAX_SPEED
 
-                    self.destination = destination
-
-            #dt = (self.time - self.angle_time) / 1000
-            #angle_change = ANGLE_5#Angle(2*math.pi * STEERING_RATE)
-            #l_angle = max(self.wheel_angle-angle_change, -MAX_WHEEL_ANGLE)
-            #r_angle = min(self.wheel_angle+angle_change, MAX_WHEEL_ANGLE)
-
-            #l_left_crash, l_right_crash = self.predictCrash(
-            #    l_angle, self.speed, obstacles)
-            #r_left_crash, r_right_crash = self.predictCrash(
-            #    r_angle, self.speed, obstacles)
-
-            #l_time = min(getCrashTime(l_left_crash),
-            #             getCrashTime(l_right_crash))
-
-            #r_time = min(getCrashTime(r_left_crash),
-            #             getCrashTime(r_right_crash))
-
-            #if curr_time < 3:
-            #    avoiding_collision = True
-
-            #    times_angles = [(l_time, l_angle),
-            #                    (r_time, r_angle)]
-            #    times_angles.sort()
-
-            #    time, angle = times_angles[0]
-
-            #    self.alt_controlAngle(angle)
-            #    self.controlSpeed(DESIRED_SPEED, False)
-            #    if time < curr_time:
-            #        print("AVOIDING", self.wheel_angle)
-            #    else:
-            #        print("OH NOES", self.wheel_angle)
-
-            #if time < 3:
-            #    avoiding_collision = True
-
-                # try other angles, and see which one makes crash time
-                # most distant. if current angle is best, slow down
-
-                #if time < 1:
-                #    self.controlSpeed(SLOW_SPEED, False)
-                #else:
-                #    self.controlSpeed(DESIRED_SPEED, False)
-
-                #if left_time < right_time:
-                #    self.controlAngle(-ANGLE_45)
-                #elif right_time < left_time:
-                #    self.controlAngle(ANGLE_45)
-                #else:
-                #    self.controlAngle(ANGLE_0)
-
-        if avoiding_collision:
+        if self.crash:
             print("AVOIDING")
-            return
-
-        # look for nearby collisions
-        #total_vec = VECTOR_0
-        #self.red_lines = []
-        #for grass in self.world.grass:
-        #    line, dist, vec = grass.findNearestLine(self.front)
-        #    if line and dist < ROAD_WIDTH/2:
-        #        total_vec += vec
-        #        total_vec = vec
-        #        self.red_lines.append(line)
-        #        self.red_lines.append((line[0], self.front))
-        #        self.red_lines.append((line[1], self.front))
-        #if self.red_lines:
-        #    destination = self.position + total_vec.norm() * 4
-        #    angle = getAngle(destination - self.position)
-        #    angle_difference = angle - self.angle
-
-        #    self.controlAngle(angle_difference)
-        #    self.controlSpeed(DESIRED_SPEED, False)
 
         elif waypoint:
             # adjust wheel angle using destination point
-            destination = waypoint.position
-            angle, magnitude = getPolar(destination - self.position)
-            angle_difference = angle - self.angle
-
-            self.controlAngle(angle_difference)
-            self.controlSpeed(DESIRED_SPEED, False)
+            self.desired_angle = getAngle(destination - self.position)
+            self.desired_speed = MAX_SPEED
             print("SEEKING")
 
             self.destination = destination
 
         else:
-            self.controlAngle(ANGLE_0)
-            self.controlSpeed(0, False)
-            self.destination = None
+            self.desired_angle = self.angle
+            self.desired_speed = 0
+            self.destination   = None
 
     def draw(self, selected=False):
         if self.stopped:
@@ -584,14 +458,16 @@ class Car(Obstacle):
             point_2 = self.world.getDrawable(point_2)
             pygame.draw.line(screen, BLACK, point_1, point_2, 1)
 
+        #bubble = [self.world.getDrawable(point) for point in self.bubble]
+        #pygame.draw.polygon(screen, LIGHT_GREY, bubble, 1)
+
         rad = self.world.scaleDistance(0.25)
         if self.destination:
             dest = self.world.getDrawable(self.destination)
             pygame.draw.circle(screen, BLACK, dest, rad, 1)
 
         if self.circle_centre:
-            centre = self.world.getDrawable(self.circle_centre)
-
+            centre       = self.world.getDrawable(self.circle_centre)
             outer_radius = self.world.scaleDistance(self.outer_radius)
             inner_radius = self.world.scaleDistance(self.inner_radius)
 
@@ -600,7 +476,7 @@ class Car(Obstacle):
 
             if self.crash:
                 time, car_point, crash_point = self.crash
-                car_angle, radius = getPolar(car_point - self.circle_centre)
+                car_angle, radius = getPolar(car_point   - self.circle_centre)
                 crash_angle       = getAngle(crash_point - self.circle_centre)
 
                 rect = generateRect(self.circle_centre, radius, self.world)
@@ -628,7 +504,6 @@ class Car(Obstacle):
             pygame.draw.line(screen, GREY, left,  front_left,  1)
             pygame.draw.line(screen, GREY, right, front_right, 1)
 
-            rad = self.world.scaleDistance(0.25)
             if self.crash:
                 time, car_point, crash_point = self.crash
                 car_point   = self.world.getDrawable(car_point)

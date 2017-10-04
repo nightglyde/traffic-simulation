@@ -162,6 +162,11 @@ class World(Obstacle):
                     car_i.stop(obstacle)
                     self.controllers[i].clearWaypoints()
 
+            for obstacle in self.grass:
+                if car_i.checkCollision(obstacle):
+                    index = int(time / 1000) % len(ALL_COLOURS)
+                    obstacle.colour = ALL_COLOURS[index]
+
         for controller in self.controllers:
             controller.update()
 

@@ -31,31 +31,7 @@ class CarController(Obstacle):
         self.path = deque()
         self.path.append(self.car.position)
 
-#        self.car_side_paths = [deque() for i in range(6)]
-#        self.updateCarSidePaths()
-
-    def updateCarSidePaths(self):
-        car_left = getVector(self.car.angle).left90() * CAR_WIDTH/2
-
-        front_left = self.car.hull[1]
-        pivot_left = self.car.position + car_left
-        rear_left  = self.car.hull[2]
-
-        front_right = self.car.hull[0]
-        pivot_right = self.car.position - car_left
-        rear_right  = self.car.hull[3]
-
-        self.car_side_paths[0].append(front_left)
-        self.car_side_paths[1].append(pivot_left)
-        self.car_side_paths[2].append(rear_left)
-
-        self.car_side_paths[3].append(front_right)
-        self.car_side_paths[4].append(pivot_right)
-        self.car_side_paths[5].append(rear_right)
-
-        if len(self.car_side_paths[0]) > PATH_MEMORY:
-            for path in self.car_side_paths:
-                path.popleft()
+        self.frame_counter = 0
 
     def clearWaypoints(self):
         self.waypoints.clear()
@@ -78,10 +54,9 @@ class CarController(Obstacle):
         # simulate car driving to next waypoint
         for i in range(1000):
             if i % 20 == 0:
-                path.append(sim_car.front)#position)
+                path.append(sim_car.front)
 
-            #distance = (destination - sim_car.centre).mag()
-            if sim_car.withinRadius(destination, WAYPOINT_THRESHOLD):#distance <= WAYPOINT_THRESHOLD:
+            if sim_car.withinRadius(destination, WAYPOINT_THRESHOLD):
                 break
 
             sim_car.control(waypoint)
@@ -93,7 +68,7 @@ class CarController(Obstacle):
             self.limited_addWaypoint(waypoint)
             return True
 
-        path.append(sim_car.front)#position)
+        path.append(sim_car.front)
         waypoint.update(time-start_time, path, sim_car)
         self.waypoints.append(waypoint)
         return True
@@ -111,7 +86,7 @@ class CarController(Obstacle):
         self.waypoints.append(waypoint)
         waypoint.limited_update(time, path, angle)
 
-    def alt_addRandomWaypoint(self):
+    def addRandomWaypoint(self):
         while True:
             pos      = self.world.generateRandomPosition()
             waypoint = Waypoint(self, pos, WAYPOINT_RADIUS)
@@ -123,10 +98,8 @@ class CarController(Obstacle):
                 else:
                     if self.addWaypoint(waypoint):
                         return
-                    #else:
-                    #    self.clearWaypoints()
 
-    def addRandomWaypoint(self):
+    def alt_addRandomWaypoint(self):
         if self.waypoints:
             waypoints = self.waypoints
         else:
@@ -152,6 +125,15 @@ class CarController(Obstacle):
         if self.car.stopped:
             return
 
+        self.path.append(self.car.position)
+        if len(self.path) > PATH_MEMORY:
+            self.path.popleft()
+
+        if self.frame_counter % 6 != 0:
+            self.frame_counter += 1
+            return
+        self.frame_counter += 1
+
         if self.waypoint_time is None:
             self.clearWaypoints()
             self.generateWaypoints()
@@ -161,9 +143,7 @@ class CarController(Obstacle):
 
             offset = (self.car.time - self.waypoint_time) - waypoint.time
 
-            #distance = (waypoint.position - self.car.centre).mag()
-            if self.car.withinRadius(waypoint.position, WAYPOINT_THRESHOLD):#distance <= WAYPOINT_THRESHOLD:
-
+            if self.car.withinRadius(waypoint.position, WAYPOINT_THRESHOLD):
                 self.waypoints.popleft()
                 self.score += 1
                 self.waypoint_time = self.car.time
@@ -174,21 +154,10 @@ class CarController(Obstacle):
                 if self.score == TOTAL_WAYPOINTS:
                     print(self.name, "finished at time",
                           self.waypoint_time / 1000)
-
-            #elif offset >= 5000: # five seconds over time
-            #    print("timed out!", offset)
-            #    self.clearWaypoints()
-
             else:
                 break
 
             self.generateWaypoints()
-
-        self.path.append(self.car.position)
-        if len(self.path) > PATH_MEMORY:
-            self.path.popleft()
-
-#        self.updateCarSidePaths()
 
         if self.waypoints:
             self.car.control(self.waypoints[0])
@@ -200,16 +169,6 @@ class CarController(Obstacle):
             path = [self.world.getDrawable(point) for point in self.path]
             pygame.draw.lines(self.world.screen, GREY, False, path, 1)
 
-#        colours = [MAGENTA, RED,  YELLOW,
-#                   GREEN,   CYAN, BLUE]
-
-#        if len(self.car_side_paths[0]) > 1:
-#            for i in range(6):
-#                colour = colours[i]
-#                path = self.car_side_paths[i]
-#                path = [self.world.getDrawable(point) for point in path]
-#                pygame.draw.lines(self.world.screen, colour, False, path, 1)
-
     def drawWaypoints(self):
         for waypoint in self.waypoints:
             waypoint.drawPath()
@@ -217,19 +176,8 @@ class CarController(Obstacle):
         for waypoint in self.waypoints:
             waypoint.draw()
 
-        #for point_1, point_2 in self.red_lines:
-        #    point_1 = self.world.getDrawable(point_1)
-        #    point_2 = self.world.getDrawable(point_2)
-        #    pygame.draw.line(self.world.screen, self.colour, point_1, point_2, 3)
-
         thres = self.world.scaleDistance(WAYPOINT_THRESHOLD)
         for option in self.options:
             point = self.world.getDrawable(option)
             pygame.draw.circle(self.world.screen, self.colour, point, thres, 1)
-
-        #dest = self.world.getDrawable(self.destination)
-        #pygame.draw.circle(self.world.screen, BLACK, dest, thres, 1)
-
-        #pos = self.world.getDrawable(self.car.position)
-        #pygame.draw.line(self.world.screen, self.colour, pos, dest, 1)
 

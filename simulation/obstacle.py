@@ -77,7 +77,7 @@ class Obstacle:
                 dist = ccw(point_i, point, point_k) / dist_ik
             else:
                 dist = min(dist_ij, dist_ik)
-
+            dist = ccw(point_i, point, point_k) / dist_ik
             if best_dist is None or abs(dist) < abs(best_dist):
                 best_dist = dist
                 best_line = (point_i, point_k)
@@ -159,7 +159,7 @@ class Obstacle:
                 radius, car_angle, speed, car_point = details[i]
 
                 if circ_dist > radius:
-                    break
+                    continue
 
                 offset = math.sqrt(radius**2 - circ_dist**2)
                 dists  = [near_dist - offset, near_dist + offset]
@@ -167,18 +167,20 @@ class Obstacle:
                 for dist in dists:
                     if 0 <= dist <= i_j_dist:
                         crash_point = point_i + i_j_norm * dist
-                        abs_angle   = getAngle(crash_point - circle_centre)
+
+                        if (crash_point - car_point).mag() > COLLISION_DISTANCE:
+                            continue
+
+                        abs_angle = getAngle(crash_point - circle_centre)
                         if direction == LEFT:
                             rel_angle = (abs_angle - car_angle).norm()
                         else:
                             rel_angle = (car_angle - abs_angle).norm()
 
-                        arc_len = rel_angle * radius
-                        if arc_len <= COLLISION_DISTANCE:
-                            time = arc_len / speed
-                            crash = (time, car_point, crash_point)
-                            if closest_crash is None or crash < closest_crash:
-                                closest_crash = crash
+                        time  = rel_angle * radius / speed
+                        crash = (time, car_point, crash_point)
+                        if closest_crash is None or crash < closest_crash:
+                            closest_crash = crash
         return closest_crash
 
     def crashLine(self, car_points, forward, speed):

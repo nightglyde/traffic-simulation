@@ -7,6 +7,9 @@ from collections import deque
 FRAMES_PER_SECOND = 60
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 
+ACTION_DELAY = 500
+ACTION_TIME  = ACTION_DELAY / 1000
+
 SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
@@ -16,6 +19,7 @@ WORLD_HEIGHT = 100 # must be at least 30
 ROAD_WIDTH = 3.5
 COLLISION_DISTANCE = 20
 BUBBLE_SIZE = 0.5
+BUBBLE_DIAG = math.sqrt(BUBBLE_SIZE**2 / 2)
 
 CAR_LENGTH   = 4.5
 CAR_WIDTH    = 1.8
@@ -200,6 +204,8 @@ ANGLE_180 = Angle(math.radians(180))
 
 MAX_WHEEL_ANGLE = ANGLE_30
 TURN_RADIUS     = PIVOT_TO_AXLE / math.sin(MAX_WHEEL_ANGLE.value)
+
+TINY_ANGLE = math.radians(0.001)
 
 ###########
 # COLOURS #
