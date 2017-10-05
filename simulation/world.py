@@ -95,7 +95,7 @@ class World(Obstacle):
                 continue
 
             vec = pos - waypoint.position
-            if vec.mag() > 10:#16:
+            if vec.mag() > 10:
                 continue
 
             diff = angleBetween(vec, getVector(waypoint.angle))
@@ -107,13 +107,9 @@ class World(Obstacle):
         return good_options
 
     def addCar(self, name, colour, time):
-        self.num_cars += 1
-
         # create car
         while True:
             pos = random.choice(self.starting_positions)
-
-            #pos = self.generateRandomPosition()
 
             for option in waypoint_options:
                 vec = option - pos
@@ -123,8 +119,6 @@ class World(Obstacle):
                 angle = getAngle(vec)
                 break
 
-            #angle = Angle(random.random()*2*math.pi)
-
             car = Car(self, name, colour, pos, angle, time)
             if self.checkObject(car):
 
@@ -132,14 +126,12 @@ class World(Obstacle):
                     if car.checkCollision(other_car):
                         break
                 else:
-                    controller = CarController(car)
+                    controller = CarController(car, self.num_cars)
                     self.controllers.append(controller)
-                    self.cars.append(car)
-                    return
 
-        # create car controller
-        controller = CarController(self, name, colour)
-        self.controllers.append(controller)
+                    self.cars.append(car)
+                    self.num_cars += 1
+                    return
 
     def update(self, time):
         for car in self.cars:
@@ -162,13 +154,30 @@ class World(Obstacle):
                     car_i.stop(obstacle)
                     self.controllers[i].clearWaypoints()
 
-            for obstacle in self.grass:
-                if car_i.checkCollision(obstacle):
-                    index = int(time / 1000) % len(ALL_COLOURS)
-                    obstacle.colour = ALL_COLOURS[index]
+        for grass in self.grass:
+            for car in self.cars:
+                if grass.checkCollision(car):
+                    grass.colour = DARK_GREEN
+                    break
+            else:
+                grass.colour = LIGHT_GREEN
 
         for controller in self.controllers:
             controller.update()
+
+    def sendMessages(self):
+        # send messages
+        messages = {i: [] for i in range(SEND_TO_ALL, self.num_cars)}
+        for i in range(self.num_cars):
+            controller = self.controllers[i]
+            for message in controller.sendMessages():
+                address, message_type, content = message
+                messages[address].append((i, message_type, content))
+
+        # receive messages
+        for i in range(self.num_cars):
+            controller = self.controllers[i]
+            controller.receiveMessages(messages[SEND_TO_ALL], messages[i])
 
     def scaleDistance(self, distance):
         return round(distance * self.scale)
@@ -270,5 +279,5 @@ class World(Obstacle):
 
         for car in self.cars:
             car.draw(car is self.selected_car)
-            car.drawExtra()
+            #car.drawExtra()
 

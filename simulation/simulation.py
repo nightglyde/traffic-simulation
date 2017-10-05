@@ -4,7 +4,7 @@ from world import World
 
 INCLUDE_CAPTION = True
 
-MAX_CARS    = 1
+MAX_CARS    = 4
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
                "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
@@ -133,6 +133,7 @@ while not done:
     if not paused:
         world_time += TIME_STEP #min(time_step, TIME_STEP)
         world.update(world_time)
+        world.sendMessages()
 
     # draw to screen
     screen.fill(WHITE)

@@ -15,9 +15,7 @@ class Waypoint(Obstacle):
         self.inner_radius = radius * 0.8
         self.generateHull()
 
-        self.time  = None
-        self.path  = None
-        self.car   = None
+        self.prev  = None
         self.angle = None
 
     def generateHull(self):
@@ -27,37 +25,9 @@ class Waypoint(Obstacle):
             vector = getVector(angle) * self.outer_radius
             self.hull.append(self.position + vector)
 
-    def alt_update(self, time, path, pos, angle, speed,
-               velocity, engine_force, wheel_angle, braking, reverse):
-
-        self.time = time
-        self.path = path
-
-        self.car_pos = pos
-        self.angle   = angle
-        self.speed   = speed
-
-        self.velocity     = velocity
-        self.engine_force = engine_force
-        self.wheel_angle  = wheel_angle
-        self.braking      = braking
-        self.reverse      = reverse
-
-    def update(self, time, path, car):
-        self.time  = time
-        self.path  = path
-        self.car   = car
-        self.angle = car.angle
-
-    def limited_update(self, time, path, angle):
-        self.time  = time
-        self.path  = path
-        self.angle = angle
-
-    def drawPath(self):
-        if len(self.path) > 1:
-            path = [self.world.getDrawable(point) for point in self.path]
-            pygame.draw.lines(self.world.screen, self.colour, False, path, 1)
+    def update(self, prev):
+        self.prev  = prev
+        self.angle = getAngle(self.position - prev.position)
 
     def draw(self):
         inner_radius = self.world.scaleDistance(self.inner_radius)

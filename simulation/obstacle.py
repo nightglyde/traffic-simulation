@@ -178,7 +178,7 @@ class Obstacle:
                             rel_angle = (car_angle - abs_angle).norm()
 
                         time  = rel_angle * radius / speed
-                        crash = (time, car_point, crash_point)
+                        crash = (time, car_point, crash_point, i_j)
                         if closest_crash is None or crash < closest_crash:
                             closest_crash = crash
         return closest_crash
@@ -218,7 +218,7 @@ class Obstacle:
 
                         if 0 <= ray_dist <= COLLISION_DISTANCE:
                             time  = ray_dist / speed
-                            crash = (time, car_point, crash_point)
+                            crash = (time, car_point, crash_point, i_j)
                             if closest_crash is None or crash < closest_crash:
                                 closest_crash = crash
             else:
@@ -233,7 +233,8 @@ class Obstacle:
                         if 0 <= ray_dist <= COLLISION_DISTANCE:
                             time        = ray_dist / speed
                             crash_point = car_point + forward * ray_dist
-                            crash       = (time, car_point, crash_point)
+
+                            crash = (time, car_point, crash_point, i_j)
                             if closest_crash is None or crash < closest_crash:
                                 closest_crash = crash
         return closest_crash

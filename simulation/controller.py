@@ -7,16 +7,18 @@ from car import Car
 WAYPOINT_RADIUS    = ROAD_WIDTH / 2
 WAYPOINT_THRESHOLD = 0.5
 
-MAX_WAYPOINTS   = 2
+MAX_WAYPOINTS   = 20
 TOTAL_WAYPOINTS = 1000
 
 DESIRED_SPEED = 10
 
-PATH_MEMORY = 300
+PATH_MEMORY = 100
 
 class CarController(Obstacle):
-    def __init__(self, car):
-        self.car    = car
+    def __init__(self, car, index):
+        self.car   = car
+        self.index = index
+
         self.world  = car.world
         self.name   = car.name
         self.colour = car.colour
@@ -26,16 +28,23 @@ class CarController(Obstacle):
         self.waypoint_time = None
         self.limited_mode  = True#False
 
-        self.options = []
-
         self.path = deque()
         self.path.append(self.car.position)
 
         self.frame_counter = 0
 
+        self.sim_car       = None
+        self.sim_waypoints = deque()
+        self.future        = deque()
+
+        self.messages = []
+
+        self.slow_time = -1
+
     def clearWaypoints(self):
         self.waypoints.clear()
         self.waypoint_time = self.car.time
+        self.future.clear()
 
     def addWaypoint(self, waypoint):
         if self.waypoints:
@@ -59,7 +68,8 @@ class CarController(Obstacle):
             if sim_car.withinRadius(destination, WAYPOINT_THRESHOLD):
                 break
 
-            sim_car.control(waypoint)
+            slow = sim_car.time <= self.slow_time
+            sim_car.control(waypoint, slow)
             time += TIME_STEP
             sim_car.update(time)
 
@@ -79,12 +89,15 @@ class CarController(Obstacle):
         else:
             prev = self.car
 
-        angle, distance = getPolar(waypoint.position - prev.position)
-        time = distance / DESIRED_SPEED * 1000
-        path = [prev.position, waypoint.position]
+        #angle, distance = getPolar(waypoint.position - prev.position)
+        #time = distance / DESIRED_SPEED * 1000
+        #path = [prev.position, waypoint.position]
 
+        waypoint.update(prev)
         self.waypoints.append(waypoint)
-        waypoint.limited_update(time, path, angle)
+        #waypoint.limited_update(time, path, angle)
+
+        self.sim_waypoints.append(waypoint)
 
     def addRandomWaypoint(self):
         while True:
@@ -105,11 +118,11 @@ class CarController(Obstacle):
         else:
             waypoints = [self.car]
 
-        self.options = self.world.getWaypointOptions(waypoints)
-        if not self.options:
-            self.options = self.world.waypoint_options
+        options = self.world.getWaypointOptions(waypoints)
+        if not options:
+            options = self.world.waypoint_options
 
-        waypoint = Waypoint(self, random.choice(self.options),
+        waypoint = Waypoint(self, random.choice(options),
                                   WAYPOINT_RADIUS)
         if self.limited_mode:
             self.limited_addWaypoint(waypoint)
@@ -121,6 +134,34 @@ class CarController(Obstacle):
               len(self.waypoints) + self.score < TOTAL_WAYPOINTS:
             self.addRandomWaypoint()
 
+    def simulateFuture(self):
+        if self.sim_car is None:
+            self.sim_car       = self.car.copy()
+            self.sim_waypoints = self.waypoints.copy()
+
+        while self.future and self.future[0][1] < self.car.time:
+            self.future.popleft()
+
+        if len(self.future) >= 10:
+            return
+
+        if not self.sim_waypoints:
+            return
+
+        for i in range(3):
+            if self.sim_car.time % (TIME_STEP * 6) == 0:
+                self.future.append((self.sim_car.position, self.sim_car.time))
+
+            if self.sim_car.withinRadius(self.sim_waypoints[0].position,
+                                         WAYPOINT_THRESHOLD):
+                self.sim_waypoints.popleft()
+                if not self.sim_waypoints:
+                    return
+
+            slow = self.sim_car.time <= self.slow_time
+            self.sim_car.control(self.sim_waypoints[0], slow)
+            self.sim_car.update(self.sim_car.time + TIME_STEP)
+
     def update(self):
         if self.car.stopped:
             return
@@ -129,11 +170,6 @@ class CarController(Obstacle):
         if len(self.path) > PATH_MEMORY:
             self.path.popleft()
 
-        if self.frame_counter % 6 != 0:
-            self.frame_counter += 1
-            return
-        self.frame_counter += 1
-
         if self.waypoint_time is None:
             self.clearWaypoints()
             self.generateWaypoints()
@@ -141,15 +177,10 @@ class CarController(Obstacle):
         while self.waypoints:
             waypoint = self.waypoints[0]
 
-            offset = (self.car.time - self.waypoint_time) - waypoint.time
-
             if self.car.withinRadius(waypoint.position, WAYPOINT_THRESHOLD):
                 self.waypoints.popleft()
                 self.score += 1
                 self.waypoint_time = self.car.time
-
-                print("{} {} time offset: {}".format(
-                    self.name, self.score, offset))
 
                 if self.score == TOTAL_WAYPOINTS:
                     print(self.name, "finished at time",
@@ -159,10 +190,57 @@ class CarController(Obstacle):
 
             self.generateWaypoints()
 
+        self.simulateFuture()
+
+        slow = self.car.time <= self.slow_time
         if self.waypoints:
-            self.car.control(self.waypoints[0])
+            self.car.control(self.waypoints[0], slow)
         else:
-            self.car.control(None)
+            self.car.control(None, slow)
+
+    def sendMessages(self):
+        if self.car.stopped:
+            return []
+
+        self.messages.append((SEND_TO_ALL, CURRENT_DETAILS, self.car.position))
+
+        self.messages.append((SEND_TO_ALL, FUTURE_DETAILS, self.future.copy()))
+
+        return self.messages
+
+    def receiveMessages(self, public, private):
+        if self.car.stopped:
+            return
+
+        self.messages.clear()
+
+        for message in public:
+            source, message_type, content = message
+
+            if source == self.index:
+                continue
+
+            if message_type == CURRENT_DETAILS:
+                pass
+
+            if message_type == FUTURE_DETAILS:
+                other_future = content
+
+                num = min(len(self.future), len(other_future))
+                for i in range(num):
+                    self_position,  self_time  = self.future[i]
+                    other_position, other_time = other_future[i]
+
+                    if self_time != other_time:
+                        print("PROBLEM!", self.name, self_time, other_time)
+                        #raise RuntimeError
+
+                    if (other_position - self_position).mag() < 6:
+                        print("DANGER!", self.index, source)
+                        self.future.clear()
+                        self.sim_car = None
+                        if source < self.index:
+                            self.slow_time = self.car.time + TIME_STEP * 60
 
     def drawPath(self):
         if len(self.path) > 1:
@@ -170,14 +248,20 @@ class CarController(Obstacle):
             pygame.draw.lines(self.world.screen, GREY, False, path, 1)
 
     def drawWaypoints(self):
-        for waypoint in self.waypoints:
-            waypoint.drawPath()
+        #prev = self.world.getDrawable(self.car.position)
+        #for waypoint in self.waypoints:
+        #    pos = self.world.getDrawable(waypoint.position)
+        #    pygame.draw.line(self.world.screen, self.colour, prev, pos, 1)
+        #    prev = pos
 
-        for waypoint in self.waypoints:
-            waypoint.draw()
+        #for waypoint in self.waypoints:
+        #    waypoint.drawPath()
 
-        thres = self.world.scaleDistance(WAYPOINT_THRESHOLD)
-        for option in self.options:
-            point = self.world.getDrawable(option)
-            pygame.draw.circle(self.world.screen, self.colour, point, thres, 1)
+        if self.waypoints:
+            self.waypoints[0].draw()
+
+        rad = self.world.scaleDistance(1)
+        for point, time in self.future:
+            point = self.world.getDrawable(point)
+            pygame.draw.circle(self.world.screen, self.colour, point, rad, 3)
 

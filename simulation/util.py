@@ -4,13 +4,13 @@ import pygame
 
 from collections import deque
 
-FRAMES_PER_SECOND = 60
+FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 
 ACTION_DELAY = 500
 ACTION_TIME  = ACTION_DELAY / 1000
 
-SCREEN_WIDTH  = 1200 # pixels
+SCREEN_WIDTH  = 800#1200 # pixels
 SCREEN_HEIGHT = 800
 
 WORLD_WIDTH  = 100 # metres
@@ -41,6 +41,15 @@ ARROW_STEM_WIDTH  = 0.45
 LEFT   = -1
 RIGHT  = 1
 CENTRE = 0
+
+# messaging
+SEND_TO_ALL = -1
+
+# public message types
+CURRENT_DETAILS = 0
+FUTURE_DETAILS  = 1
+
+# private message types
 
 ##########
 # VECTOR #
@@ -205,7 +214,7 @@ ANGLE_180 = Angle(math.radians(180))
 MAX_WHEEL_ANGLE = ANGLE_30
 TURN_RADIUS     = PIVOT_TO_AXLE / math.sin(MAX_WHEEL_ANGLE.value)
 
-TINY_ANGLE = math.radians(0.001)
+TINY_ANGLE = math.radians(1)
 
 ###########
 # COLOURS #
@@ -390,6 +399,12 @@ predefined_grass = [
     [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
     [Vector(90,  0), Vector(100,  0), Vector(100, 100), Vector(90, 100)],
     [Vector( 0, 90), Vector(100, 90), Vector(100, 100), Vector( 0, 100)],
+
+    # boundary corners
+    [Vector( 0,   0), Vector( 25,   0), Vector(  0,  25)],
+    [Vector(75,   0), Vector(100,   0), Vector(100,  25)],
+    [Vector( 0,  75), Vector( 25, 100), Vector(  0, 100)],
+    [Vector(75, 100), Vector(100,  75), Vector(100, 100)],
 
     # internal squares
     [Vector(15, 17), Vector(17, 15), Vector(33, 15), Vector(35, 17),
