@@ -6,18 +6,19 @@ from collections import deque
 
 FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
+STEP_TIME         = TIME_STEP / 1000
 
 ACTION_DELAY = 500
 ACTION_TIME  = ACTION_DELAY / 1000
 
-SCREEN_WIDTH  = 800#1200 # pixels
+SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
 WORLD_WIDTH  = 100 # metres
 WORLD_HEIGHT = 100 # must be at least 30
 
 ROAD_WIDTH = 3.5
-COLLISION_DISTANCE = 20
+COLLISION_DISTANCE = 10
 BUBBLE_SIZE = 0.5
 BUBBLE_DIAG = math.sqrt(BUBBLE_SIZE**2 / 2)
 
@@ -114,10 +115,12 @@ SCREEN_BOTTOM_RIGHT = Vector(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 class Angle:
     def __init__(self, value):
+        value = value % (2*math.pi)
+
         if value > math.pi:
             value -= math.pi*2
-        elif value < -math.pi:
-            value += math.pi*2
+        #elif value < -math.pi:
+        #    value += math.pi*2
         self.value = value
 
     def norm(self):
@@ -167,9 +170,6 @@ def getAngle(vector):
     if x < 0:
         angle += math.pi
     return Angle(angle)
-
-#def getMagnitude(vector):
-#    return math.sqrt(vector.x**2 + vector.y**2)
 
 def getPolar(vector):
     x = vector.x
@@ -373,6 +373,168 @@ def rightTurn(a, b):
     if turnDirection(a, b) == LEFT:
         return 2*math.pi - angle
     return angle
+
+def getIntersection(a, b, x, y):
+
+    ab = b-a
+    xy = y-x
+    ax = z-a
+
+    ab_cross_xy = crossProduct(ab, xy)
+    ax_cross_ab = crossProduct(ax, ab)
+
+    if ab_cross_xy == 0.0:
+        # lines are parallel
+
+        if ax_cross_ab == 0.0:
+            # lines are collinear
+            pass
+
+    else:
+        # lines are not parallel
+        xy_dist = ax_cross_ab / ab_cross_xy
+        if 0 <= xy_dist <= 1:
+            ab_dist = crossProduct(ax, xy) / ab_cross_xy
+            if 0 <= ab_dist <= 1:
+                intersection = a + ab.norm() * ab_dist
+                return [a, intersection, b], [x, intersection, y]
+
+    return [a, b], [x, y]
+
+def getBoundaryLines(shapes):
+    num_shapes = len(shapes)
+
+    for i in range(num_shapes-1):
+        shape_i = shapes[i].hull
+
+        num_i = len(shape_i)
+        for a in range(num_i):
+            point_a = shape_i[a]
+            point_b = shape_i[(a+1) % num_i]
+
+            for j in range(i+1, num_shapes):
+                shape_j = shapes[j].hull
+
+                num_j = len(shape_j)
+                for x in range(num_j):
+                    point_x = shape_j[x]
+                    point_y = shape_j[(x+1) % num_j]
+
+                    ab_points, xy_points = getIntersection(point_a, point_b,
+                                                           point_x, point_y)
+
+def crashCircle(line, circle_centre, direction, details):
+    point_i, point_j = line
+
+    ij      = point_j - point_i
+    ij_dist = ij.mag()
+    ij_norm = ij / ij_dist
+
+    ic      = circle_centre - point_i
+    jc      = circle_centre - point_j
+    ic_dist = ic.mag()
+    jc_dist = jc.mag()
+
+    if max(ic_dist, jc_dist) < details[-1][0]: # smallest radius
+        return None
+
+    near_dist = dotProduct(ic, ij_norm)
+    nearest   = point_i + ij_norm * near_dist
+    circ_dist = (nearest - circle_centre).mag()
+
+    if near_dist <= 0:
+        if ic_dist > details[0][0]: # biggest radius
+            return None
+    elif near_dist >= ij_dist:
+        if jc_dist > details[0][0]:
+            return None
+    else:
+        if circ_dist > details[0][0]:
+            return None
+
+    closest_crash = None
+    for i in range(len(details)):
+        radius, car_angle, speed, car_point = details[i]
+
+        if circ_dist > radius:
+            continue
+
+        offset = math.sqrt(radius**2 - circ_dist**2)
+        dists  = [near_dist - offset, near_dist + offset]
+
+        for dist in dists:
+            if 0 <= dist <= ij_dist:
+                crash_point = point_i + ij_norm * dist
+
+                if (crash_point - car_point).mag() > COLLISION_DISTANCE:
+                    continue
+
+                abs_angle = getAngle(crash_point - circle_centre)
+
+                if direction == LEFT:
+                    rel_angle = (abs_angle - car_angle).norm()
+                else:
+                    rel_angle = (car_angle - abs_angle).norm()
+
+                time  = rel_angle * radius / speed
+                crash = (time, car_point, crash_point, line)
+                if closest_crash is None or crash < closest_crash:
+                    closest_crash = crash
+    return closest_crash
+
+def crashLine(line, car_points, forward, speed):
+    closest_crash = None
+
+    point_i, point_j = line
+
+    ij = point_j - point_i
+    f_cross_ij = crossProduct(forward, ij)
+
+    if f_cross_ij == 0.0:
+        # lines are parallel
+        print("Z")
+
+        for car_point in car_points:
+            ic = point_i - car_point
+
+            ic_cross_f = crossProduct(ic, forward)
+            if ic_cross_f == 0.0:
+                # collinear
+                ij_dot_f = dotProduct(ij, forward)
+
+                if ij_dot_f > 0:
+                    crash_point = point_i
+                    print("A")
+                else:
+                    crash_point = point_j
+                    ic = crash_point - car_point
+                    print("B")
+
+                f_dot_f = dotProduct(forward, forward)
+                ray_dist = dotProduct(ic, forward) / f_dot_f
+
+                if 0 <= ray_dist <= COLLISION_DISTANCE:
+                    time  = ray_dist / speed
+                    crash = (time, car_point, crash_point, line)
+                    if closest_crash is None or crash < closest_crash:
+                        closest_crash = crash
+    else:
+        # lines are not parallel
+        for car_point in car_points:
+            ic = point_i - car_point
+
+            ij_dist = crossProduct(ic, forward) / f_cross_ij
+            if 0 <= ij_dist <= 1:
+
+                ray_dist = crossProduct(ic, ij)     / f_cross_ij
+                if 0 <= ray_dist <= COLLISION_DISTANCE:
+                    time        = ray_dist / speed
+                    crash_point = car_point + forward * ray_dist
+
+                    crash = (time, car_point, crash_point, line)
+                    if closest_crash is None or crash < closest_crash:
+                        closest_crash = crash
+    return closest_crash
 
 predefined_grass_old = [
     # outside boundary

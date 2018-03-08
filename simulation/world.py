@@ -4,6 +4,8 @@ from obstacle import Obstacle
 from car import Car
 from controller import CarController
 
+from generate_world import roads_list
+
 SCALE_CHANGE = 1.25
 
 class World(Obstacle):
@@ -17,6 +19,7 @@ class World(Obstacle):
                      Vector(self.width, 0),
                      Vector(self.width, self.height),
                      Vector(0, self.height)]
+        self.centre = Vector(self.width/2, self.height/2)
 
         self.obstacles = []
         self.grass     = []
@@ -52,19 +55,29 @@ class World(Obstacle):
         self.min_y = None
         self.max_y = None
 
-    def checkObject(self, world_object):
-        for point in world_object.hull:
+    def checkWaypoint(self, waypoint):
+        if not self.checkInside(waypoint.position):
+            return False
+        if waypoint.checkBorder(self):
+            return False
+        for obstacle in self.obstacles:
+            if waypoint.checkCollision(obstacle):
+                return False
+        for grass in self.grass:
+            if waypoint.checkCollision(grass):
+                return False
+        return True
+
+    def checkCar(self, car):
+        for point in car.hull:
             if not self.checkInside(point):
                 return False
-
         for obstacle in self.obstacles:
-            if obstacle.checkCollision(world_object):
+            if obstacle.checkCollision(car):
                 return False
-
         for grass in self.grass:
-            if grass.checkCollision(world_object):
+            if grass.checkCollision(car):
                 return False
-
         return True
 
     def generateRandomPosition(self):
@@ -111,6 +124,9 @@ class World(Obstacle):
         while True:
             pos = random.choice(self.starting_positions)
 
+            #pos   = self.generateRandomPosition()
+            #angle = getAngle(pos - self.centre)
+
             for option in waypoint_options:
                 vec = option - pos
                 if vec.mag() > 10:
@@ -120,13 +136,13 @@ class World(Obstacle):
                 break
 
             car = Car(self, name, colour, pos, angle, time)
-            if self.checkObject(car):
+            if self.checkCar(car):
 
                 for other_car in self.cars:
                     if car.checkCollision(other_car):
                         break
                 else:
-                    controller = CarController(car, self.num_cars)
+                    controller = CarController(car)
                     self.controllers.append(controller)
 
                     self.cars.append(car)
@@ -137,6 +153,7 @@ class World(Obstacle):
         for car in self.cars:
             car.update(time)
 
+        crash = False
         for i in range(self.num_cars):
             car_i = self.cars[i]
 
@@ -145,14 +162,21 @@ class World(Obstacle):
 
                 if car_i.checkCollision(car_j):
                     car_i.stop(car_j)
-                    car_j.stop(car_i)
                     self.controllers[i].clearWaypoints()
+                    if not car_i.stopped:
+                        crash = True
+
+                    car_j.stop(car_i)
                     self.controllers[j].clearWaypoints()
+                    if not car_j.stopped:
+                        crash = True
 
             for obstacle in self.obstacles:
                 if car_i.checkCollision(obstacle):
                     car_i.stop(obstacle)
                     self.controllers[i].clearWaypoints()
+                    if not car_i.stopped:
+                        crash = True
 
         for grass in self.grass:
             for car in self.cars:
@@ -163,21 +187,27 @@ class World(Obstacle):
                 grass.colour = LIGHT_GREEN
 
         for controller in self.controllers:
+            if crash:
+                controller.clearFuture()
+                controller.clearWaypoints()
             controller.update()
 
     def sendMessages(self):
+        messages = {SEND_TO_ALL: []}
+        for controller in self.controllers:
+            messages[controller.name] = []
+
         # send messages
-        messages = {i: [] for i in range(SEND_TO_ALL, self.num_cars)}
-        for i in range(self.num_cars):
-            controller = self.controllers[i]
+        for controller in self.controllers:
+            source = controller.name
             for message in controller.sendMessages():
                 address, message_type, content = message
-                messages[address].append((i, message_type, content))
+                messages[address].append((source, message_type, content))
 
         # receive messages
-        for i in range(self.num_cars):
-            controller = self.controllers[i]
-            controller.receiveMessages(messages[SEND_TO_ALL], messages[i])
+        for controller in self.controllers:
+            address = controller.name
+            controller.receiveMessages(messages[SEND_TO_ALL], messages[address])
 
     def scaleDistance(self, distance):
         return round(distance * self.scale)
@@ -228,6 +258,7 @@ class World(Obstacle):
         true_mouse_position = self.getTruePosition(mouse_position)
         if not self.checkInside(true_mouse_position):
             self.panning = False
+            return
 
         for car in self.cars:
             if car.checkInside(true_mouse_position):
@@ -280,4 +311,27 @@ class World(Obstacle):
         for car in self.cars:
             car.draw(car is self.selected_car)
             #car.drawExtra()
+
+        for road in roads_list:
+            thingy = road.end - road.start
+            if thingy.mag() == 0.0:
+                pygame.draw.circle(self.screen, RED,
+                                   self.getDrawable(road.end), 5, 1)
+                continue
+
+            forward = (road.end - road.start).norm()
+            left    = forward.left90() * 0.5
+
+            start = self.getDrawable(road.start)
+            end   = self.getDrawable(road.end)
+
+            left_corner  = self.getDrawable(road.end - forward + left)
+            right_corner = self.getDrawable(road.end - forward - left)
+
+            pygame.draw.line(self.screen, BLACK, start, end, 1)
+
+            triangle = [end, left_corner, right_corner]
+
+            pygame.draw.polygon(self.screen, WHITE, triangle)
+            pygame.draw.polygon(self.screen, BLACK, triangle, 1)
 

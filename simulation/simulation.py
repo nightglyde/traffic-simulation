@@ -4,10 +4,12 @@ from world import World
 
 INCLUDE_CAPTION = True
 
-MAX_CARS    = 4
+MAX_CARS    = 5
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
                "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
+
+#CAR_COLOURS = {"YEL": YELLOW}
 
 # initialise game engine
 pygame.init()
@@ -128,6 +130,7 @@ while not done:
 
         elif event.type == pygame.USEREVENT:
             paused = True
+
 
     # update world
     if not paused:
