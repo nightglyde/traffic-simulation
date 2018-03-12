@@ -14,6 +14,7 @@ ACTION_TIME  = ACTION_DELAY / 1000
 SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
 
+# these variables are modified later on in this file
 WORLD_WIDTH  = 100 # metres
 WORLD_HEIGHT = 100 # must be at least 30
 
@@ -536,61 +537,6 @@ def crashLine(line, car_points, forward, speed):
                         closest_crash = crash
     return closest_crash
 
-predefined_grass_old = [
-    # outside boundary
-    [Vector( 0,  0), Vector(100,  0), Vector(100,  10), Vector( 0,  10)],
-    [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
-    [Vector(90,  0), Vector(100,  0), Vector(100, 100), Vector(90, 100)],
-    [Vector( 0, 90), Vector(100, 90), Vector(100, 100), Vector( 0, 100)],
-
-    # internal squares
-    [Vector(15, 15), Vector(35, 15), Vector(35, 35), Vector(15, 35)],
-    [Vector(40, 15), Vector(60, 15), Vector(60, 35), Vector(40, 35)],
-    [Vector(65, 15), Vector(85, 15), Vector(85, 35), Vector(65, 35)],
-    [Vector(15, 40), Vector(35, 40), Vector(35, 60), Vector(15, 60)],
-    [Vector(40, 40), Vector(60, 40), Vector(60, 60), Vector(40, 60)],
-    [Vector(65, 40), Vector(85, 40), Vector(85, 60), Vector(65, 60)],
-    [Vector(15, 65), Vector(35, 65), Vector(35, 85), Vector(15, 85)],
-    [Vector(40, 65), Vector(60, 65), Vector(60, 85), Vector(40, 85)],
-    [Vector(65, 65), Vector(85, 65), Vector(85, 85), Vector(65, 85)],
-]
-
-predefined_grass = [
-    # outside boundary
-    [Vector( 0,  0), Vector(100,  0), Vector(100,  10), Vector( 0,  10)],
-    [Vector( 0,  0), Vector( 10,  0), Vector( 10, 100), Vector( 0, 100)],
-    [Vector(90,  0), Vector(100,  0), Vector(100, 100), Vector(90, 100)],
-    [Vector( 0, 90), Vector(100, 90), Vector(100, 100), Vector( 0, 100)],
-
-    # boundary corners
-    [Vector( 0,   0), Vector( 25,   0), Vector(  0,  25)],
-    [Vector(75,   0), Vector(100,   0), Vector(100,  25)],
-    [Vector( 0,  75), Vector( 25, 100), Vector(  0, 100)],
-    [Vector(75, 100), Vector(100,  75), Vector(100, 100)],
-
-    # internal squares
-    [Vector(15, 17), Vector(17, 15), Vector(33, 15), Vector(35, 17),
-     Vector(35, 33), Vector(33, 35), Vector(17, 35), Vector(15, 33)],
-    [Vector(40, 17), Vector(42, 15), Vector(58, 15), Vector(60, 17),
-     Vector(60, 33), Vector(58, 35), Vector(42, 35), Vector(40, 33)],
-    [Vector(65, 17), Vector(67, 15), Vector(83, 15), Vector(85, 17),
-     Vector(85, 33), Vector(83, 35), Vector(67, 35), Vector(65, 33)],
-
-    [Vector(15, 42), Vector(17, 40), Vector(33, 40), Vector(35, 42),
-     Vector(35, 58), Vector(33, 60), Vector(17, 60), Vector(15, 58)],
-    [Vector(40, 42), Vector(42, 40), Vector(58, 40), Vector(60, 42),
-     Vector(60, 58), Vector(58, 60), Vector(42, 60), Vector(40, 58)],
-    [Vector(65, 42), Vector(67, 40), Vector(83, 40), Vector(85, 42),
-     Vector(85, 58), Vector(83, 60), Vector(67, 60), Vector(65, 58)],
-
-    [Vector(15, 67), Vector(17, 65), Vector(33, 65), Vector(35, 67),
-     Vector(35, 83), Vector(33, 85), Vector(17, 85), Vector(15, 83)],
-    [Vector(40, 67), Vector(42, 65), Vector(58, 65), Vector(60, 67),
-     Vector(60, 83), Vector(58, 85), Vector(42, 85), Vector(40, 83)],
-    [Vector(65, 67), Vector(67, 65), Vector(83, 65), Vector(85, 67),
-     Vector(85, 83), Vector(83, 85), Vector(67, 85), Vector(65, 83)],
-]
-
 starting_positions = [
     Vector(12.5,12.5), Vector(37.5,12.5), Vector(62.5,12.5), Vector(87.5,12.5),
     Vector(12.5,37.5), Vector(37.5,37.5), Vector(62.5,37.5), Vector(87.5,37.5),
@@ -630,4 +576,64 @@ waypoint_options = [
     Vector(87.5, 25), Vector(87.5, 50), Vector(87.5, 75),
 
 ]
+
+# generate grass
+border_size = 10
+road_size   = ROAD_WIDTH * 2
+block_size  = 30
+corner_offset = TURN_RADIUS
+num_blocks = 3
+
+next_block = block_size + road_size
+
+world_size = border_size + road_size + next_block*num_blocks + border_size
+
+WORLD_WIDTH  = world_size
+WORLD_HEIGHT = world_size
+
+predefined_grass = [
+    [
+        Vector(0, 0),
+        Vector(world_size, 0),
+        Vector(world_size, border_size),
+        Vector(0, border_size),
+    ],
+    [
+        Vector(0, 0),
+        Vector(border_size, 0),
+        Vector(border_size, world_size),
+        Vector(0, world_size),
+    ],
+    [
+        Vector(world_size-border_size, 0),
+        Vector(world_size, 0),
+        Vector(world_size, world_size),
+        Vector(world_size-border_size, world_size),
+    ],
+    [
+        Vector(0, world_size-border_size),
+        Vector(world_size, world_size-border_size),
+        Vector(world_size, world_size),
+        Vector(0, world_size),
+    ],
+]
+
+# block
+x_start = border_size + road_size
+y_start = border_size + road_size
+for i in range(num_blocks):
+    x = x_start + next_block * i
+    for j in range(num_blocks):
+        y = y_start + next_block * j
+
+        predefined_grass.append([
+            Vector(x+corner_offset, y),
+            Vector(x+block_size-corner_offset, y),
+            Vector(x+block_size, y+corner_offset),
+            Vector(x+block_size, y+block_size-corner_offset),
+            Vector(x+block_size-corner_offset, y+block_size),
+            Vector(x+corner_offset, y+block_size),
+            Vector(x, y+block_size-corner_offset),
+            Vector(x, y+corner_offset),
+        ])
 

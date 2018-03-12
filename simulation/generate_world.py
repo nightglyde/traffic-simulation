@@ -31,15 +31,20 @@ class Road:
 
         turn = sign(ab_cross_xy)
 
-        if turn == LEFT:
-            print("LEFT")
+        if turn == CENTRE:
+            bx = x-b
 
-        elif turn == RIGHT:
-            print("RIGHT")
+            ab_cross_bx = crossProduct(ab, bx)
 
-        else: # turn == CENTRE
-            print("CENTRE")
-            return False
+            if ab_cross_bx < 0.0001:
+                joiny_road = Road(b, x)
+                joiny_road.prev_roads.append(self)
+                self.next_roads.append(joiny_road)
+                other.prev_roads.append(joiny_road)
+                joiny_road.next_roads.append(other)
+                return True
+            else:
+                return False
 
         ax_cross_ab = crossProduct(ax, ab)
         ax_cross_xy = crossProduct(ax, xy)
@@ -49,17 +54,26 @@ class Road:
 
         intersect = a + ab * ab_rel_dist
 
-        print(ab_rel_dist, xy_rel_dist, intersect)
+        #print(ab_rel_dist, xy_rel_dist, intersect)
 
         if ab_rel_dist < 1 or xy_rel_dist > 0:
-            print("BAD")
+            #print("BAD")
             return False
-        print("GOOD")
+        #print("GOOD")
 
         bi_dist = (b-intersect).mag()
         xi_dist = (x-intersect).mag()
 
-        if bi_dist < xi_dist:
+        if abs(bi_dist - xi_dist) < 0.000001:
+            turn_start = b
+            turn_end   = x
+
+            prev_road = self
+            next_road = other
+
+            extra_road = None
+
+        elif bi_dist < xi_dist:
             turn_start = b
             turn_end   = intersect + xy.norm() * bi_dist
 
@@ -102,7 +116,12 @@ class Road:
             print("BAD CONNECTION", turn_radius, TURN_RADIUS)
             #raise Exception('Bad road connection: {} to {}'.format(self, other))
 
-            roads_list.remove(extra_road)
+            if extra_road != None:
+                roads_list.remove(extra_road)
+                if extra_road in self.next_roads:
+                    self.next_roads.remove(extra_road)
+                if extra_road in other.prev_roads:
+                    other.prev_roads.remove(extra_road)
 
             return False
 
@@ -113,11 +132,11 @@ class Road:
         centre_end_angle   = getAngle(centre_end)
 
         ang_diff = centre_end_angle - centre_start_angle
-        print("ANGLE:", ang_diff, ang_diff.value)
+        #print("ANGLE:", ang_diff, ang_diff.value)
 
         prev_point = turn_start
 
-        thingy = turn_radius / 4
+        thingy = turn_radius / 2
 
         if turn == LEFT:
             for i in range(1, abs(int(ang_diff.value*thingy))):
@@ -150,30 +169,87 @@ class Road:
         next_road.prev_roads.append(curr_road)
         curr_road.next_roads.append(next_road)
 
-        # does the path of one cross the other one?
-        # (line projected from the end   of the first  road, forwards)
-        # (line projected from the start of the second road, backwards)
-        # there needs to be at least enough gap to fit a simple turning circle
-
-
-        # how big of a turning circle should it be?
-        # we want to make sure we only turn left or right, not both
-        # also, we should have as big a turning circle as possible (i think)
-
         return True
 
     def __repr__(self):
         return "Road({}, {})".format(self.start, self.end)
 
+class Intersection:
+    def __init__(self):
+        self.inputs  = []
+        self.outputs = []
 
-a = random.randint(0, 100)
-b = random.randint(0, 100)
-c = random.randint(0, 100)
-d = random.randint(0, 100)
+    def addInput(self, road):
+        self.inputs.append(road)
 
-road1 = Road(Vector(a, b), Vector(c, d))
+    def addOutput(self, road):
+        self.outputs.append(road)
+
+    def joinRoads(self):
+        for in_road in self.inputs:
+            for out_road in self.outputs:
+                result = in_road.connect(out_road)
+                if result == False:
+                    print(in_road, out_road, result)
 
 if True:
+    intersections = [[Intersection() for i in range(4)] for j in range(4)]
+
+    lane_size = road_size / 2
+    half_lane = road_size / 4
+    offset = TURN_RADIUS
+
+    x_start = border_size + road_size
+    y_start = border_size + half_lane
+    for i in range(num_blocks):
+        x = x_start + next_block * i
+        for j in range(num_blocks+1):
+            y = y_start + next_block * j
+
+            # roads pointing right
+            right_road = Road(
+                Vector(x + offset, y),
+                Vector(x + block_size - offset, y)
+            )
+            intersections[i][j].addOutput(right_road)
+            intersections[i+1][j].addInput(right_road)
+
+            # roads pointing left
+            left_road = Road(
+                Vector(x + block_size - offset, y + lane_size),
+                Vector(x + offset, y + lane_size)
+            )
+            intersections[i+1][j].addOutput(left_road)
+            intersections[i][j].addInput(left_road)
+
+            # roads pointing up
+            up_road = Road(
+                Vector(y, x + block_size - offset),
+                Vector(y, x + offset)
+            )
+            intersections[j][i+1].addOutput(up_road)
+            intersections[j][i].addInput(up_road)
+
+            # roads pointing down
+            down_road = Road(
+                Vector(y + lane_size, x + offset),
+                Vector(y + lane_size, x + block_size - offset)
+            )
+            intersections[j][i].addOutput(down_road)
+            intersections[j][i+1].addInput(down_road)
+
+    for intersection_list in intersections:
+        for intersection in intersection_list:
+            intersection.joinRoads()
+
+else:
+    a = random.randint(0, 100)
+    b = random.randint(0, 100)
+    c = random.randint(0, 100)
+    d = random.randint(0, 100)
+
+    road1 = Road(Vector(a, b), Vector(c, d))
+
     for i in range(500):
         a = random.randint(0, 100)
         b = random.randint(0, 100)

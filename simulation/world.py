@@ -122,18 +122,18 @@ class World(Obstacle):
     def addCar(self, name, colour, time):
         # create car
         while True:
-            pos = random.choice(self.starting_positions)
+            #pos = random.choice(self.starting_positions)
 
-            #pos   = self.generateRandomPosition()
-            #angle = getAngle(pos - self.centre)
+            pos   = self.generateRandomPosition()
+            angle = getAngle(pos - self.centre)
 
-            for option in waypoint_options:
-                vec = option - pos
-                if vec.mag() > 10:
-                    continue
+            #for option in waypoint_options:
+            #    vec = option - pos
+            #    if vec.mag() > 10:
+            #        continue
 
-                angle = getAngle(vec)
-                break
+            #    angle = getAngle(vec)
+            #    break
 
             car = Car(self, name, colour, pos, angle, time)
             if self.checkCar(car):
@@ -319,19 +319,18 @@ class World(Obstacle):
                                    self.getDrawable(road.end), 5, 1)
                 continue
 
-            forward = (road.end - road.start).norm()
-            left    = forward.left90() * 0.5
-
             start = self.getDrawable(road.start)
             end   = self.getDrawable(road.end)
-
-            left_corner  = self.getDrawable(road.end - forward + left)
-            right_corner = self.getDrawable(road.end - forward - left)
-
             pygame.draw.line(self.screen, BLACK, start, end, 1)
 
-            triangle = [end, left_corner, right_corner]
+            #forward = (road.end - road.start).norm()
+            #left    = forward.left90() * 0.5
 
-            pygame.draw.polygon(self.screen, WHITE, triangle)
-            pygame.draw.polygon(self.screen, BLACK, triangle, 1)
+            #left_corner  = self.getDrawable(road.end - forward + left)
+            #right_corner = self.getDrawable(road.end - forward - left)
+
+            #triangle = [end, left_corner, right_corner]
+
+            #pygame.draw.polygon(self.screen, WHITE, triangle)
+            #pygame.draw.polygon(self.screen, BLACK, triangle, 1)
 

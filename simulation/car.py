@@ -267,7 +267,7 @@ class Car(Obstacle):
         self.crash = None
         self.lines = []
 
-        if self.speed > 0.0: # this is the bit we desparately need to replace
+        if False: #self.speed > 0.0: # this is the bit we desparately need to replace
             forward = getVector(self.angle)
             for obstacle in self.world.obstacles:
                 self.lines += obstacle.linesWithinRadius(self.rear,
