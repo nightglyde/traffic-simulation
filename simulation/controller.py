@@ -10,9 +10,15 @@ FUTURE_INTERVAL = TIME_STEP * 6
 
 PATH_MEMORY = 50
 
+MAX_SPEED = 15
+
 class CarController(Obstacle):
-    def __init__(self, car):
-        self.car = car
+    def __init__(self, car, road):
+        self.car  = car
+        self.road = road
+
+        self.route = deque()
+        self.next_road = self.road
 
         self.world  = car.world
         self.name   = car.name
@@ -20,12 +26,12 @@ class CarController(Obstacle):
 
         self.sim_car       = None
         self.future        = deque()
-        self.sim_waypoints = deque()
+        #self.sim_waypoints = deque()
 
         self.waypoints     = deque()
         self.score         = 0
         self.waypoint_time = self.car.time
-        self.generateWaypoints()
+        #self.generateWaypoints()
 
         self.path = deque()
         self.path.append(self.car.position)
@@ -92,31 +98,34 @@ class CarController(Obstacle):
             self.future.popleft()
 
         if self.sim_car is None:
-            self.sim_car       = self.car.copy()
-            self.sim_waypoints = self.waypoints.copy()
+            self.sim_car = self.car.copy()
+            #self.sim_waypoints = self.waypoints.copy()
 
-        if len(self.future) >= MAX_FUTURE or not self.sim_waypoints:
+        if len(self.future) >= MAX_FUTURE:# or not self.sim_waypoints:
             return
 
-        car      = self.sim_car
-        waypoint = self.sim_waypoints[0]
+        car = self.sim_car
+        car.control(self.route)
+        #waypoint = self.sim_waypoints[0]
         for i in range(3):
             if car.time % FUTURE_INTERVAL == 0:
                 if len(self.future) >= MAX_FUTURE:
                     return
                 self.future.append(FuturePoint(car))
 
-            if waypoint.checkInside(car.centre):
-                self.sim_waypoints.popleft()
-                if self.sim_waypoints:
-                    waypoint = self.sim_waypoints[0]
-                else:
-                    return
-
-            slow = car.time <= self.slow_time
-            keep = car.time <= self.keep_time
-            car.control(waypoint, slow, keep)
             car.update(car.time + TIME_STEP)
+
+            #if waypoint.checkInside(car.centre):
+            #    self.sim_waypoints.popleft()
+            #    if self.sim_waypoints:
+            #        waypoint = self.sim_waypoints[0]
+            #    else:
+            #        return
+
+            #slow = car.time <= self.slow_time
+            #keep = car.time <= self.keep_time
+            #car.control(waypoint, slow, keep)
+            #car.update(car.time + TIME_STEP)
 
     def update(self):
         if self.car.stopped:
@@ -126,26 +135,50 @@ class CarController(Obstacle):
         if len(self.path) > PATH_MEMORY:
             self.path.popleft()
 
-        while self.waypoints:
-            waypoint = self.waypoints[0]
+        #while self.waypoints:
+        #    waypoint = self.waypoints[0]
 
-            if waypoint.checkInside(self.car.centre):
-                self.waypoints.popleft()
-                self.score += 1
-                self.waypoint_time = self.car.time
-            else:
-                break
+        #    if waypoint.checkInside(self.car.centre):
+        #        self.waypoints.popleft()
+        #        self.score += 1
+        #        self.waypoint_time = self.car.time
+        #    else:
+        #        break
 
-            self.generateWaypoints()
+        #    self.generateWaypoints()
 
-        self.simulateFuture()
+        # generate route
+        while len(self.route) < 10:
+            self.next_road = random.choice(self.next_road.next_roads)
 
-        slow = self.car.time <= self.slow_time
-        keep = self.car.time <= self.keep_time
-        if self.waypoints:
-            self.car.control(self.waypoints[0], slow, keep)
-        else:
-            self.car.control(None, slow, keep)
+            start    = self.next_road.start
+            end      = self.next_road.end
+            road_vec = end - start
+            angle    = getAngle(road_vec)
+
+            mag = road_vec.mag()
+            for i in range(1, int(mag), 4):
+                pos = start + road_vec * (i / mag)
+
+                waypoint = Waypoint(self, pos, angle)
+                self.route.append((waypoint, MAX_SPEED))
+
+            waypoint = Waypoint(self, end, angle)
+            self.route.append((waypoint, MAX_SPEED))
+
+        self.car.control(self.route)
+
+        #self.simulateFuture()
+
+        #if route_update:
+        #    self.car.control(self.route)
+
+        #slow = self.car.time <= self.slow_time
+        #keep = self.car.time <= self.keep_time
+        #if self.waypoints:
+        #    self.car.control(self.waypoints[0], slow, keep)
+        #else:
+        #    self.car.control(None, slow, keep)
 
     def sendMessages(self):
         if self.car.stopped:
@@ -178,21 +211,23 @@ class CarController(Obstacle):
 
                     dist = (their_future.position - my_future.position).mag()
                     if dist < 5:
-                        self.clearFuture()
-                        future_time = self.car.time + TIME_STEP * 60
+                        print(self.name, "is going to crash into", source)
 
-                        my_heading    = getVector(my_future.angle)
-                        their_heading = getVector(their_future.angle)
+                        #self.clearFuture()
+                        #future_time = self.car.time + TIME_STEP * 60
+
+                        #my_heading    = getVector(my_future.angle)
+                        #their_heading = getVector(their_future.angle)
 
                         #cp = crossProduct(my_heading, their_heading)
                         #if cp > 0:
-                        if self.name < source:
+                        #if self.name < source:
                             # give way
-                            self.slow_time = future_time
-                            self.keep_time = future_time
-                            print(self.name, "is giving way to", source)
+                            #self.slow_time = future_time
+                            #self.keep_time = future_time
+                            #print(self.name, "is giving way to", source)
 
-                        break
+                        #break
 
     def drawPath(self):
         if len(self.path) > 1:
@@ -200,8 +235,11 @@ class CarController(Obstacle):
             pygame.draw.lines(self.world.screen, GREY, False, path, 1)
 
     def drawWaypoints(self):
-        if self.waypoints:
-            self.waypoints[0].draw()
+    #    if self.waypoints:
+    #        self.waypoints[0].draw()
+
+        for waypoint, speed in self.route:
+            waypoint.draw()
 
         for future_point in self.future:
             future_point.draw()

@@ -122,6 +122,30 @@ class World(Obstacle):
     def addCar(self, name, colour, time):
         # create car
         while True:
+            road = random.choice(roads_list)
+            road_vec = road.end - road.start
+
+            pos = road.start + road_vec * random.random()
+            angle = getAngle(road_vec)
+
+            car = Car(self, name, colour, pos, angle, time)
+            if self.checkCar(car):
+
+                for other_car in self.cars:
+                    if car.checkCollision(other_car):
+                        break
+
+                else:
+                    controller = CarController(car, road)
+                    self.controllers.append(controller)
+
+                    self.cars.append(car)
+                    self.num_cars += 1
+                    return
+
+    def alt_addCar(self, name, colour, time):
+        # create car
+        while True:
             #pos = random.choice(self.starting_positions)
 
             pos   = self.generateRandomPosition()
@@ -142,7 +166,7 @@ class World(Obstacle):
                     if car.checkCollision(other_car):
                         break
                 else:
-                    controller = CarController(car)
+                    controller = CarController(car, road)
                     self.controllers.append(controller)
 
                     self.cars.append(car)

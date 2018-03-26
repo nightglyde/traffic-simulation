@@ -76,6 +76,7 @@ class Car(Obstacle):
         self.angular_velocity = 0.0              # radians per second
 
         # control
+        self.route         = deque()
         self.desired_angle = ANGLE_0
         self.desired_speed = 0.0
 
@@ -88,13 +89,19 @@ class Car(Obstacle):
         car = Car(self.world, self.name, self.colour,
                   self.position, self.angle, self.time)
 
-        car.stopped          = self.stopped
+        # status
+        car.stopped = self.stopped
+
+        # motion
         car.engine_force     = self.engine_force
         car.wheel_angle      = self.wheel_angle
         car.speed            = self.speed
         car.angular_velocity = self.angular_velocity
-        car.desired_angle    = self.desired_angle
-        car.desired_speed    = self.desired_speed
+
+        # control
+        car.route         = self.route.copy()
+        car.desired_angle = self.desired_angle
+        car.desired_speed = self.desired_speed
 
         car.generateHull()
         return car
@@ -164,6 +171,34 @@ class Car(Obstacle):
 
             self.world.obstacles.append(self)
 
+    def updateRoute(self):
+        while self.route:
+            waypoint, desired_speed = self.route[0]
+
+            if waypoint.checkInside(self.centre):
+                self.route.popleft()
+                continue
+
+            destination        = waypoint.position
+            self.desired_speed = desired_speed
+            self.desired_angle = getAngle(destination - self.position)
+
+            angle_difference = self.desired_angle - self.angle
+            if angle_difference < ANGLE_0:
+                centre   = getTurningCircle(LEFT, self, TURN_RADIUS)
+                distance = (destination - centre).mag()
+                if distance < TURN_RADIUS:
+                    self.desired_angle = self.angle + ANGLE_90
+            elif angle_difference > ANGLE_0:
+                centre   = getTurningCircle(RIGHT, self, TURN_RADIUS)
+                distance = (destination - centre).mag()
+                if distance < TURN_RADIUS:
+                    self.desired_angle = self.angle - ANGLE_90
+            return
+
+        self.desired_speed = 0.0
+        self.desired_angle = self.angle
+
     def update(self, time):
         if self.stopped:
             return
@@ -174,6 +209,9 @@ class Car(Obstacle):
 
         dt = (time - self.time) / 1000
         self.time = time
+
+        if True:
+            self.updateRoute()
 
         self.wheel_angle = getNextWheelAngle(self.desired_angle, self.angle,
                                              self.wheel_angle,   self.speed, dt)
@@ -258,7 +296,10 @@ class Car(Obstacle):
                         result = crash
         return result
 
-    def control(self, waypoint, slow, keep):
+    def control(self, route):
+        self.route = route
+
+    def old_control(self, waypoint, slow, keep):
         if slow:
             self.desired_speed = SLOW_SPEED
         else:
