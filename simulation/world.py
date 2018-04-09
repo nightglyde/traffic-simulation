@@ -122,10 +122,21 @@ class World(Obstacle):
     def addCar(self, name, colour, time):
         # create car
         while True:
+            #while True:
+            #    road = random.choice(roads_list)
+            #    road_vec = road.end - road.start
+            #    road_length = road_vec.mag()
+            #    if road_length > 3:
+            #        break
+
+            #dist_along_road = 1 + random.random() * (road_length-2)
+
+            #pos = road.start + road_vec * (dist_along_road/road_length)
+
             road = random.choice(roads_list)
             road_vec = road.end - road.start
 
-            pos = road.start + road_vec * random.random()
+            pos   = road.start + road_vec * random.random()
             angle = getAngle(road_vec)
 
             car = Car(self, name, colour, pos, angle, time)
@@ -336,16 +347,16 @@ class World(Obstacle):
             car.draw(car is self.selected_car)
             #car.drawExtra()
 
-        for road in roads_list:
-            thingy = road.end - road.start
-            if thingy.mag() == 0.0:
-                pygame.draw.circle(self.screen, RED,
-                                   self.getDrawable(road.end), 5, 1)
-                continue
+        #for road in roads_list:
+        #    thingy = road.end - road.start
+        #    if thingy.mag() == 0.0:
+        #        pygame.draw.circle(self.screen, RED,
+        #                           self.getDrawable(road.end), 5, 1)
+        #        continue
 
-            start = self.getDrawable(road.start)
-            end   = self.getDrawable(road.end)
-            pygame.draw.line(self.screen, BLACK, start, end, 1)
+        #    start = self.getDrawable(road.start)
+        #    end   = self.getDrawable(road.end)
+        #    pygame.draw.line(self.screen, BLACK, start, end, 1)
 
             #forward = (road.end - road.start).norm()
             #left    = forward.left90() * 0.5

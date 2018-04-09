@@ -4,7 +4,7 @@ from world import World
 
 INCLUDE_CAPTION = True
 
-MAX_CARS    = 5
+MAX_CARS    = 1
 CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
                "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
                "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}

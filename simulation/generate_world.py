@@ -136,7 +136,7 @@ class Road:
 
         prev_point = turn_start
 
-        thingy = turn_radius / 3
+        thingy = turn_radius / 2
 
         if turn == LEFT:
             for i in range(1, abs(int(ang_diff.value*thingy))):
