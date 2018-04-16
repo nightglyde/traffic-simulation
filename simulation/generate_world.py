@@ -10,6 +10,8 @@ class Road:
         self.next_roads = []
         self.prev_roads = []
 
+        self.intersection = None
+
         roads_list.append(self)
 
     def connect(self, other):
@@ -181,6 +183,7 @@ class Intersection:
 
     def addInput(self, road):
         self.inputs.append(road)
+        road.intersection = self
 
     def addOutput(self, road):
         self.outputs.append(road)
@@ -189,14 +192,12 @@ class Intersection:
         for in_road in self.inputs:
             for out_road in self.outputs:
                 result = in_road.connect(out_road)
-                if result == False:
-                    print(in_road, out_road, result)
+                #if result == False:
+                #    print(in_road, out_road, result)
 
 if True:
-    intersections = [[Intersection() for i in range(4)] for j in range(4)]
+    intersections = [[Intersection() for i in range(num_blocks+1)] for j in range(num_blocks+1)]
 
-    lane_size = road_size / 2
-    half_lane = road_size / 4
     offset = TURN_RADIUS
 
     x_start = border_size + road_size
@@ -241,6 +242,14 @@ if True:
     for intersection_list in intersections:
         for intersection in intersection_list:
             intersection.joinRoads()
+
+    ramp_road = Road(RAMP_POSITION, RAMP_END)
+    for road in roads_list:
+        if ramp_road.connect(road):
+            print("Connected", ramp_road, "to", road)
+            break
+        else:
+            print("Could not connect", ramp_road, "to", road)
 
 else:
     a = random.randint(0, 100)

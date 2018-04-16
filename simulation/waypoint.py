@@ -1,4 +1,5 @@
 from util import *
+from obstacle import Obstacle, convexHull
 
 WAYPOINT_RADIUS     = ROAD_WIDTH / 2
 FUTURE_POINT_RADIUS = CAR_WIDTH  / 2
@@ -63,12 +64,17 @@ class Waypoint:
         pygame.draw.circle(screen, dark_colour,  centre, outer_radius, 1)
         pygame.draw.circle(screen, dark_colour,  centre, inner_radius, 1)
 
-class FuturePoint(Waypoint):
-    def __init__(self, car):
+class FuturePoint(Obstacle):
+    def __init__(self, car, prev_hull):
+        self.name     = car.name # temporary, cos i don't know how to deal with
+                                 # giving way when they're parallel yet
         self.world    = car.world
         self.colour   = car.colour
         self.position = car.centre
         self.angle    = car.angle
+
+        self.orig_hull = car.hull
+        self.hull      = convexHull(self.orig_hull + prev_hull)
 
         self.radius       = FUTURE_POINT_RADIUS
         self.inner_radius = self.radius * 0.8
@@ -89,10 +95,10 @@ class FuturePoint(Waypoint):
         dark_colour  = DARKER[colour]
 
         centre = self.world.getDrawable(pos)
-        pygame.draw.circle(screen, colour,       centre, outer_radius)
-        pygame.draw.circle(screen, light_colour, centre, inner_radius)
-        pygame.draw.circle(screen, dark_colour,  centre, outer_radius, 1)
-        pygame.draw.circle(screen, dark_colour,  centre, inner_radius, 1)
+        #pygame.draw.circle(screen, colour,       centre, outer_radius)
+        #pygame.draw.circle(screen, light_colour, centre, inner_radius)
+        #pygame.draw.circle(screen, dark_colour,  centre, outer_radius, 1)
+        #pygame.draw.circle(screen, dark_colour,  centre, inner_radius, 1)
 
         front = pos + getVector(self.angle)             * self.inner_radius
         right = pos + getVector(self.angle + ANGLE_120) * self.inner_radius

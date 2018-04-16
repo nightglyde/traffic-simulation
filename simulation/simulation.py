@@ -4,10 +4,10 @@ from world import World
 
 INCLUDE_CAPTION = True
 
-MAX_CARS    = 1
-CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
-               "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
-               "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
+#MAX_CARS    = 12
+#CAR_COLOURS = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
+#               "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
+#               "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
 
 #CAR_COLOURS = {"YEL": YELLOW}
 
@@ -37,22 +37,22 @@ world_time = 0
 prev_time  = pygame.time.get_ticks()
 
 # create cars
-count = 0
-for i in range(1000):
-    for colour_name in CAR_COLOURS:
-        name   = colour_name + "_" + str(i)
-        colour = CAR_COLOURS[colour_name]
-
-        world.addCar(name, colour, world_time)
-
-        print(name)
-
-        count += 1
-        if count == MAX_CARS:
-            break
-    else:
-        continue
-    break
+#count = 0
+#for i in range(1000):
+#    for colour_name in CAR_COLOURS:
+#        name   = colour_name + "_" + str(i)
+#        colour = CAR_COLOURS[colour_name]
+#
+#        world.addCar(name, colour, world_time)
+#
+#        print(name)
+#
+#        count += 1
+#        if count == MAX_CARS:
+#            break
+#    else:
+#        continue
+#    break
 
 print()
 
@@ -102,7 +102,8 @@ while not done:
         # generate screen caption
         string = "Car Simulator | FPS: {}".format(fps)
         for score, time, name in scores:
-            string += " | {:4} {:3}".format(name, -score)
+            #string += " | {:4} {:3}".format(name, -score)
+            string += " | {:4}".format(name)
         pygame.display.set_caption(string)
 
     # deal with events

@@ -8,8 +8,11 @@ FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
-ACTION_DELAY = 500
-ACTION_TIME  = ACTION_DELAY / 1000
+MAX_CARS            = 12
+CAR_ADDING_INTERVAL = TIME_STEP * 100
+
+#ACTION_DELAY = 500
+#ACTION_TIME  = ACTION_DELAY / 1000
 
 SCREEN_WIDTH  = 1200 # pixels
 SCREEN_HEIGHT = 800
@@ -19,9 +22,9 @@ WORLD_WIDTH  = 100 # metres
 WORLD_HEIGHT = 100 # must be at least 30
 
 ROAD_WIDTH = 3.5
-COLLISION_DISTANCE = 10
-BUBBLE_SIZE = 0.5
-BUBBLE_DIAG = math.sqrt(BUBBLE_SIZE**2 / 2)
+#COLLISION_DISTANCE = 10
+#BUBBLE_SIZE = 0.5
+#BUBBLE_DIAG = math.sqrt(BUBBLE_SIZE**2 / 2)
 
 CAR_LENGTH   = 4.5
 CAR_WIDTH    = 1.8
@@ -102,13 +105,13 @@ class Vector:
 def getVector(angle):
     return Vector(math.cos(angle.value), math.sin(angle.value))
 
-VECTOR_0      = Vector(0, 0)
+#VECTOR_0      = Vector(0, 0)
 SCREEN_CENTRE = Vector(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2)
 
-SCREEN_TOP_LEFT     = Vector(0,            0)
-SCREEN_TOP_RIGHT    = Vector(SCREEN_WIDTH, 0)
-SCREEN_BOTTOM_LEFT  = Vector(0,            SCREEN_HEIGHT)
-SCREEN_BOTTOM_RIGHT = Vector(SCREEN_WIDTH, SCREEN_HEIGHT)
+#SCREEN_TOP_LEFT     = Vector(0,            0)
+#SCREEN_TOP_RIGHT    = Vector(SCREEN_WIDTH, 0)
+#SCREEN_BOTTOM_LEFT  = Vector(0,            SCREEN_HEIGHT)
+#SCREEN_BOTTOM_RIGHT = Vector(SCREEN_WIDTH, SCREEN_HEIGHT)
 
 #########
 # ANGLE #
@@ -320,15 +323,40 @@ DARKER = {  WHITE: LIGHT_GREY,                            BLACK: BLACK,
        LIGHT_ROSE: ROSE,       ROSE: DARK_ROSE,       DARK_ROSE: BLACK,
 }
 
-ALL_COLOURS = [
+CAR_COLOURS = [
     RED,   ORANGE, YELLOW,  LIME,
     GREEN, SPRING, CYAN,    AZURE,
     BLUE,  VIOLET, MAGENTA, ROSE,
 ]
 
+def nextColour():
+    index = 0
+    while True:
+        random.shuffle(CAR_COLOURS)
+        for colour in CAR_COLOURS:
+            name = COLOUR_NAME[colour] + "_" + str(index)
+            yield colour, name
+        index += 1
+
+COLOUR_NAME = {RED:   "RED", ORANGE: "ORA", YELLOW:  "YEL", LIME:  "LIM",
+               GREEN: "GRN", SPRING: "SPR", CYAN:    "CYA", AZURE: "AZU",
+               BLUE:  "BLU", VIOLET: "VIO", MAGENTA: "MAG", ROSE:  "ROS"}
+
+NAME_TO_COLOUR = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
+                  "GRN": GREEN, "SPR": SPRING, "CYA": CYAN,    "AZU": AZURE,
+                  "BLU": BLUE,  "VIO": VIOLET, "MAG": MAGENTA, "ROS": ROSE}
+
 #################
 # MISCELLANEOUS #
 #################
+
+#def generateCarHull(position, angle):
+#    forward = getVector(angle)
+#    left    = forward.left90() * CAR_WIDTH/2
+#
+#    front = position + forward * PIVOT_TO_FRONT
+#    rear  = position - forward * PIVOT_TO_REAR
+#    return [front - left, front + left, rear + left, rear - left]
 
 def getTurningCircle(direction, car, radius=TURN_RADIUS):
     if direction == LEFT:
@@ -582,7 +610,7 @@ border_size = 10
 road_size   = ROAD_WIDTH * 2
 block_size  = 30
 corner_offset = TURN_RADIUS
-num_blocks = 3
+num_blocks = 3#3
 
 next_block = block_size + road_size
 
@@ -636,4 +664,12 @@ for i in range(num_blocks):
             Vector(x, y+block_size-corner_offset),
             Vector(x, y+corner_offset),
         ])
+
+lane_size = road_size / 2
+half_lane = road_size / 4
+
+RAMP_POSITION = Vector(0,           border_size + half_lane)
+RAMP_END      = Vector(border_size, border_size + half_lane)
+
+RAMP_ANGLE = getAngle(RAMP_END - RAMP_POSITION)
 
