@@ -4,67 +4,25 @@ from obstacle import Obstacle
 from waypoint import Waypoint, FuturePoint
 
 MAX_WAYPOINTS = 10
-MAX_FUTURE    = 20#10
-FUTURE_SPEED  = 6
+MAX_FUTURE    = 10
+FUTURE_SPEED  = 20#10#20#6
 
-FUTURE_INTERVAL = TIME_STEP * 3#6
+FUTURE_INTERVAL = TIME_STEP * 6
 
 PATH_MEMORY = 50
 
-MAX_SPEED  = 15
-SLOW_SPEED = 7.5
-
 MIN_ROUTE_PIECES = 20
 
-def checkGiveWay(self_future, other_future):
-    self_position = self_future.position
-    self_angle    = self_future.angle
-
-    other_position = other_future.position
-    other_angle    = other_future.angle
-
-    ab = getVector(self_angle)
-    xy = getVector(other_angle)
-    ax = other_position - self_position
-
-    ab_cross_xy = crossProduct(ab, xy)
-
-    turn = sign(ab_cross_xy)
-    if turn == CENTRE:
-        # no idea
-        # return self_position + (ax/2)
-        return self_future.name < other_future.name
-
-    ax_cross_ab = crossProduct(ax, ab)
-    ax_cross_xy = crossProduct(ax, xy)
-
-    ab_rel_dist = ax_cross_xy / ab_cross_xy
-    xy_rel_dist = ax_cross_ab / ab_cross_xy
-
-    if ab_rel_dist > xy_rel_dist:
-        return True
-
-    if ab_rel_dist < xy_rel_dist:
-        return False
-
-    if turn == RIGHT:
-        return True
-
-    return False
-
-    #print(self_future.name, ab_rel_dist, xy_rel_dist, turn==RIGHT)
-
-    #intersect = self_position + ab * ab_rel_dist
-    #return intersect
+SENSE_GIVE_WAY_THRESHOLD = 30
 
 class CarController(Obstacle):
     def __init__(self, car, road):
         self.car  = car
-        self.road = road
+        #self.road = road
 
-        self.route = deque()
-        self.next_road = self.road
-        car.control(self.route)
+        self.route = car.route#deque()
+        self.next_road = road
+        #car.control(self.route)
 
         self.world  = car.world
         self.name   = car.name
@@ -78,11 +36,12 @@ class CarController(Obstacle):
         self.waypoint_time = self.car.time
         #self.generateWaypoints()
 
-        self.path = deque()
+        self.path = car.path
         self.path.append(self.car.position)
 
-        self.messages   = []
-        self.car_status = {}
+        self.messages       = []
+        self.car_status     = {}
+        self.give_way_rules = {}
 
         #self.slow_time = -1
         #self.keep_time = -1
@@ -137,7 +96,7 @@ class CarController(Obstacle):
             self.addRandomWaypoint()
 
     def simulateFuture(self):
-        while self.future and self.future[0].time < self.car.time:
+        while self.future and self.future[0].end_time < self.car.time:
             if (self.future[0].position - self.car.position).mag() > 2:
                 self.clearFuture()
                 break
@@ -153,11 +112,12 @@ class CarController(Obstacle):
                     return
 
                 if self.future:
-                    prev_hull = self.future[-1].orig_hull
+                    start_time = self.future[-1].end_time
+                    start_hull = self.future[-1].end_hull
                 else:
-                    prev_hull = self.car.hull
-
-                self.future.append(FuturePoint(car, prev_hull))
+                    start_time = self.car.time
+                    start_hull = self.car.hull
+                self.future.append(FuturePoint(car, start_time, start_hull))
 
             car.update(car.time + TIME_STEP)
 
@@ -214,16 +174,127 @@ class CarController(Obstacle):
             self.route.append(instruction)
             self.sim_car.route.append(instruction)
 
-        self.road = self.route[0][0]
+        #self.road = self.route[0][0]
 
         self.simulateFuture()
+
+    def checkGiveWay(self, car_name):
+        car_pos, car_angle, car_speed = self.car_status[car_name]
+
+        ab = getVector(self.car.angle)
+        xy = getVector(car_angle)
+        ax = car_pos - self.car.position
+
+        if ax.mag() > SENSE_GIVE_WAY_THRESHOLD:
+            # car is too far away to bother
+            return False
+
+        ab_cross_xy = crossProduct(ab, xy)
+
+        turn = sign(ab_cross_xy)
+        if turn == CENTRE:
+            # parallel
+
+            if dotProduct(ab, xy) <= 0:
+                # facing opposite directions
+                return self.name > car_name
+
+            ax_dot_xy = dotProduct(ax, xy)
+            if ax_dot_xy > 0:
+                # car 1 is behind car 2
+                return True
+            if ax_dot_xy < 0:
+                # car 1 is in front of car 2
+                return False
+
+            ax_cross_ab = crossProduct(ax, ab)
+            if ax_cross_ab < 0:
+                # car 1 is to the left of car 2
+                return True
+            if ax_cross_ab > 0:
+                # car 1 is to the right of car 2
+                return False
+
+            # car 1 is on top of car 2
+            return self.name > car_name
+
+        ax_cross_ab = crossProduct(ax, ab)
+        ax_cross_xy = crossProduct(ax, xy)
+
+        ab_rel_dist = ax_cross_xy / ab_cross_xy
+        xy_rel_dist = ax_cross_ab / ab_cross_xy
+
+        if ab_rel_dist > xy_rel_dist:
+            return True
+
+        if ab_rel_dist < xy_rel_dist:
+            return False
+
+        if turn == RIGHT:
+            return True
+
+        return False
+
+        #intersect = self_position + ab * ab_rel_dist
+
+    def checkFutures(self, their_name, their_futures, giving_way_to):
+        for my_future in self.future:
+            for their_future in their_futures:
+
+                if my_future.checkCollision(their_future):
+
+                    #if self.checkGiveWay(their_name):
+                    print(self.name, "is giving way to", their_name,
+                          "at time", self.car.time / 1000)
+                    #giving_way_to.append((their_name, my_future.start_time))
+                    giving_way_to.add(their_name)
+
+                    return
+
+
+        #my_iter    = iter(self.future)
+        #their_iter = iter(content)
+
+        #try:
+        #    my_future    = next(my_iter)
+        #    their_future = next(their_iter)
+        #except StopIteration:
+        #    continue
+
+        #while True:
+        #    try:
+        #        if my_future.checkCollision(their_future):
+        #            if checkGiveWay(my_future, their_future):
+        #                print(self.name, "is giving way to", source,
+        #                      "at time", self.car.time / 1000)
+        #                giving_way_to.append(source)
+        #            break
+
+        #        if my_future.start_time <= their_future.start_time:
+        #            my_future = next(my_iter)
+        #        else:
+        #            their_future = next(their_iter)
+
+        #    except StopIteration:
+        #        break
+
+        #i_points = len(self.future)
+        #j_points = len(content)
+
+        #i = 0
+        #j = 0
+
+        #my_future = self.future[i]
+        #their_future = content[j]
+
+        #while i < i_points and j < j_points:
 
     def sendMessages(self):
         if self.car.stopped:
             return []
 
-        self.messages.append((SEND_TO_ALL, CURRENT_DETAILS,
-                              (self.car.position, self.car.angle)))
+        status = (self.car.position, self.car.angle, self.car.speed)
+        self.messages.append((SEND_TO_ALL, CURRENT_DETAILS, status))
         self.messages.append((SEND_TO_ALL, FUTURE_DETAILS, self.future.copy()))
         return self.messages
 
@@ -233,67 +304,80 @@ class CarController(Obstacle):
 
         self.messages.clear()
 
+        giving_way_to = set()
+        given_way_by  = set()
+
         for message in public:
             source, message_type, content = message
 
             if source == self.name:
                 continue
 
-            if message_type == CURRENT_DETAILS:
-                position, angle = content
-                self.car_status[source] = (position, angle, self.car.time)
+            elif message_type == CURRENT_DETAILS:
+                position, angle, speed  = content
+                self.car_status[source] = (position, angle, speed)
+
+                if source in given_way_by:
+                    self.give_way_rules[source] = False
+                else:
+                    self.give_way_rules[source] = self.checkGiveWay(source)
 
             elif message_type == FUTURE_DETAILS:
-                num = min(len(self.future), len(content))
-                for i in range(num):
+                if source in self.give_way_rules:
+                    if self.give_way_rules[source]:
+                        self.checkFutures(source, content, giving_way_to)
 
-                    # get the convex hull of self.future[i] and self.future[i+1]
-                    # and the convect hull of content[i] and content[i+1]
-                    # and then check if those obstacles collide
+            elif message_type == GIVE_WAY_MESSAGE:
+                if content == self.name:
+                    self.give_way_rules[source] = False
+                    given_way_by.add(source)
 
-                    my_future    = self.future[i]
-                    their_future = content[i]
+                    # find a way to make this last over several seconds,
+                    # so that they don't switch their give ways
 
-                    dist = (their_future.position - my_future.position).mag()
-                    if dist < 10 and my_future.checkCollision(their_future):
+        if giving_way_to:
+            self.car.setDesiredSpeed(0, self.car.time + TIME_STEP*20, MAX_SPEED)
+            road, waypoint, desired_speed, time = self.route[0]
+            self.route.appendleft((road, waypoint, 0,
+                                   self.car.time + TIME_STEP*20))
 
-                            # remove this bit
-                            #if dist < 3:
-                            #    print("Dist<3", end=" ")
-                            #if my_future.checkCollision(their_future):
-                            #    print("collis", end=" ")
-                            #print(self.name, source, self.car.time/10)
 
-                            if checkGiveWay(my_future, their_future):
-                                print(self.name, "is giving way to", source,
-                                      "at time", self.car.time / 1000)
+            #last_road = self.sim_car.route[0][0]
 
-                                road, waypoint, speed, time = self.route[0]
+            #stop_at_next = False
+            #for i in range(len(self.route)):
+            #    road, waypoint, desired_speed, time = self.route[i]
 
-                                self.route.appendleft(
-                                    (road, waypoint, 0,
-                                     self.car.time + TIME_STEP*20)#10)
-                                )
+                #if road == last_road:
+                #    stop_at_next = True
 
-                            self.clearFuture()
-                            break
+                #elif stop_at_next:
+                #    break
 
-    def drawPath(self):
-        if len(self.path) > 1:
-            path = [self.world.getDrawable(point) for point in self.path]
-            pygame.draw.lines(self.world.screen, GREY, False, path, 1)
+                #desired_speed = #max(0.1, desired_speed/2)#-1)
+            #    desired_speed = desired_speed/2
+
+            #    self.route[i] = (road, waypoint, desired_speed, time)
+
+            #    if i >= 5:
+            #        break
+
+            self.clearFuture()
+
+            for car_name in giving_way_to:
+                self.messages.append((SEND_TO_ALL, GIVE_WAY_MESSAGE, car_name))
 
     def drawWaypoints(self):
-        if self.waypoints:
-            self.waypoints[0].draw()
+        #if self.waypoints:
+        #    self.waypoints[0].draw()
 
-        screen = self.world.screen
-        colour = self.colour
-        for road, waypoint, speed, time in self.route:
-            a = self.world.getDrawable(road.start)
-            b = self.world.getDrawable(road.end)
+        #screen = self.world.screen
+        #colour = self.colour
+        #for road, waypoint, speed, time in self.route:
+        #    a = self.world.getDrawable(road.start)
+        #    b = self.world.getDrawable(road.end)
             #w = self.world.getDrawable(waypoint)
-            pygame.draw.line(screen, colour, a, b, 1)
+        #    pygame.draw.line(screen, LIGHTER[colour], a, b, 3)
             #pygame.draw.circle(screen, DARKER[colour], w, 3, 2)
 
         for future_point in self.future:

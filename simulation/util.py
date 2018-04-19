@@ -9,7 +9,7 @@ TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
 MAX_CARS            = 12
-CAR_ADDING_INTERVAL = TIME_STEP * 100
+CAR_ADDING_INTERVAL = TIME_STEP * 50
 
 #ACTION_DELAY = 500
 #ACTION_TIME  = ACTION_DELAY / 1000
@@ -26,6 +26,22 @@ ROAD_WIDTH = 3.5
 #BUBBLE_SIZE = 0.5
 #BUBBLE_DIAG = math.sqrt(BUBBLE_SIZE**2 / 2)
 
+# physics constants
+DRAG_CONSTANT    = 0.761
+RR_CONSTANT      = DRAG_CONSTANT * 30
+BRAKING_CONSTANT = 10000
+GRAVITY_CONSTANT = 9.807
+
+MIN_ENGINE_FORCE = 0
+MAX_ENGINE_FORCE = 10000
+
+CAR_MASS   = 1250
+CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
+
+MAX_SPEED  = 15
+SLOW_SPEED = 7.5
+
+# car size
 CAR_LENGTH   = 4.5
 CAR_WIDTH    = 1.8
 WHEEL_LENGTH = 0.9
@@ -51,8 +67,9 @@ CENTRE = 0
 SEND_TO_ALL = -1
 
 # public message types
-CURRENT_DETAILS = 0
-FUTURE_DETAILS  = 1
+CURRENT_DETAILS  = 0
+FUTURE_DETAILS   = 1
+GIVE_WAY_MESSAGE = 2
 
 # private message types
 
@@ -329,14 +346,39 @@ CAR_COLOURS = [
     BLUE,  VIOLET, MAGENTA, ROSE,
 ]
 
-def nextColour():
-    index = 0
+def nextColour(cars_list):
+
+    colour_indices = {colour: 0 for colour in CAR_COLOURS}
+
     while True:
+
+        colour_counts = {colour: 0 for colour in CAR_COLOURS}
+        for car in cars_list:
+            colour_counts[car.colour] += 1
+
+        min_count = 10000000000
+        for colour in colour_counts:
+            min_count = min(colour_counts[colour], min_count)
+
         random.shuffle(CAR_COLOURS)
         for colour in CAR_COLOURS:
-            name = COLOUR_NAME[colour] + "_" + str(index)
-            yield colour, name
-        index += 1
+            if colour_counts[colour] == min_count:
+
+                index = colour_indices[colour]
+                colour_indices[colour] += 1
+
+                name = COLOUR_NAME[colour] + "_" + str(index)
+                yield colour, name
+
+                break
+
+    #index = 0
+    #while True:
+    #    random.shuffle(CAR_COLOURS)
+    #    for colour in CAR_COLOURS:
+    #        name = COLOUR_NAME[colour] + "_" + str(index)
+    #        yield colour, name
+    #    index += 1
 
 COLOUR_NAME = {RED:   "RED", ORANGE: "ORA", YELLOW:  "YEL", LIME:  "LIM",
                GREEN: "GRN", SPRING: "SPR", CYAN:    "CYA", AZURE: "AZU",
@@ -608,9 +650,9 @@ waypoint_options = [
 # generate grass
 border_size = 10
 road_size   = ROAD_WIDTH * 2
-block_size  = 30
+block_size  = 30#50#30
 corner_offset = TURN_RADIUS
-num_blocks = 3#3
+num_blocks = 3
 
 next_block = block_size + road_size
 
@@ -668,8 +710,8 @@ for i in range(num_blocks):
 lane_size = road_size / 2
 half_lane = road_size / 4
 
-RAMP_POSITION = Vector(0,           border_size + half_lane)
-RAMP_END      = Vector(border_size, border_size + half_lane)
+#RAMP_POSITION = Vector(0,           border_size + half_lane)
+#RAMP_END      = Vector(border_size, border_size + half_lane)
 
-RAMP_ANGLE = getAngle(RAMP_END - RAMP_POSITION)
+#RAMP_ANGLE = getAngle(RAMP_END - RAMP_POSITION)
 

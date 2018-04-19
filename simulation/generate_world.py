@@ -1,6 +1,7 @@
 from util import *
 
 roads_list = []
+ramp_roads = []
 
 class Road:
     def __init__(self, start, end):
@@ -239,17 +240,47 @@ if True:
             intersections[j][i].addOutput(down_road)
             intersections[j][i+1].addInput(down_road)
 
+    x_start = -20
+    x_end   = border_size - offset
+    y_start = border_size + half_lane
+    for i in range(num_blocks+1):
+        y = y_start + next_block * i
+        road = Road(Vector(x_start,         y),
+                    Vector(x_start + x_end, y))
+        intersections[0][i].addInput(road)
+        ramp_roads.append(road)
+
+        road = Road(Vector(world_size - x_start,         world_size - y),
+                    Vector(world_size - x_start - x_end, world_size - y))
+        intersections[num_blocks][num_blocks-i].addInput(road)
+        ramp_roads.append(road)
+
+    x_start = border_size + lane_size + half_lane
+    y_start = -20
+    y_end   = border_size - offset
+    for i in range(num_blocks+1):
+        x = x_start + next_block * i
+        road = Road(Vector(x, y_start),
+                    Vector(x, y_start + y_end))
+        intersections[i][0].addInput(road)
+        ramp_roads.append(road)
+
+        road = Road(Vector(world_size - x, world_size - y_start),
+                    Vector(world_size - x, world_size - y_start - y_end))
+        intersections[num_blocks-i][num_blocks].addInput(road)
+        ramp_roads.append(road)
+
     for intersection_list in intersections:
         for intersection in intersection_list:
             intersection.joinRoads()
 
-    ramp_road = Road(RAMP_POSITION, RAMP_END)
-    for road in roads_list:
-        if ramp_road.connect(road):
-            print("Connected", ramp_road, "to", road)
-            break
-        else:
-            print("Could not connect", ramp_road, "to", road)
+    #for i, ramp_road in enumerate(ramp_roads):
+    #    for j, road in enumerate(roads_list):
+    #        if ramp_road.connect(road):
+    #            print("Connected", ramp_road, i, "to", road, i)
+    #            break
+    #    else:
+    #        print("Could not connect", ramp_road, i)
 
 else:
     a = random.randint(0, 100)

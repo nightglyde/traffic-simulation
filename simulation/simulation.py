@@ -137,7 +137,6 @@ while not done:
     if not paused:
         world_time += TIME_STEP #min(time_step, TIME_STEP)
         world.update(world_time)
-        world.sendMessages()
 
     # draw to screen
     screen.fill(WHITE)

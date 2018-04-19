@@ -4,7 +4,9 @@ from obstacle import Obstacle
 from car import Car
 from controller import CarController
 
-from generate_world import roads_list, ramp_road
+from generate_world import roads_list, ramp_roads
+
+from give_way_rules import checkGiveWay
 
 SCALE_CHANGE = 1.25
 
@@ -31,9 +33,10 @@ class World(Obstacle):
         self.controllers = []
         #self.num_cars = 0
 
-        self.car_generator = nextColour()
+        self.car_generator = nextColour(self.cars)
 
-        self.car_added_time = -CAR_ADDING_INTERVAL
+        self.ramp_cooldown = 0
+        #self.ramp_cooldown = [0 for road in ramp_roads]
 
         self.ghosts       = []
         self.crashed_cars = 0
@@ -54,13 +57,17 @@ class World(Obstacle):
         self.pan_position = None
         self.pan_offset   = None
 
-        self.panning = False
+        self.panning      = False
         self.selected_car = None
 
         self.min_x = None
         self.max_x = None
         self.min_y = None
         self.max_y = None
+
+        # temporary
+        #self.printables = []
+        self.give_way_rules = []
 
     def checkWaypoint(self, waypoint):
         if not self.checkInside(waypoint.position):
@@ -163,14 +170,72 @@ class World(Obstacle):
 
     def addCar(self, time):
         colour, name = next(self.car_generator)
-        pos   = RAMP_POSITION
-        angle = RAMP_ANGLE
+
+        road  = random.choice(ramp_roads)#ramp_roads[road_num]
+        pos   = road.start
+        angle = getAngle(road.end - road.start)
 
         car = Car(self, name, colour, pos, angle, time)
+        car.speed = MAX_SPEED
 
-        self.controllers.append(CarController(car, ramp_road))
+        self.controllers.append(CarController(car, road))
         self.cars.append(car)
-        self.car_added_time = time
+        self.ramp_cooldown = time + CAR_ADDING_INTERVAL
+        #self.ramp_cooldown[road_num] = time + CAR_ADDING_INTERVAL
+
+    def alt_update(self, time):
+
+        if not self.cars:
+            # add a bunch of cars
+
+            angle = Vector(random.randint(-1, 1), random.randint(-1, 1))
+
+            presets = [
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                Vector(random.randint(1, 5)*20, random.randint(1, 5)*20),
+                #Vector(random.randint(0, 100), random.randint(0, 100)),
+            ]
+
+            #presets = [
+                #(Vector(50, 50), Vector(0, -1)),
+                #(Vector(60, 50), Vector(0, -1)),
+
+
+            #    (Vector(80, 60), Vector(1, 0)),
+            #    (Vector(90, 60), Vector(1, 0)),
+            #]
+
+            for pos in presets:
+                colour, name = next(self.car_generator)
+
+                #pos += SCREEN_CENTRE
+
+                car = Car(self, name, colour, pos, angle, time)
+                self.cars.append(car)
+
+        num_cars = len(self.cars)
+
+        self.printables.clear()
+
+        for car_i in self.cars:
+            for car_j in self.cars:
+                if car_i == car_j:
+                    continue
+
+                give_way, intersect = checkGiveWay(car_i, car_j)
+
+                if give_way:
+                    print(car_i.name, "gives way to", car_j.name)
+                    self.printables.append((car_i, car_j))
+                #else:
+                #    print(car_j.name, "gives way to", car_i.name)
+
+                #self.printables.append((car_i, car_j, intersect))
 
     def update(self, time):
         for car in self.cars:
@@ -178,7 +243,7 @@ class World(Obstacle):
 
         num_cars = len(self.cars)
 
-        crash = False
+        #crash = False
         for i in range(num_cars):
             car_i = self.cars[i]
 
@@ -188,21 +253,22 @@ class World(Obstacle):
                 dist = (car_i.position - car_j.position).mag()
                 if dist < 10 and car_i.checkCollision(car_j):
                         self.controllers[i].clearWaypoints()
-                        if not car_i.stopped:
-                            crash = True
+                        #if not car_i.stopped:
+                        #    crash = True
                         car_i.stop(car_j)
 
                         self.controllers[j].clearWaypoints()
-                        if not car_j.stopped:
-                            crash = True
+                        #if not car_j.stopped:
+                        #    crash = True
                         car_j.stop(car_i)
 
-            for obstacle in self.obstacles:
-                if car_i.checkCollision(obstacle):
-                    self.controllers[i].clearWaypoints()
-                    if not car_i.stopped:
-                        crash = True
-                    car_i.stop(obstacle)
+            #for obstacle in self.obstacles:
+            #    if car_i.checkCollision(obstacle):
+
+            #       self.controllers[i].clearWaypoints()
+                    #if not car_i.stopped:
+                    #    crash = True
+            #       car_i.stop(obstacle)
 
         i = 0
         while i < len(self.controllers):
@@ -227,8 +293,31 @@ class World(Obstacle):
         #    else:
         #        grass.colour = LIGHT_GREEN
 
+        self.sendMessages()
+
+        self.give_way_rules.clear()
+        for controller_i in self.controllers:
+            for controller_j in self.controllers:
+                if controller_i == controller_j:
+                    continue
+                if controller_i.checkGiveWay(controller_j.name):
+                    self.give_way_rules.append((controller_i,
+                                                controller_j))
+
         if len(self.cars) < MAX_CARS:
-            if time > self.car_added_time + CAR_ADDING_INTERVAL:
+
+            #valid_ramps = []
+            #for i, cooldown in enumerate(self.ramp_cooldown):
+            #    if time >= cooldown:
+            #        valid_ramps.append(i)
+
+            #if valid_ramps:
+            #    random.shuffle(valid_ramps)
+
+            #    for i in range(min(len(valid_ramps), MAX_CARS - len(self.cars))):
+            #        self.addCar(time, valid_ramps[i])
+
+            if time >= self.ramp_cooldown:
                 self.addCar(time)
 
     def sendMessages(self):
@@ -334,21 +423,36 @@ class World(Obstacle):
 
         for grass in self.grass:
             grass.draw()
+            #grass.drawOutline()
 
         box = [self.getDrawable(point) for point in self.hull]
         pygame.draw.polygon(self.screen, BLACK, box, 1)
 
         for ghost in self.ghosts:
+            #ghost.drawPath()
             ghost.draw()
 
         for obstacle in self.obstacles:
             obstacle.draw(True)
 
+        for control_a, control_b in self.give_way_rules:
+            pos_a = control_a.car.centre
+            pos_b = control_b.car.centre
+
+            point_a = self.getDrawable(pos_a)
+            point_b = self.getDrawable(pos_b)
+
+            pygame.draw.line(self.screen, control_b.colour,
+                             point_a, point_b, 1)
+
         for controller in self.controllers:
             controller.drawWaypoints()
 
-        for controller in self.controllers:
-            controller.drawPath()
+        #for controller in self.controllers:
+        #    controller.drawPath()
+
+        #for car in self.cars:
+        #    car.drawPath()
 
         for car in self.cars:
             car.draw(car is self.selected_car)

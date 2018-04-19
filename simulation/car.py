@@ -3,22 +3,19 @@ from util import *
 from obstacle import Obstacle
 
 # physics constants
-DRAG_CONSTANT    = 0.761
-RR_CONSTANT      = DRAG_CONSTANT * 30
-BRAKING_CONSTANT = 10000
-GRAVITY_CONSTANT = 9.807
+#DRAG_CONSTANT    = 0.761
+#RR_CONSTANT      = DRAG_CONSTANT * 30
+#BRAKING_CONSTANT = 10000
+#GRAVITY_CONSTANT = 9.807
 
-MIN_ENGINE_FORCE = 0
-MAX_ENGINE_FORCE = 10000
+#MIN_ENGINE_FORCE = 0
+#MAX_ENGINE_FORCE = 10000
 
-CAR_MASS   = 1250
-CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
+#CAR_MASS   = 1250
+#CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
 
 AVOID_CIRCLES = False
 SHOW_WHEELS   = True
-
-SLOW_SPEED = 7.5
-MAX_SPEED  = 15
 
 STEERING_RATE = 2*math.pi * 0.5#0.1
 
@@ -79,12 +76,18 @@ class Car(Obstacle):
         self.angular_velocity = 0.0              # radians per second
 
         # control
-        self.route         = deque()
-        self.desired_angle = ANGLE_0
-        self.desired_speed = 0.0
+        self.route            = deque()
         self.desired_position = self.position
+        self.desired_angle    = ANGLE_0
+
+        self.desired_speed = 0.0
+        self.speed_timeout = -1
+        self.speed_default = MAX_SPEED
 
         self.generateHull()
+
+        # modified by the controller
+        self.path = deque()
 
     def copy(self):
         car = Car(self.world, self.name, self.colour,
@@ -131,7 +134,15 @@ class Car(Obstacle):
             print("Crashed cars:", self.world.crashed_cars)
             self.world.ghosts.append(self)
 
+    def setDesiredSpeed(self, speed, timeout, default):
+        self.desired_speed = speed
+        self.speed_timeout = timeout
+        self.speed_default = default
+
     def updateRoute(self):
+        #if self.time >= self.speed_timeout:
+        #    self.desired_speed = self.speed_default
+
         speed_zero = False
         #while self.route:
         #    road, waypoint, desired_speed, time = self.route[0]
@@ -185,8 +196,6 @@ class Car(Obstacle):
             self.desired_speed = 0.0
         else:
             self.desired_speed = desired_speed
-
-        # scale LOOK_AHEAD_DIST by the sharpness of the turn???
 
         if self_dist + LOOK_AHEAD_DIST <= wayp_dist:
             look_ahead = (self_dist + LOOK_AHEAD_DIST) / wayp_dist
@@ -288,8 +297,8 @@ class Car(Obstacle):
 
         self.generateHull()
 
-    def control(self, route):
-        self.route = route
+    #def control(self, route):
+    #    self.route = route
 
     def draw(self, selected=False):
         screen = self.world.screen
@@ -444,4 +453,14 @@ class Car(Obstacle):
             radius_3 = max(2, self.world.scaleDistance(0.2))
             pygame.draw.circle(screen, DARKER[self.colour],  pos, radius_3)
             pygame.draw.circle(screen, BLACK,                pos, radius_3, 1)
+
+    def drawPath(self):
+        if len(self.path) > 1:
+            path = [self.world.getDrawable(point) for point in self.path]
+            pygame.draw.lines(self.world.screen, GREY, False, path, 1)
+
+        #screen = self.world.screen
+        #for past_point in self.path:
+        #    hull = [self.world.getDrawable(point) for point in past_point.hull]
+        #    pygame.draw.polygon(screen, GREY, hull, 1)
 

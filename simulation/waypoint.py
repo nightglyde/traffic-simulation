@@ -65,7 +65,7 @@ class Waypoint:
         pygame.draw.circle(screen, dark_colour,  centre, inner_radius, 1)
 
 class FuturePoint(Obstacle):
-    def __init__(self, car, prev_hull):
+    def __init__(self, car, start_time, start_hull):
         self.name     = car.name # temporary, cos i don't know how to deal with
                                  # giving way when they're parallel yet
         self.world    = car.world
@@ -73,41 +73,62 @@ class FuturePoint(Obstacle):
         self.position = car.centre
         self.angle    = car.angle
 
-        self.orig_hull = car.hull
-        self.hull      = convexHull(self.orig_hull + prev_hull)
+        self.start_time = start_time
+        self.end_time   = car.time
+
+        self.end_hull = car.hull
+        self.hull     = convexHull(start_hull + self.end_hull)
 
         self.radius       = FUTURE_POINT_RADIUS
         self.inner_radius = self.radius * 0.8
 
-        self.time = car.time
+    def checkCollision(self, other):
+        #if other in self.checked:
+            #return self.checked[other]
+
+        if self.end_time < other.start_time:
+            return False
+
+        if self.start_time > other.end_time:
+            return False
+
+        dist = (self.position - other.position).mag()
+        if dist > 10:
+            #self.checked[other] = False
+            return False
+
+        return Obstacle.checkCollision(self, other)
 
     def draw(self):
-        inner_radius = self.world.scaleDistance(self.inner_radius)
-        if inner_radius <= 0:
-            return
-        outer_radius = self.world.scaleDistance(self.radius)
+        #inner_radius = self.world.scaleDistance(self.inner_radius)
+        #if inner_radius <= 0:
+        #    return
+        #outer_radius = self.world.scaleDistance(self.radius)
 
         screen = self.world.screen
-        pos    = self.position
+        #pos    = self.position
 
         colour       = self.colour
         light_colour = LIGHTER[colour]
         dark_colour  = DARKER[colour]
 
-        centre = self.world.getDrawable(pos)
+        #centre = self.world.getDrawable(pos)
         #pygame.draw.circle(screen, colour,       centre, outer_radius)
         #pygame.draw.circle(screen, light_colour, centre, inner_radius)
         #pygame.draw.circle(screen, dark_colour,  centre, outer_radius, 1)
         #pygame.draw.circle(screen, dark_colour,  centre, inner_radius, 1)
 
-        front = pos + getVector(self.angle)             * self.inner_radius
-        right = pos + getVector(self.angle + ANGLE_120) * self.inner_radius
-        left  = pos + getVector(self.angle - ANGLE_120) * self.inner_radius
+        #front = pos + getVector(self.angle)             * self.inner_radius
+        #right = pos + getVector(self.angle + ANGLE_120) * self.inner_radius
+        #left  = pos + getVector(self.angle - ANGLE_120) * self.inner_radius
 
-        arrow = [centre,
-                 self.world.getDrawable(right),
-                 self.world.getDrawable(front),
-                 self.world.getDrawable(left)]
-        pygame.draw.polygon(screen, colour,  arrow)
-        pygame.draw.polygon(screen, dark_colour, arrow, 1)
+        #arrow = [centre,
+        #         self.world.getDrawable(right),
+        #         self.world.getDrawable(front),
+        #         self.world.getDrawable(left)]
+        #pygame.draw.polygon(screen, colour,  arrow)
+        #pygame.draw.polygon(screen, dark_colour, arrow, 1)
+
+        hull = [self.world.getDrawable(point) for point in self.hull]
+        pygame.draw.polygon(screen, light_colour, hull, 1)
 
