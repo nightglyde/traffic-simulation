@@ -17,7 +17,7 @@ from obstacle import Obstacle
 AVOID_CIRCLES = False
 SHOW_WHEELS   = True
 
-STEERING_RATE = 2*math.pi * 0.5#0.1
+STEERING_RATE = 2*math.pi * 0.5#0.5#0.1
 
 LOOK_AHEAD_DIST = 3#TURN_RADIUS
 
@@ -58,12 +58,13 @@ def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     return wheel_angle
 
 class Car(Obstacle):
-    def __init__(self, world, name, colour, position, angle, time):
+    def __init__(self, world, name, colour, road, position, angle, time):
         self.world  = world
         self.name   = name
         self.colour = colour
 
         # status
+        self.road     = road
         self.position = position # metres
         self.angle    = angle    # radians
         self.time     = time     # miliseconds
@@ -82,7 +83,7 @@ class Car(Obstacle):
 
         self.desired_speed = 0.0
         self.speed_timeout = -1
-        self.speed_default = MAX_SPEED
+        #self.speed_default = MAX_SPEED
 
         self.generateHull()
 
@@ -91,7 +92,7 @@ class Car(Obstacle):
 
     def copy(self):
         car = Car(self.world, self.name, self.colour,
-                  self.position, self.angle, self.time)
+                  self.road, self.position, self.angle, self.time)
 
         # status
         car.stopped = self.stopped
@@ -126,76 +127,71 @@ class Car(Obstacle):
         if not self.stopped:
             self.stopped = True
             print(self.name, "crashed into", other.name,
-                  "at time", self.time / 1000)
-
-            #self.world.obstacles.append(self)
+                  "at time", self.time / 1000,
+                  "going speed", self.speed*3.6)
 
             self.world.crashed_cars += 1
             print("Crashed cars:", self.world.crashed_cars)
             self.world.ghosts.append(self)
 
-    def setDesiredSpeed(self, speed, timeout, default):
-        self.desired_speed = speed
-        self.speed_timeout = timeout
-        self.speed_default = default
-
     def updateRoute(self):
-        #if self.time >= self.speed_timeout:
-        #    self.desired_speed = self.speed_default
-
-        speed_zero = False
-        #while self.route:
-        #    road, waypoint, desired_speed, time = self.route[0]
-        #    if desired_speed == 0:
-        #        if self.time < time:
-                    # slam breaks!
-                    #self.desired_speed = 0.0
-                    #self.desired_angle = getAngle(
-                    #    self.desired_position - self.position)
-                    #self.desired_angle = self.angle
-                    #return
-        #            speed_zero = True
-        #            break
-        #        else:
-        #            self.route.popleft()
-        #    else:
-        #        break
-
         while self.route:
-            road, waypoint, desired_speed, time = self.route[0]
 
-            if desired_speed == 0:
-                if self.time < time:
-                    speed_zero = True
-                else:
-                    self.route.popleft()
-                    continue
+            instruction = self.route[0]
+
+            if isinstance(instruction, ChangeSpeed):
+                self.desired_speed = instruction.speed
+                self.speed_timeout = self.time + instruction.timeout
+
+                self.route.popleft()
+                continue
+
+            #if isinstance(instruction, FollowRoad):
+            road     = instruction.road
+            waypoint = instruction.waypoint
 
             road_vec = road.end - road.start
             road_len = road_vec.mag()
 
             self_vec  = self.centre - road.start
-            self_dist = dotProduct(self_vec, road_vec) / road_len
+            self_dist = dotProduct(self_vec, road.vec) / road.length
 
             wayp_vec  = waypoint - road.start
             wayp_dist = wayp_vec.mag()
 
             if self_dist >= wayp_dist:
+                #if isinstance(instruction, TrafficLight):
+                #    if not instruction.checkSafe():
+                #        break
+
                 self.route.popleft()
                 continue
 
             break
 
         if not self.route:
+            self.road = None
+
             self.desired_speed    = 0.0
             self.desired_angle    = self.angle
             self.desired_position = self.position
             return
 
-        if speed_zero:
-            self.desired_speed = 0.0
-        else:
-            self.desired_speed = desired_speed
+        self.road = road
+
+        if self.time >= self.speed_timeout:
+            if isinstance(instruction, TrafficLight):
+                if instruction.checkSafe():
+                    self.desired_speed = MAX_SPEED
+                else:
+
+                    # what if we got the car to cautiously approach the
+                    # intersection instead of blindly stopping
+
+                    self.desired_speed = 0
+
+            elif isinstance(instruction, FollowRoad):
+                self.desired_speed = instruction.speed
 
         if self_dist + LOOK_AHEAD_DIST <= wayp_dist:
             look_ahead = (self_dist + LOOK_AHEAD_DIST) / wayp_dist
@@ -205,7 +201,11 @@ class Car(Obstacle):
             dist_left = LOOK_AHEAD_DIST - (wayp_dist - self_dist)
 
             for i in range(1, len(self.route)):
-                next_waypoint = self.route[i][1]
+                instruction = self.route[i]
+                if isinstance(instruction, ChangeSpeed):
+                    continue
+
+                next_waypoint = instruction.waypoint
 
                 wayp_vec  = next_waypoint - waypoint
                 wayp_dist = wayp_vec.mag()
@@ -215,8 +215,8 @@ class Car(Obstacle):
                     self.desired_position = waypoint + wayp_vec * look_ahead
                     break
 
-                dist_left    -= wayp_dist
-                waypoint = next_waypoint
+                dist_left -= wayp_dist
+                waypoint   = next_waypoint
 
             else:
                 self.desired_position = waypoint
@@ -282,7 +282,9 @@ class Car(Obstacle):
 
         # forwards motion of car
         acceleration   = force / CAR_MASS
-        self.speed    += acceleration * dt
+        #self.speed    += acceleration * dt
+        self.speed     = max(0, self.speed + acceleration * dt)
+
         self.position += getVector(self.angle) * self.speed * dt
 
         # cornering (part 2)
@@ -296,9 +298,6 @@ class Car(Obstacle):
             self.angular_velocity = 0.0
 
         self.generateHull()
-
-    #def control(self, route):
-    #    self.route = route
 
     def draw(self, selected=False):
         screen = self.world.screen

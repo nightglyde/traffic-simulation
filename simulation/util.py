@@ -39,7 +39,7 @@ CAR_MASS   = 1250
 CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
 
 MAX_SPEED  = 15
-SLOW_SPEED = 7.5
+SLOW_SPEED = 5
 
 # car size
 CAR_LENGTH   = 4.5
@@ -59,9 +59,18 @@ ARROW_WIDTH       = 0.9
 ARROW_STEM_LENGTH = ARROW_LENGTH - 0.5
 ARROW_STEM_WIDTH  = 0.45
 
+# turns
 LEFT   = -1
 RIGHT  = 1
 CENTRE = 0
+
+# traffic lights
+CYCLE_DURATION = 5000
+AMBER_PHASE    = 4000
+
+RED_LIGHT   = 0
+AMBER_LIGHT = 1
+GREEN_LIGHT = 2
 
 # messaging
 SEND_TO_ALL = -1
@@ -650,7 +659,7 @@ waypoint_options = [
 # generate grass
 border_size = 10
 road_size   = ROAD_WIDTH * 2
-block_size  = 30#50#30
+block_size  = 50#30
 corner_offset = TURN_RADIUS
 num_blocks = 3
 
@@ -714,4 +723,36 @@ half_lane = road_size / 4
 #RAMP_END      = Vector(border_size, border_size + half_lane)
 
 #RAMP_ANGLE = getAngle(RAMP_END - RAMP_POSITION)
+
+class FollowRoad:
+    def __init__(self, road, waypoint, speed):
+        self.road     = road
+        self.waypoint = waypoint
+        self.speed    = speed
+
+    def getNextRoad(self):
+        return self.road.next_road
+
+class ChangeSpeed:
+    def __init__(self, speed, timeout):
+        self.speed   = speed
+        self.timeout = timeout
+
+class TrafficLight:
+    def __init__(self, road, exit):
+        self.road     = road
+        self.waypoint = road.end
+        #self.speed    = SLOW_SPEED
+
+        self.intersection = road.intersection
+        self.entrance     = road.input_index
+        self.exit         = exit
+
+        self.path = road.getPath(exit)
+
+    def checkSafe(self):
+        return self.intersection.checkTrafficLights(self.entrance, self.exit)
+
+    def getNextRoad(self):
+        return self.path[0]
 

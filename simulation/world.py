@@ -4,7 +4,7 @@ from obstacle import Obstacle
 from car import Car
 from controller import CarController
 
-from generate_world import roads_list, ramp_roads
+from generate_world import all_intersections, entry_roads, all_roads#roads_list, ramp_roads
 
 from give_way_rules import checkGiveWay
 
@@ -147,7 +147,7 @@ class World(Obstacle):
 
             #pos = road.start + road_vec * (dist_along_road/road_length)
 
-            road = random.choice(roads_list)
+#            road = random.choice(roads_list)
             road_vec = road.end - road.start
 
             pos   = road.start + road_vec * random.random()
@@ -171,16 +171,15 @@ class World(Obstacle):
     def addCar(self, time):
         colour, name = next(self.car_generator)
 
-        road  = random.choice(ramp_roads)#ramp_roads[road_num]
+        road  = random.choice(entry_roads)#ramp_roads)#ramp_roads[road_num]
         pos   = road.start
         angle = getAngle(road.end - road.start)
 
-        car = Car(self, name, colour, pos, angle, time)
-        car.speed = MAX_SPEED
+        car = Car(self, name, colour, road, pos, angle, time)
 
-        self.controllers.append(CarController(car, road))
+        self.controllers.append(CarController(car))
         self.cars.append(car)
-        self.ramp_cooldown = time + CAR_ADDING_INTERVAL
+        self.ramp_cooldown = time + CAR_ADDING_INTERVAL + random.randint(1, CAR_ADDING_INTERVAL)
         #self.ramp_cooldown[road_num] = time + CAR_ADDING_INTERVAL
 
     def alt_update(self, time):
@@ -238,6 +237,9 @@ class World(Obstacle):
                 #self.printables.append((car_i, car_j, intersect))
 
     def update(self, time):
+        for intersection in all_intersections:
+            intersection.updateTrafficLights(time)
+
         for car in self.cars:
             car.update(time)
 
@@ -252,12 +254,12 @@ class World(Obstacle):
 
                 dist = (car_i.position - car_j.position).mag()
                 if dist < 10 and car_i.checkCollision(car_j):
-                        self.controllers[i].clearWaypoints()
+                        #self.controllers[i].clearFuture()
                         #if not car_i.stopped:
                         #    crash = True
                         car_i.stop(car_j)
 
-                        self.controllers[j].clearWaypoints()
+                        #self.controllers[j].clearWaypoints()
                         #if not car_j.stopped:
                         #    crash = True
                         car_j.stop(car_i)
@@ -425,11 +427,31 @@ class World(Obstacle):
             grass.draw()
             #grass.drawOutline()
 
+        for road in all_roads:
+            start = self.getDrawable(road.start)
+            end   = self.getDrawable(road.end)
+            pygame.draw.line(self.screen, BLACK, start, end, 1)
+
+        for intersection in all_intersections:
+            for pair in intersection.pairs:
+                light = intersection.lights[pair]
+                if light == RED_LIGHT:
+                    continue
+                elif light == AMBER_LIGHT:
+                    colour = YELLOW
+                else:
+                    colour = GREEN
+
+                for road in intersection.paths[pair]:
+                    start = self.getDrawable(road.start)
+                    end   = self.getDrawable(road.end)
+                    pygame.draw.line(self.screen, colour, start, end, 2)
+
         box = [self.getDrawable(point) for point in self.hull]
         pygame.draw.polygon(self.screen, BLACK, box, 1)
 
         for ghost in self.ghosts:
-            #ghost.drawPath()
+            ghost.drawPath()
             ghost.draw()
 
         for obstacle in self.obstacles:
@@ -439,11 +461,17 @@ class World(Obstacle):
             pos_a = control_a.car.centre
             pos_b = control_b.car.centre
 
+            mid = (pos_a + pos_b)/2
+
             point_a = self.getDrawable(pos_a)
             point_b = self.getDrawable(pos_b)
+            mid_point = self.getDrawable(mid)
 
             pygame.draw.line(self.screen, control_b.colour,
                              point_a, point_b, 1)
+
+            pygame.draw.line(self.screen, control_b.colour,
+                             mid_point, point_b, 3)
 
         for controller in self.controllers:
             controller.drawWaypoints()
@@ -451,15 +479,15 @@ class World(Obstacle):
         #for controller in self.controllers:
         #    controller.drawPath()
 
-        #for car in self.cars:
-        #    car.drawPath()
+        for car in self.cars:
+            car.drawPath()
 
         for car in self.cars:
             car.draw(car is self.selected_car)
             #car.drawExtra()
 
-        #for car in self.cars:
-        #    car.drawDesiredPosition()
+        for car in self.cars:
+            car.drawDesiredPosition()
 
         #for road in roads_list:
         #    thingy = road.end - road.start
