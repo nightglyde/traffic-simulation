@@ -297,14 +297,14 @@ class World(Obstacle):
 
         self.sendMessages()
 
-        self.give_way_rules.clear()
-        for controller_i in self.controllers:
-            for controller_j in self.controllers:
-                if controller_i == controller_j:
-                    continue
-                if controller_i.checkGiveWay(controller_j.name):
-                    self.give_way_rules.append((controller_i,
-                                                controller_j))
+        #self.give_way_rules.clear()
+        #for controller_i in self.controllers:
+        #    for controller_j in self.controllers:
+        #        if controller_i == controller_j:
+        #            continue
+        #        if controller_i.checkGiveWay(controller_j.name):
+        #            self.give_way_rules.append((controller_i,
+        #                                        controller_j))
 
         if len(self.cars) < MAX_CARS:
 

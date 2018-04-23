@@ -83,16 +83,16 @@ class CarController(Obstacle):
 
             # this is an arbitrary value that happens to work with
             # getting the car to stop in time for the intersection
-            dist = 15
+            #dist = 15
             if isinstance(road, TerminalRoad):
-                if road.length > dist:
-                    distance = road.length - dist
+                #if road.length > dist:
+                #    distance = road.length - dist
 
-                    waypoint = road.start + road.vec * (distance / road.length)
+                #    waypoint = road.start + road.vec * (distance / road.length)
 
                     # if we're able to get the cars to judge speeds and distances
                     # properly, we won't need this bit
-                    self.addInstruction(FollowRoad(road, waypoint, MAX_SPEED))
+                #    self.addInstruction(FollowRoad(road, waypoint, MAX_SPEED))
 
                 exit = random.choice(road.getPathOptions())
                 self.addInstruction(TrafficLight(road, exit))
@@ -155,20 +155,46 @@ class CarController(Obstacle):
         # what if you want to go more forwards so that you're closer to
         # the next car?
 
-        distance_apart = their_distance - my_distance - CAR_LENGTH - 1#safety gap
+        distance_apart = their_distance - my_distance
 
         if distance_apart <= 0:
             # either they're behind you, or they're already crashed into you
             return False, None
 
-        my_speed = self.car.speed
+        safety_gap = 2#1 # adjust based on speed?
+        distance_apart -= CAR_LENGTH# + safety_gap
 
-        deceleration = min(BRAKING_CONSTANT, CAR_WEIGHT) / CAR_MASS
-        braking_time = (my_speed - car_speed) / deceleration
+        #if distance_apart <= safety_gap:
+        #    return True, 0
 
-        time_until_crash = distance_apart / (my_speed - car_speed)
+        try_speed = car_speed# / 2
 
-        return True, time_until_crash - braking_time
+        distance_until_match = (distance_apart - safety_gap) * (my_speed + try_speed) / (my_speed - try_speed)
+
+        if distance_until_match <= 0:
+            return True, 0
+
+        deceleration = (my_speed**2 - try_speed**2) / (2*distance_until_match)
+
+        deceleration = max(0, deceleration)
+
+        #if deceleration < 4 and distance_until_match > 5:
+        #if distance_until_match > 2 and my_speed < SLOW_SPEED:
+        if distance_until_match > 15:
+            print(self.name, car_name, "maximise")
+            return True, MAX_SPEED
+
+        speed_choice = my_speed - deceleration * TIME_STEP
+        print(self.name, car_name, try_speed, speed_choice, "match")
+
+        return True, speed_choice
+
+        #deceleration = min(BRAKING_CONSTANT, CAR_WEIGHT) / CAR_MASS
+        #braking_time = (my_speed - car_speed) / deceleration
+
+        #time_until_crash = distance_apart / (my_speed - car_speed)
+
+        #return True, time_until_crash - braking_time
 
     def checkGiveWay(self, car_name):
         car_pos, car_angle, car_speed, car_road = self.car_status[car_name]
@@ -252,8 +278,10 @@ class CarController(Obstacle):
         self.messages.clear()
 
         giving_way_to = set()
-        match_speed_of = set()
+        #match_speed_of = set()
         #given_way_by  = set()
+
+        next_speed = MAX_SPEED
 
         for message in public:
             source, message_type, content = message
@@ -274,16 +302,13 @@ class CarController(Obstacle):
 
                 #else:
 
-                self.give_way_rules[source] = self.checkGiveWay(source)
+                #self.give_way_rules[source] = self.checkGiveWay(source)
 
-                if self.give_way_rules[source]:
+                #if self.give_way_rules[source]:
 
-                    following, time_left = self.checkFollowing(source)
-                    if following:
-                        print(self.name, "following", source, time_left)
-
-                        if time_left < 1:
-                            match_speed_of.add(source)
+                following, speed_choice = self.checkFollowing(source)
+                if following:
+                    next_speed = min(next_speed, speed_choice)
 
                 #if source in given_way_by:
                 #    self.give_way_rules[source] = False
@@ -330,26 +355,30 @@ class CarController(Obstacle):
             #    self.messages.append((SEND_TO_ALL, GIVE_WAY_MESSAGE, content))
             #    self.give_way_announcements[car_name] = (True, timeout)
 
-        elif match_speed_of:
-            min_speed = MAX_SPEED
-            for car_name in match_speed_of:
+        elif next_speed < MAX_SPEED:
+            self.route.appendleft(ChangeSpeed(next_speed, 1000))
+            self.clearFuture()
 
-                print(self.name, "is matching speed of", car_name,
-                      "at time", self.car.time / 1000, self.car.speed)
+        #elif match_speed_of:
+        #    min_speed = MAX_SPEED
+        #    for car_name in match_speed_of:
 
-                position, angle, speed, road = self.car_status[car_name]
+        #        print(self.name, "is matching speed of", car_name,
+        #              "at time", self.car.time / 1000, self.car.speed)
 
-                min_speed = min(speed, min_speed)
+        #        position, angle, speed, road = self.car_status[car_name]
 
-            print(self.name, self.car.speed, min_speed)
+        #        min_speed = min(speed, min_speed)
+
+        #    print(self.name, self.car.speed, min_speed)
 
             # temporary: use an underestimate, see if that helps
-            min_speed *= 0.75
+        #    min_speed *= 0.75
 
             #road, waypoint, desired_speed, time = self.route[0]
             #self.route.appendleft((road, waypoint, min_speed, 1000))
-            self.route.appendleft(ChangeSpeed(min_speed, 1000))
-            self.clearFuture()
+        #    self.route.appendleft(ChangeSpeed(min_speed, 1000))
+        #    self.clearFuture()
 
     def drawWaypoints(self):
         #if self.waypoints:

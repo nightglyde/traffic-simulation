@@ -350,9 +350,11 @@ for i in range(num_blocks+1):
     x = x_start + next_block * i
     road = TerminalRoad(Vector(x, y_start),
                         Vector(x, y_end))
+    entry_roads.append(road)
     intersections[i][0].addRoad([road], [])
 
     road = TerminalRoad(Vector(world_size - x, world_size - y_start),
                         Vector(world_size - x, world_size - y_end))
+    entry_roads.append(road)
     intersections[num_blocks-i][num_blocks].addRoad([road], [])
 

@@ -27,6 +27,19 @@ def calculateMaxSpeed(distance):
     speed        = math.sqrt(-2 * acceleration * distance)
     return min(speed, MAX_SPEED)
 
+def calculateSlowToStop(speed, distance):
+    deceleration = speed**2 / (distance * 2)
+
+    # replace this with something better
+    #if deceleration < 4 and distance > 5:
+    #    return MAX_SPEED
+    if distance > 15:# and speed < SLOW_SPEED:
+        return MAX_SPEED
+
+
+    new_speed = speed - deceleration * TIME_STEP
+    return new_speed
+
 def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     ang_diff = (desired_car_angle - car_angle).value
     if ang_diff == 0.0 or speed == 0.0:
@@ -187,8 +200,10 @@ class Car(Obstacle):
 
                     # what if we got the car to cautiously approach the
                     # intersection instead of blindly stopping
+                    distance_left = wayp_dist - self_dist - 1#safety gap
 
-                    self.desired_speed = 0
+                    self.desired_speed = calculateSlowToStop(self.speed,
+                                                             distance_left)
 
             elif isinstance(instruction, FollowRoad):
                 self.desired_speed = instruction.speed

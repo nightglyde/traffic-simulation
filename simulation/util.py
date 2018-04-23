@@ -8,7 +8,7 @@ FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
-MAX_CARS            = 12
+MAX_CARS            = 30
 CAR_ADDING_INTERVAL = TIME_STEP * 50
 
 #ACTION_DELAY = 500
@@ -661,7 +661,7 @@ border_size = 10
 road_size   = ROAD_WIDTH * 2
 block_size  = 50#30
 corner_offset = TURN_RADIUS
-num_blocks = 3
+num_blocks = 2#3
 
 next_block = block_size + road_size
 
