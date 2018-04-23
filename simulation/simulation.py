@@ -76,8 +76,14 @@ while not done:
 
         # generate screen caption
         string  = "Car Simulator | FPS: {}".format(fps)
-        string += " | Score: {} | Crash: {}".format(world.successful_cars,
-                                                      len(world.ghosts))
+        string += " | Score: {} | Crash: {} | Active cars: {}".format(
+                                                    world.successful_cars,
+                                                    world.crashed_cars,
+                                                    len(world.cars))
+
+        if paused:
+            string += " | PAUSED"
+
         #for car in world.cars:
             #string += " | {:4} {:.1f}".format(car.name, car.speed*3.6)
         #    string += " | {:4} {:2}".format(car.name, round(car.speed*3.6))
@@ -105,6 +111,9 @@ while not done:
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 paused = not paused
+
+            if event.key == pygame.K_ESCAPE:
+                world.resetZoom()
 
         elif event.type == pygame.USEREVENT:
             paused = True

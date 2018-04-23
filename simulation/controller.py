@@ -138,7 +138,7 @@ class CarController(Obstacle):
             # you're not going to crash into them
         #    return False, None
 
-        my_distance = self.car.road.getDistanceAlong(self.car.position)
+        my_distance = self.car.road.getDistanceAlong(self.car.centre)
 
         their_distance = 0
         for instruction in self.route:
@@ -192,6 +192,10 @@ class CarController(Obstacle):
         if dist_apart <= 0:
             print(self.name, car_name, dist_apart, "too close")
             return True, 0
+
+        #if my_speed < 1 and dist_apart > 0.1:
+            #print(self.name, car_name, my_speed, dist_apart, "creep forward")
+        #    return True, 1
 
         #if distance_apart <= safety_gap:
         #    return True, 0

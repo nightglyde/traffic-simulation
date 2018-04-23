@@ -142,6 +142,8 @@ class Car(Obstacle):
             print(self.name, "crashed into", other.name,
                   "at time", self.time / 1000,
                   "going speed", self.speed*3.6)
+
+            self.world.crashed_cars += 1
             self.world.ghosts.append(self)
 
     def stop(self):

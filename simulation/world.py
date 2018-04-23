@@ -6,7 +6,9 @@ from controller import CarController
 
 from generate_world import all_intersections, entry_roads, all_roads#roads_list, ramp_roads
 
-from give_way_rules import checkGiveWay
+#from give_way_rules import checkGiveWay
+
+MAX_GHOSTS = 50
 
 SCALE_CHANGE = 1.25
 
@@ -38,7 +40,9 @@ class World(Obstacle):
         self.ramp_cooldown = 0
 
         self.successful_cars = 0
-        self.ghosts = []
+        self.crashed_cars    = 0
+
+        self.ghosts = deque()
 
         # pan and zoom
         self.scale = min(SCREEN_WIDTH  / self.width  * 0.9,
@@ -52,6 +56,9 @@ class World(Obstacle):
 
         self.offset = Vector((SCREEN_WIDTH  / self.scale - self.width)  / 2,
                              (SCREEN_HEIGHT / self.scale - self.height) / 2)
+
+        self.default_offset = self.offset
+        self.default_scale  = self.scale
 
         self.pan_position = None
         self.pan_offset   = None
@@ -273,14 +280,25 @@ class World(Obstacle):
                     #    crash = True
             #       car_i.stop(obstacle)
 
+        get_new_focus = False
+
         i = 0
         while i < len(self.controllers):
             car = self.cars[i]
             if car.stopped:
                 self.cars.pop(i)
                 self.controllers.pop(i)
+                if self.selected_car == car:
+                    #self.resetZoom()
+                    get_new_focus = True
             else:
                 i += 1
+
+        if get_new_focus:
+            if self.cars:
+                self.selected_car = random.choice(self.cars)
+            else:
+                self.resetZoom()
 
         for controller in self.controllers:
             #if crash:
@@ -323,6 +341,9 @@ class World(Obstacle):
             if time >= self.ramp_cooldown:
                 self.addCar(time)
 
+        while len(self.ghosts) > MAX_GHOSTS:
+            self.ghosts.popleft()
+
     def sendMessages(self):
         messages = {SEND_TO_ALL: []}
         for controller in self.controllers:
@@ -353,14 +374,20 @@ class World(Obstacle):
     def getTruePosition(self, screen_position):
         return screen_position/self.scale - self.offset
 
+    def resetZoom(self):
+        self.selected_car = None
+
+        self.scale  = self.default_scale
+        self.offset = self.default_offset
+
     def zoomIn(self, mouse_position):
         if self.selected_car != None:
             mouse_position = SCREEN_CENTRE
             true_mouse_position = self.selected_car.centre
         else:
             true_mouse_position = self.getTruePosition(mouse_position)
-            if not self.checkInside(true_mouse_position):
-                return
+            #if not self.checkInside(true_mouse_position):
+            #    return
 
         new_scale = min(self.scale * SCALE_CHANGE, self.scale_max)
 
@@ -373,8 +400,8 @@ class World(Obstacle):
             true_mouse_position = self.selected_car.centre
         else:
             true_mouse_position = self.getTruePosition(mouse_position)
-            if not self.checkInside(true_mouse_position):
-                return
+            #if not self.checkInside(true_mouse_position):
+            #    return
 
         new_scale = max(self.scale / SCALE_CHANGE, self.scale_min)
 
@@ -387,9 +414,9 @@ class World(Obstacle):
 
     def startPan(self, mouse_position):
         true_mouse_position = self.getTruePosition(mouse_position)
-        if not self.checkInside(true_mouse_position):
-            self.panning = False
-            return
+        #if not self.checkInside(true_mouse_position):
+        #    self.panning = False
+        #    return
 
         for car in self.cars:
             if car.checkInside(true_mouse_position):
@@ -448,8 +475,8 @@ class World(Obstacle):
                     end   = self.getDrawable(road.end)
                     pygame.draw.line(self.screen, colour, start, end, 2)
 
-        box = [self.getDrawable(point) for point in self.hull]
-        pygame.draw.polygon(self.screen, BLACK, box, 1)
+        #box = [self.getDrawable(point) for point in self.hull]
+        #pygame.draw.polygon(self.screen, BLACK, box, 1)
 
         for ghost in self.ghosts:
             ghost.drawPath()
