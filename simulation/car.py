@@ -87,7 +87,7 @@ class Car(Obstacle):
         self.engine_force     = MIN_ENGINE_FORCE # newtons
         self.wheel_angle      = ANGLE_0          # radians
         self.speed            = 0.0              # metres per second
-        self.angular_velocity = 0.0              # radians per second
+        #self.angular_velocity = 0.0              # radians per second
 
         # control
         self.route            = deque()
@@ -114,7 +114,7 @@ class Car(Obstacle):
         car.engine_force     = self.engine_force
         car.wheel_angle      = self.wheel_angle
         car.speed            = self.speed
-        car.angular_velocity = self.angular_velocity
+        #car.angular_velocity = self.angular_velocity
 
         # control
         car.route         = self.route.copy()
@@ -136,16 +136,19 @@ class Car(Obstacle):
         self.hull = [self.front - car_left, self.front + car_left,
                      self.rear  + car_left, self.rear  - car_left]
 
-    def stop(self, other):
+    def crash(self, other):
         if not self.stopped:
             self.stopped = True
             print(self.name, "crashed into", other.name,
                   "at time", self.time / 1000,
                   "going speed", self.speed*3.6)
-
-            self.world.crashed_cars += 1
-            print("Crashed cars:", self.world.crashed_cars)
             self.world.ghosts.append(self)
+
+    def stop(self):
+        if not self.stopped:
+            self.stopped = True
+            print(self.name, "finished mission at time", self.time / 1000)
+            self.world.successful_cars += 1
 
     def updateRoute(self):
         while self.route:
@@ -183,7 +186,7 @@ class Car(Obstacle):
             break
 
         if not self.route:
-            self.road = None
+            self.stop()
 
             self.desired_speed    = 0.0
             self.desired_angle    = self.angle
@@ -299,7 +302,6 @@ class Car(Obstacle):
         acceleration   = force / CAR_MASS
         #self.speed    += acceleration * dt
         self.speed     = max(0, self.speed + acceleration * dt)
-
         self.position += getVector(self.angle) * self.speed * dt
 
         # cornering (part 2)
@@ -308,9 +310,9 @@ class Car(Obstacle):
             ang_vel = self.speed / radius
             self.angle += Angle(ang_vel * dt / 2)
 
-            self.angular_velocity = abs(ang_vel)
-        else:
-            self.angular_velocity = 0.0
+        #    self.angular_velocity = abs(ang_vel)
+        #else:
+        #    self.angular_velocity = 0.0
 
         self.generateHull()
 

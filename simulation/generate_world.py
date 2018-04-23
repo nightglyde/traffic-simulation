@@ -35,7 +35,7 @@ class Road:
     def __repr__(self):
         return "Road({}, {})".format(self.start, self.end)
 
-class TerminalRoad(Road):
+class IntersectionRoad(Road):
     def __init__(self, start, end):
         self.start = start
         self.end   = end
@@ -56,6 +56,13 @@ class TerminalRoad(Road):
 
     def getPath(self, output_index):
         return self.intersection.paths[(self.input_index, output_index)]
+
+class TerminalRoad(Road):
+    def __init__(self, start, end):
+        self.start = start
+        self.end   = end
+
+        self.setup()
 
 def connectRoads(in_road, out_road):
     joining_roads = []
@@ -293,8 +300,6 @@ class Intersection:
 
 intersections = [[Intersection() for i in range(num_blocks+1)] for j in range(num_blocks+1)]
 
-offset = TURN_RADIUS
-
 x_start = border_size + road_size
 y_start = border_size + half_lane
 for i in range(num_blocks):
@@ -303,58 +308,82 @@ for i in range(num_blocks):
         y = y_start + next_block * j
 
         # horizontal roads
-        left_road = TerminalRoad(
-            Vector(x + block_size - offset, y + lane_size),
-            Vector(x + offset, y + lane_size)
+        left_road = IntersectionRoad(
+            Vector(x + block_size - corner_offset, y + lane_size),
+            Vector(x + corner_offset, y + lane_size)
         )
-        right_road = TerminalRoad(
-            Vector(x + offset, y),
-            Vector(x + block_size - offset, y)
+        right_road = IntersectionRoad(
+            Vector(x + corner_offset, y),
+            Vector(x + block_size - corner_offset, y)
         )
 
         intersections[i][j].addRoad(  [left_road],  [right_road])
         intersections[i+1][j].addRoad([right_road], [left_road])
 
         # vertical roads
-        up_road = TerminalRoad(
-            Vector(y, x + block_size - offset),
-            Vector(y, x + offset)
+        up_road = IntersectionRoad(
+            Vector(y, x + block_size - corner_offset),
+            Vector(y, x + corner_offset)
         )
-        down_road = TerminalRoad(
-            Vector(y + lane_size, x + offset),
-            Vector(y + lane_size, x + block_size - offset)
+        down_road = IntersectionRoad(
+            Vector(y + lane_size, x + corner_offset),
+            Vector(y + lane_size, x + block_size - corner_offset)
         )
 
         intersections[j][i].addRoad(  [up_road],   [down_road])
         intersections[j][i+1].addRoad([down_road], [up_road])
 
-x_start = -50
-x_end   = border_size - offset
+x_start = border_size - block_size + corner_offset
+x_end   = border_size - corner_offset
 y_start = border_size + half_lane
 for i in range(num_blocks+1):
     y = y_start + next_block * i
-    road = TerminalRoad(Vector(x_start, y),
-                        Vector(x_end,   y))
-    entry_roads.append(road)
-    intersections[0][i].addRoad([road], [])
 
-    road = TerminalRoad(Vector(world_size - x_start, world_size - y),
-                        Vector(world_size - x_end,   world_size - y))
-    entry_roads.append(road)
-    intersections[num_blocks][num_blocks-i].addRoad([road], [])
+    # left entry
+    entry_road = IntersectionRoad(
+        Vector(x_start, y),
+        Vector(x_end,   y)
+    )
+    exit_road = TerminalRoad(
+        Vector(x_end,   y+lane_size),
+        Vector(x_start, y+lane_size)
+    )
+    entry_roads.append(entry_road)
+    intersections[0][i].addRoad([entry_road], [exit_road])
 
-x_start = border_size + lane_size + half_lane
-y_start = -50
-y_end   = border_size - offset
-for i in range(num_blocks+1):
-    x = x_start + next_block * i
-    road = TerminalRoad(Vector(x, y_start),
-                        Vector(x, y_end))
-    entry_roads.append(road)
-    intersections[i][0].addRoad([road], [])
+    # right entry
+    entry_road = IntersectionRoad(
+        Vector(world_size-x_start, world_size-y),
+        Vector(world_size-x_end,   world_size-y)
+    )
+    exit_road = TerminalRoad(
+        Vector(world_size-x_end,   world_size-y-lane_size),
+        Vector(world_size-x_start, world_size-y-lane_size)
+    )
+    entry_roads.append(entry_road)
+    intersections[num_blocks][num_blocks-i].addRoad([entry_road], [exit_road])
 
-    road = TerminalRoad(Vector(world_size - x, world_size - y_start),
-                        Vector(world_size - x, world_size - y_end))
-    entry_roads.append(road)
-    intersections[num_blocks-i][num_blocks].addRoad([road], [])
+    # top entry
+    entry_road = IntersectionRoad(
+        Vector(y+lane_size, x_start),
+        Vector(y+lane_size, x_end)
+    )
+    exit_road = TerminalRoad(
+        Vector(y, x_end),
+        Vector(y, x_start)
+    )
+    entry_roads.append(entry_road)
+    intersections[i][0].addRoad([entry_road], [exit_road])
+
+    # bottom entry
+    entry_road = IntersectionRoad(
+        Vector(world_size-y-lane_size, world_size-x_start),
+        Vector(world_size-y-lane_size, world_size-x_end)
+    )
+    exit_road = TerminalRoad(
+        Vector(world_size-y, world_size-x_end),
+        Vector(world_size-y, world_size-x_start)
+    )
+    entry_roads.append(entry_road)
+    intersections[num_blocks-i][num_blocks].addRoad([entry_road], [exit_road])
 

@@ -36,10 +36,9 @@ class World(Obstacle):
         self.car_generator = nextColour(self.cars)
 
         self.ramp_cooldown = 0
-        #self.ramp_cooldown = [0 for road in ramp_roads]
 
-        self.ghosts       = []
-        self.crashed_cars = 0
+        self.successful_cars = 0
+        self.ghosts = []
 
         # pan and zoom
         self.scale = min(SCREEN_WIDTH  / self.width  * 0.9,
@@ -176,6 +175,8 @@ class World(Obstacle):
         angle = getAngle(road.end - road.start)
 
         car = Car(self, name, colour, road, pos, angle, time)
+        car.speed = SLOW_SPEED#MAX_SPEED
+        #car.engine_force = MAX_ENGINE_FORCE
 
         self.controllers.append(CarController(car))
         self.cars.append(car)
@@ -257,12 +258,12 @@ class World(Obstacle):
                         #self.controllers[i].clearFuture()
                         #if not car_i.stopped:
                         #    crash = True
-                        car_i.stop(car_j)
+                        car_i.crash(car_j)
 
                         #self.controllers[j].clearWaypoints()
                         #if not car_j.stopped:
                         #    crash = True
-                        car_j.stop(car_i)
+                        car_j.crash(car_i)
 
             #for obstacle in self.obstacles:
             #    if car_i.checkCollision(obstacle):
@@ -486,8 +487,8 @@ class World(Obstacle):
             car.draw(car is self.selected_car)
             #car.drawExtra()
 
-        for car in self.cars:
-            car.drawDesiredPosition()
+        #for car in self.cars:
+        #    car.drawDesiredPosition()
 
         #for road in roads_list:
         #    thingy = road.end - road.start

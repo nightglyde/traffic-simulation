@@ -2,7 +2,7 @@ from util import *
 
 from obstacle import Obstacle
 from waypoint import Waypoint, FuturePoint
-from generate_world import TerminalRoad
+from generate_world import IntersectionRoad, TerminalRoad
 
 MAX_WAYPOINTS = 10
 MAX_FUTURE    = 10
@@ -38,6 +38,7 @@ class CarController(Obstacle):
 
         self.give_way_announcements = {}
 
+        self.addInstruction(self.car.road)
         self.generateRoute()
 
     def clearFuture(self):
@@ -70,21 +71,35 @@ class CarController(Obstacle):
 
             car.update(car.time + TIME_STEP)
 
-    def addInstruction(self, instruction):
+    def addInstruction(self, road):
+        if isinstance(road, IntersectionRoad):
+            exit = random.choice(road.getPathOptions())
+            instruction = TrafficLight(road, MAX_SPEED, exit)
+        elif isinstance(road, TerminalRoad):
+            instruction = ExitWorld(road, MAX_SPEED)
+        else:
+            instruction = FollowRoad(road, MAX_SPEED)
+
         self.route.append(instruction)
         self.sim_car.route.append(instruction)
 
     def generateRoute(self):
+        if not self.route:
+            return
+
         while len(self.route) < MIN_ROUTE_PIECES:
-            if not self.route:
-                road = self.car.road
-            else:
-                road = self.route[-1].getNextRoad()
+
+            instruction = self.route[-1]
+            if isinstance(instruction, ExitWorld):
+                return
+
+            road = instruction.getNextRoad()
+            self.addInstruction(road)
 
             # this is an arbitrary value that happens to work with
             # getting the car to stop in time for the intersection
             #dist = 15
-            if isinstance(road, TerminalRoad):
+            #if isinstance(road, IntersectionRoad):
                 #if road.length > dist:
                 #    distance = road.length - dist
 
@@ -94,11 +109,13 @@ class CarController(Obstacle):
                     # properly, we won't need this bit
                 #    self.addInstruction(FollowRoad(road, waypoint, MAX_SPEED))
 
-                exit = random.choice(road.getPathOptions())
-                self.addInstruction(TrafficLight(road, exit))
+            #    exit = random.choice(road.getPathOptions())
+            #    self.addInstruction(TrafficLight(road, exit))
 
-            else:
-                self.addInstruction(FollowRoad(road, road.end, MAX_SPEED))
+            #elif isinstance(road, TerminalRoad):
+            #    self.addInstruction(ExitWorld(road))
+            #else:
+            #    self.addInstruction(FollowRoad(road, road.end, MAX_SPEED))
 
     def update(self):
         if self.car.stopped:
@@ -117,9 +134,9 @@ class CarController(Obstacle):
 
         my_speed = self.car.speed
 
-        if my_speed <= car_speed:
+        #if my_speed <= car_speed:
             # you're not going to crash into them
-            return False, None
+        #    return False, None
 
         my_distance = self.car.road.getDistanceAlong(self.car.position)
 
@@ -155,37 +172,62 @@ class CarController(Obstacle):
         # what if you want to go more forwards so that you're closer to
         # the next car?
 
-        distance_apart = their_distance - my_distance
+        dist_apart = their_distance - my_distance
 
-        if distance_apart <= 0:
+        if dist_apart <= 0:
             # either they're behind you, or they're already crashed into you
             return False, None
 
-        safety_gap = 2#1 # adjust based on speed?
-        distance_apart -= CAR_LENGTH# + safety_gap
+        gap = 2#1 # safety gap
+        dist_apart -= CAR_LENGTH + gap
+
+        #if dist_apart > 15:
+            #print(self.name, car_name, "maximise")
+        #    return False, None
+
+        if dist_apart > 15:
+            # they're way ahead of you
+            return False, None
+
+        if dist_apart <= 0:
+            print(self.name, car_name, dist_apart, "too close")
+            return True, 0
 
         #if distance_apart <= safety_gap:
         #    return True, 0
 
-        try_speed = car_speed# / 2
+        #distance_until_match = (distance_apart - safety_gap) * (my_speed + car_speed) / (my_speed - car_speed)
 
-        distance_until_match = (distance_apart - safety_gap) * (my_speed + try_speed) / (my_speed - try_speed)
+        #if distance_until_match <= 0:
+        #    return True, 0
 
-        if distance_until_match <= 0:
-            return True, 0
+        #deceleration = (my_speed**2 - car_speed**2) / (2*distance_until_match)
 
-        deceleration = (my_speed**2 - try_speed**2) / (2*distance_until_match)
+        #deceleration = max(0, deceleration)
 
-        deceleration = max(0, deceleration)
+        if car_speed <= 0:
+            car_decel = 0
+            my_decel = my_speed**2 / (dist_apart * 2)
+        else:
+            car_decel = BRAKING_DECEL
+            my_decel = 2*(dist_apart)*(car_decel**2)/(car_speed**2) + car_decel
+
+        #dist_until_match = my_speed**2 / (my_decel * 2)
+
+        #if dist_until_match > 15:
+        #    print(self.name, car_name, "maximise")
+        #    return True, MAX_SPEED
 
         #if deceleration < 4 and distance_until_match > 5:
         #if distance_until_match > 2 and my_speed < SLOW_SPEED:
-        if distance_until_match > 15:
-            print(self.name, car_name, "maximise")
-            return True, MAX_SPEED
+        #if distance_until_match > 15:
+        #    print(self.name, car_name, "maximise")
+        #    return True, MAX_SPEED
 
-        speed_choice = my_speed - deceleration * TIME_STEP
-        print(self.name, car_name, try_speed, speed_choice, "match")
+        speed_choice = my_speed - my_decel * TIME_STEP
+        #print(self.name, car_name, car_speed, speed_choice, "match")
+
+        #print(self.name, car_name, car_decel, my_decel, my_speed, dist_apart, "match")
 
         return True, speed_choice
 

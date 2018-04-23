@@ -75,11 +75,12 @@ while not done:
         #scores.sort()
 
         # generate screen caption
-        string = "Car Simulator | FPS: {}".format(fps)
-        for car in world.cars:
-        #for score, time, name in scores:
-            #string += " | {:4} {:3}".format(name, -score)
-            string += " | {:4} {:.1f}".format(car.name, car.speed*3.6)
+        string  = "Car Simulator | FPS: {}".format(fps)
+        string += " | Score: {} | Crash: {}".format(world.successful_cars,
+                                                      len(world.ghosts))
+        #for car in world.cars:
+            #string += " | {:4} {:.1f}".format(car.name, car.speed*3.6)
+        #    string += " | {:4} {:2}".format(car.name, round(car.speed*3.6))
         pygame.display.set_caption(string)
 
     # deal with events

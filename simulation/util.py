@@ -8,8 +8,8 @@ FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
-MAX_CARS            = 30
-CAR_ADDING_INTERVAL = TIME_STEP * 50
+MAX_CARS            = 30#12
+CAR_ADDING_INTERVAL = TIME_STEP * 20#50
 
 #ACTION_DELAY = 500
 #ACTION_TIME  = ACTION_DELAY / 1000
@@ -37,6 +37,9 @@ MAX_ENGINE_FORCE = 10000
 
 CAR_MASS   = 1250
 CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
+
+BRAKING_FORCE = min(BRAKING_CONSTANT, CAR_WEIGHT)
+BRAKING_DECEL = BRAKING_FORCE / CAR_WEIGHT
 
 MAX_SPEED  = 15
 SLOW_SPEED = 5
@@ -670,7 +673,7 @@ world_size = border_size + road_size + next_block*num_blocks + border_size
 WORLD_WIDTH  = world_size
 WORLD_HEIGHT = world_size
 
-predefined_grass = [
+alt_predefined_grass = [
     [
         Vector(0, 0),
         Vector(world_size, 0),
@@ -697,12 +700,14 @@ predefined_grass = [
     ],
 ]
 
+predefined_grass = []
+
 # block
 x_start = border_size + road_size
 y_start = border_size + road_size
-for i in range(num_blocks):
+for i in range(-1, num_blocks+1):
     x = x_start + next_block * i
-    for j in range(num_blocks):
+    for j in range(-1, num_blocks+1):
         y = y_start + next_block * j
 
         predefined_grass.append([
@@ -725,9 +730,9 @@ half_lane = road_size / 4
 #RAMP_ANGLE = getAngle(RAMP_END - RAMP_POSITION)
 
 class FollowRoad:
-    def __init__(self, road, waypoint, speed):
+    def __init__(self, road, speed):
         self.road     = road
-        self.waypoint = waypoint
+        self.waypoint = road.end
         self.speed    = speed
 
     def getNextRoad(self):
@@ -739,10 +744,10 @@ class ChangeSpeed:
         self.timeout = timeout
 
 class TrafficLight:
-    def __init__(self, road, exit):
+    def __init__(self, road, speed, exit):
         self.road     = road
         self.waypoint = road.end
-        #self.speed    = SLOW_SPEED
+        self.speed    = speed
 
         self.intersection = road.intersection
         self.entrance     = road.input_index
@@ -755,4 +760,10 @@ class TrafficLight:
 
     def getNextRoad(self):
         return self.path[0]
+
+class ExitWorld:
+    def __init__(self, road, speed):
+        self.road     = road
+        self.waypoint = road.end
+        self.speed    = speed
 
