@@ -1,6 +1,8 @@
 from util import *
 
 from world import World
+from pregen_0 import roads, entry_roads, intersections, \
+                     grass, world_width, world_height
 
 INCLUDE_CAPTION = True
 
@@ -12,19 +14,10 @@ size   = [SCREEN_WIDTH, SCREEN_HEIGHT]
 screen = pygame.display.set_mode(size)
 clock  = pygame.time.Clock()
 
-world = World(screen, WORLD_WIDTH, WORLD_HEIGHT)
+world = World(screen, world_width, world_height)
 
-# create grass
-for points in predefined_grass:
-    world.addGrass(points)
-
-# create starting positions
-for point in starting_positions:
-    world.addStartingPosition(point)
-
-# create waypoint options
-for point in waypoint_options:
-    world.addWaypointOption(point)
+# build world
+world.buildWorld(roads, entry_roads, intersections, grass)
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
@@ -66,27 +59,12 @@ while not done:
             total += frame
         fps = round(10/total)
 
-        # get car scores
-        #scores = []
-        #for controller in world.controllers:
-        #    scores.append((-controller.score,
-        #                    controller.waypoint_time,
-        #                    controller.car.name))
-        #scores.sort()
-
         # generate screen caption
         string  = "Car Simulator | FPS: {}".format(fps)
         string += " | Score: {} | Crash: {} | Active cars: {}".format(
-                                                    world.successful_cars,
-                                                    world.crashed_cars,
-                                                    len(world.cars))
-
+            world.successful_cars, world.crashed_cars, len(world.cars))
         if paused:
             string += " | PAUSED"
-
-        #for car in world.cars:
-            #string += " | {:4} {:.1f}".format(car.name, car.speed*3.6)
-        #    string += " | {:4} {:2}".format(car.name, round(car.speed*3.6))
         pygame.display.set_caption(string)
 
     # deal with events
@@ -121,7 +99,7 @@ while not done:
 
     # update world
     if not paused:
-        world_time += TIME_STEP #min(time_step, TIME_STEP)
+        world_time += TIME_STEP
         world.update(world_time)
 
     # draw to screen

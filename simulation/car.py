@@ -2,17 +2,7 @@ from util import *
 
 from obstacle import Obstacle
 
-# physics constants
-#DRAG_CONSTANT    = 0.761
-#RR_CONSTANT      = DRAG_CONSTANT * 30
-#BRAKING_CONSTANT = 10000
-#GRAVITY_CONSTANT = 9.807
-
-#MIN_ENGINE_FORCE = 0
-#MAX_ENGINE_FORCE = 10000
-
-#CAR_MASS   = 1250
-#CAR_WEIGHT = CAR_MASS * GRAVITY_CONSTANT
+from controller import FollowRoad, ChangeSpeed, EnterIntersection, ExitWorld
 
 AVOID_CIRCLES = False
 SHOW_WHEELS   = True
@@ -20,25 +10,6 @@ SHOW_WHEELS   = True
 STEERING_RATE = 2*math.pi * 0.5#0.5#0.1
 
 LOOK_AHEAD_DIST = 3#TURN_RADIUS
-
-def calculateMaxSpeed(distance):
-    max_force    = -min(BRAKING_CONSTANT, CAR_WEIGHT)
-    acceleration = max_force / CAR_MASS
-    speed        = math.sqrt(-2 * acceleration * distance)
-    return min(speed, MAX_SPEED)
-
-def calculateSlowToStop(speed, distance):
-    deceleration = speed**2 / (distance * 2)
-
-    # replace this with something better
-    #if deceleration < 4 and distance > 5:
-    #    return MAX_SPEED
-    if distance > 15:# and speed < SLOW_SPEED:
-        return MAX_SPEED
-
-
-    new_speed = speed - deceleration * TIME_STEP
-    return new_speed
 
 def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     ang_diff = (desired_car_angle - car_angle).value
@@ -87,7 +58,6 @@ class Car(Obstacle):
         self.engine_force     = MIN_ENGINE_FORCE # newtons
         self.wheel_angle      = ANGLE_0          # radians
         self.speed            = 0.0              # metres per second
-        #self.angular_velocity = 0.0              # radians per second
 
         # control
         self.route            = deque()
@@ -96,7 +66,6 @@ class Car(Obstacle):
 
         self.desired_speed = 0.0
         self.speed_timeout = -1
-        #self.speed_default = MAX_SPEED
 
         self.generateHull()
 
@@ -114,7 +83,6 @@ class Car(Obstacle):
         car.engine_force     = self.engine_force
         car.wheel_angle      = self.wheel_angle
         car.speed            = self.speed
-        #car.angular_velocity = self.angular_velocity
 
         # control
         car.route         = self.route.copy()
@@ -164,7 +132,6 @@ class Car(Obstacle):
                 self.route.popleft()
                 continue
 
-            #if isinstance(instruction, FollowRoad):
             road     = instruction.road
             waypoint = instruction.waypoint
 
@@ -178,10 +145,6 @@ class Car(Obstacle):
             wayp_dist = wayp_vec.mag()
 
             if self_dist >= wayp_dist:
-                #if isinstance(instruction, TrafficLight):
-                #    if not instruction.checkSafe():
-                #        break
-
                 self.route.popleft()
                 continue
 
@@ -198,17 +161,16 @@ class Car(Obstacle):
         self.road = road
 
         if self.time >= self.speed_timeout:
-            if isinstance(instruction, TrafficLight):
-                if instruction.checkSafe():
+            if isinstance(instruction, EnterIntersection):
+                if instruction.checkLights() == GREEN_LIGHT:
                     self.desired_speed = MAX_SPEED
                 else:
-
-                    # what if we got the car to cautiously approach the
-                    # intersection instead of blindly stopping
-                    distance_left = wayp_dist - self_dist - 1#safety gap
-
-                    self.desired_speed = calculateSlowToStop(self.speed,
-                                                             distance_left)
+                    dist_left = wayp_dist - self_dist - 2
+                    max_speed = calculateMaxSpeed(dist_left, self.speed)
+                    if self.speed < max_speed:
+                        self.desired_speed = MAX_SPEED
+                    else:
+                        self.desired_speed = max_speed
 
             elif isinstance(instruction, FollowRoad):
                 self.desired_speed = instruction.speed
@@ -302,7 +264,6 @@ class Car(Obstacle):
 
         # forwards motion of car
         acceleration   = force / CAR_MASS
-        #self.speed    += acceleration * dt
         self.speed     = max(0, self.speed + acceleration * dt)
         self.position += getVector(self.angle) * self.speed * dt
 
@@ -311,10 +272,6 @@ class Car(Obstacle):
             radius  = PIVOT_TO_AXLE / math.sin(self.wheel_angle.value)
             ang_vel = self.speed / radius
             self.angle += Angle(ang_vel * dt / 2)
-
-        #    self.angular_velocity = abs(ang_vel)
-        #else:
-        #    self.angular_velocity = 0.0
 
         self.generateHull()
 
@@ -350,7 +307,6 @@ class Car(Obstacle):
             self.world.getDrawable(pos              - stem_left)]
 
         if self.stopped:
-            #pygame.draw.polygon(screen, GREY, arrow, 1)
             pygame.draw.polygon(screen, LIGHTER[self.colour], arrow, 1)
 
         else:
@@ -456,29 +412,12 @@ class Car(Obstacle):
             screen = self.world.screen
             pos    = self.world.getDrawable(self.desired_position)
 
-            #radius_1 = max(6, self.world.scaleDistance(0.6))
-            #pygame.draw.circle(screen, self.colour,          pos, radius_1)
-            #pygame.draw.circle(screen, DARKER[self.colour],  pos, radius_1, 1)
-
-            #radius_2 = max(4, self.world.scaleDistance(0.4))
-            #pygame.draw.circle(screen, LIGHTER[self.colour], pos, radius_2)
-            #pygame.draw.circle(screen, DARKER[self.colour],  pos, radius_2, 1)
-
-            #radius_3 = max(2, self.world.scaleDistance(0.2))
-            #pygame.draw.circle(screen, self.colour,          pos, radius_3)
-            #pygame.draw.circle(screen, DARKER[self.colour],  pos, radius_3, 1)
-
-            radius_3 = max(2, self.world.scaleDistance(0.2))
-            pygame.draw.circle(screen, DARKER[self.colour],  pos, radius_3)
-            pygame.draw.circle(screen, BLACK,                pos, radius_3, 1)
+            radius = max(2, self.world.scaleDistance(0.2))
+            pygame.draw.circle(screen, DARKER[self.colour], pos, radius)
+            pygame.draw.circle(screen, BLACK,               pos, radius, 1)
 
     def drawPath(self):
         if len(self.path) > 1:
             path = [self.world.getDrawable(point) for point in self.path]
             pygame.draw.lines(self.world.screen, GREY, False, path, 1)
-
-        #screen = self.world.screen
-        #for past_point in self.path:
-        #    hull = [self.world.getDrawable(point) for point in past_point.hull]
-        #    pygame.draw.polygon(screen, GREY, hull, 1)
 
