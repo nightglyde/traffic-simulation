@@ -33,12 +33,12 @@ MAX_SPEED  = 15
 SLOW_SPEED = 5
 
 # car size
-CAR_LENGTH   = 4.5
+CAR_LENGTH   = 4.5 # metres
 CAR_WIDTH    = 1.8
 WHEEL_LENGTH = 0.9
 WHEEL_WIDTH  = 0.225
 AXLE_LENGTH  = 2.7
-AXLE_WIDTH   = CAR_WIDTH - WHEEL_WIDTH
+AXLE_WIDTH   = 1.5
 
 PIVOT_TO_FRONT = CAR_LENGTH/2 + AXLE_LENGTH/2 # 3.6
 PIVOT_TO_REAR  = CAR_LENGTH - PIVOT_TO_FRONT
@@ -49,6 +49,15 @@ ARROW_LENGTH      = PIVOT_TO_AXLE #1.35 #2.7
 ARROW_WIDTH       = 0.9
 ARROW_STEM_LENGTH = ARROW_LENGTH - 0.5
 ARROW_STEM_WIDTH  = 0.45
+
+LIGHT_FRONT  = PIVOT_TO_FRONT - 0.1
+LIGHT_BACK   = LIGHT_FRONT    - 0.2
+
+LIGHT_OUTER = CAR_WIDTH/2 #- 0.1
+LIGHT_MID   = LIGHT_OUTER - 0.3
+LIGHT_INNER = LIGHT_MID   - 0.3
+
+SAFETY_GAP = 2 # gap between cars
 
 # turns
 LEFT   = -1
@@ -64,14 +73,16 @@ RED_LIGHT   = 0
 AMBER_LIGHT = 1
 GREEN_LIGHT = 2
 
-# messaging
-SEND_TO_ALL = -1
+# message types
+CURRENT_DETAILS = 0
+FUTURE_DETAILS  = 1
 
-# public message types
-CURRENT_DETAILS  = 0
-FUTURE_DETAILS   = 1
+# message addresses
+SEND_TO_ALL   = 0
+LINE_OF_SIGHT = 1
+# for direct messages, use the destination car's name
 
-# private message types
+SIGHT_RADIUS = 20 # metres
 
 ##########
 # VECTOR #
@@ -84,9 +95,11 @@ class Vector:
 
     def left90(self):
         return Vector(-self.y, self.x)
+        #return Vector(self.y, -self.x)
 
     def right90(self):
         return Vector(self.y, -self.x)
+        #return Vector(-self.y, self.x)
 
     def mag(self):
         return math.sqrt(self.x**2 + self.y**2)
@@ -257,6 +270,9 @@ LIGHT_RED = (255, 128, 128)
 DARK_ORANGE  = (128,  64,   0)
 ORANGE       = (255, 128,   0)
 LIGHT_ORANGE = (255, 191, 128)
+
+# amber
+AMBER = (255, 191, 0)
 
 # yellow
 DARK_YELLOW  = (128, 128,   0)

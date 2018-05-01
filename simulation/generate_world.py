@@ -5,16 +5,16 @@ LANE_WIDTH = 3.5
 ROAD_WIDTH = LANE_WIDTH*2
 HALF_LANE  = LANE_WIDTH/2
 
-BORDER_SIZE   = 10
+BORDER_SIZE   = 50#10
 BLOCK_SIZE    = 50
 CORNER_OFFSET = 5.4
-NUM_BLOCKS    = 2
 
-NEXT_BLOCK = BLOCK_SIZE + ROAD_WIDTH
-WORLD_SIZE = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_BLOCKS
+NUM_COLS = 1
+NUM_ROWS = 1
 
-WORLD_WIDTH  = WORLD_SIZE
-WORLD_HEIGHT = WORLD_SIZE
+NEXT_BLOCK   = BLOCK_SIZE + ROAD_WIDTH
+WORLD_WIDTH  = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_COLS
+WORLD_HEIGHT = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_ROWS
 
 all_intersections = []
 
@@ -22,6 +22,7 @@ all_roads          = []
 entry_roads        = []
 normal_roads       = []
 intersection_roads = []
+crossing_roads     = []
 terminal_roads     = []
 
 def nameGenerator():
@@ -47,7 +48,7 @@ def nameGenerator():
         else:
             name = a*(num_zeds+1)
 
-name_generator = nameGenerator()
+road_name_generator = nameGenerator()
 
 class Road:
     def __init__(self, start, end):
@@ -66,7 +67,11 @@ class Road:
         self.length = self.vec.mag()
 
         all_roads.append(self)
-        self.name = "{}_{}".format(self.type_name.lower(), next(name_generator))
+
+    def generateName(self):
+        prefix = self.type_name.lower()
+        prefix = prefix[:5] + prefix[5:][-4:] + "_"
+        self.name = prefix + next(road_name_generator)
 
     def setNext(self, next_road):
         self.next_road = next_road
@@ -89,8 +94,8 @@ class IntersectionRoad(Road):
         self.start = start
         self.end   = end
 
-        intersection_roads.append(self)
         self.type_name = "IntersectionRoad"
+        intersection_roads.append(self)
         self.setup()
 
         self.intersection = None
@@ -102,19 +107,31 @@ class IntersectionRoad(Road):
         self.input_index  = index
         self.valid_paths  = intersection.connections[index]
 
-    def getPathOptions(self):
-        return self.valid_paths
+    def getExit(self, turn):
+        return self.valid_paths[turn]
 
     def getPath(self, output_index):
-        return self.intersection.paths[(self.input_index, output_index)]
+        path, turn = self.intersection.paths[(self.input_index, output_index)]
+        return path
+
+class CrossingRoad(Road):
+    def __init__(self, start, end):
+        self.start = start
+        self.end   = end
+
+        self.type_name = "Road"#CrossingRoad"
+        crossing_roads.append(self)
+        self.setup()
+
+        self.next_road = None
 
 class TerminalRoad(Road):
     def __init__(self, start, end):
         self.start = start
         self.end   = end
 
+        self.type_name = "Road"#TerminalRoad"
         terminal_roads.append(self)
-        self.type_name = "TerminalRoad"
         self.setup()
 
 def connectRoads(in_road, out_road):
@@ -140,9 +157,9 @@ def connectRoads(in_road, out_road):
         ab_cross_bx = crossProduct(ab, bx)
 
         if ab_cross_bx < 0.0001:
-            road = Road(b, x)
+            road = CrossingRoad(b, x)
             road.setNext(out_road)
-            return [road]
+            return [road], turn
         else:
             raise Exception('Bad road connection: {} to {}'.format(in_road,
                                                                    out_road))
@@ -174,13 +191,13 @@ def connectRoads(in_road, out_road):
         turn_end   = intersect + xy.norm() * bi_dist
 
         prev_road  = None
-        extra_road = Road(turn_end, x)
+        extra_road = CrossingRoad(turn_end, x)
 
     else:
         turn_start = intersect + ab.norm() * xi_dist * -1
         turn_end   = x
 
-        prev_road  = Road(b, turn_start)
+        prev_road  = CrossingRoad(b, turn_start)
         extra_road = None
 
         joining_roads.append(prev_road)
@@ -223,7 +240,7 @@ def connectRoads(in_road, out_road):
             curr_angle = centre_start_angle - Angle(i/thingy)
             curr_point = centre + getVector(curr_angle) * turn_radius
 
-            curr_road = Road(prev_point, curr_point)
+            curr_road = CrossingRoad(prev_point, curr_point)
             joining_roads.append(curr_road)
 
             if prev_road:
@@ -238,7 +255,7 @@ def connectRoads(in_road, out_road):
             curr_angle = centre_start_angle + Angle(i/thingy)
             curr_point = centre + getVector(curr_angle) * turn_radius
 
-            curr_road = Road(prev_point, curr_point)
+            curr_road = CrossingRoad(prev_point, curr_point)
             joining_roads.append(curr_road)
 
             if prev_road:
@@ -247,7 +264,7 @@ def connectRoads(in_road, out_road):
             prev_road  = curr_road
             prev_point = curr_point
 
-    curr_road = Road(prev_point, turn_end)
+    curr_road = CrossingRoad(prev_point, turn_end)
     joining_roads.append(curr_road)
     if prev_road:
         prev_road.setNext(curr_road)
@@ -259,7 +276,7 @@ def connectRoads(in_road, out_road):
 
     curr_road.setNext(out_road)
 
-    return joining_roads
+    return joining_roads, turn
 
 class Intersection:
     def __init__(self, i, j):
@@ -292,31 +309,32 @@ class Intersection:
             for j in range(old_out_count, new_out_count):
                 out_road = self.outputs[j]
 
-                path = connectRoads(in_road, out_road)
+                path, turn = connectRoads(in_road, out_road)
                 if path:
                     pair = (i, j)
                     self.pairs.append(pair)
-                    self.paths[pair]  = path
+                    self.paths[pair] = (path, turn)
 
                     self.connections[i].append(j)
 
         for i in range(old_in_count, new_in_count):
             in_road = self.inputs[i]
 
-            valid_paths = []
+            self.connections.append([None, None, None])
 
             for j in range(old_out_count):
                 out_road = self.outputs[j]
 
-                path = connectRoads(in_road, out_road)
+                path, turn = connectRoads(in_road, out_road)
                 if path:
                     pair = (i, j)
                     self.pairs.append(pair)
-                    self.paths[pair]  = path
+                    self.paths[pair] = (path, turn)
 
-                    valid_paths.append(j)
+                    self.connections[i][turn] = j
+                    self.connections[i][1] = j
+                    self.connections[i][2] = j
 
-            self.connections.append(valid_paths)
             in_road.setIntersection(self, i)
 
     def __eq__(self, other):
@@ -337,13 +355,13 @@ class Intersection:
         return "Intersection({}, {}, {}, {})".format(self.id[0], self.id[1],
                                                      inputs, outputs)
 
-intersections = [[Intersection(i, j) for i in range(NUM_BLOCKS+1)] for j in range(NUM_BLOCKS+1)]
+intersections = [[Intersection(i, j) for j in range(NUM_ROWS+1)] for i in range(NUM_COLS+1)]
 
 x_start = BORDER_SIZE + ROAD_WIDTH
 y_start = BORDER_SIZE + HALF_LANE
-for i in range(NUM_BLOCKS):
+for i in range(NUM_COLS):
     x = x_start + NEXT_BLOCK * i
-    for j in range(NUM_BLOCKS+1):
+    for j in range(NUM_ROWS+1):
         y = y_start + NEXT_BLOCK * j
 
         # horizontal roads
@@ -359,24 +377,31 @@ for i in range(NUM_BLOCKS):
         intersections[i][j].addRoad(  [left_road],  [right_road])
         intersections[i+1][j].addRoad([right_road], [left_road])
 
+x_start = BORDER_SIZE + HALF_LANE
+y_start = BORDER_SIZE + ROAD_WIDTH
+for j in range(NUM_ROWS):
+    y = y_start + NEXT_BLOCK * j
+    for i in range(NUM_COLS+1):
+        x = x_start + NEXT_BLOCK * i
+
         # vertical roads
         up_road = IntersectionRoad(
-            Vector(y, x + BLOCK_SIZE - CORNER_OFFSET),
-            Vector(y, x + CORNER_OFFSET)
+            Vector(x, y + BLOCK_SIZE - CORNER_OFFSET),
+            Vector(x, y + CORNER_OFFSET)
         )
         down_road = IntersectionRoad(
-            Vector(y + LANE_WIDTH, x + CORNER_OFFSET),
-            Vector(y + LANE_WIDTH, x + BLOCK_SIZE - CORNER_OFFSET)
+            Vector(x + LANE_WIDTH, y + CORNER_OFFSET),
+            Vector(x + LANE_WIDTH, y + BLOCK_SIZE - CORNER_OFFSET)
         )
 
-        intersections[j][i].addRoad(  [up_road],   [down_road])
-        intersections[j][i+1].addRoad([down_road], [up_road])
+        intersections[i][j].addRoad(  [up_road],   [down_road])
+        intersections[i][j+1].addRoad([down_road], [up_road])
 
 x_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
 x_end   = BORDER_SIZE - CORNER_OFFSET
 y_start = BORDER_SIZE + HALF_LANE
-for i in range(NUM_BLOCKS+1):
-    y = y_start + NEXT_BLOCK * i
+for j in range(NUM_ROWS+1):
+    y = y_start + NEXT_BLOCK * j
 
     # left entry
     entry_road = IntersectionRoad(
@@ -388,51 +413,57 @@ for i in range(NUM_BLOCKS+1):
         Vector(x_start, y+LANE_WIDTH)
     )
     entry_roads.append(entry_road)
-    intersections[0][i].addRoad([entry_road], [exit_road])
+    intersections[0][j].addRoad([entry_road], [exit_road])
 
     # right entry
     entry_road = IntersectionRoad(
-        Vector(WORLD_SIZE-x_start, WORLD_SIZE-y),
-        Vector(WORLD_SIZE-x_end,   WORLD_SIZE-y)
+        Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y),
+        Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y)
     )
     exit_road = TerminalRoad(
-        Vector(WORLD_SIZE-x_end,   WORLD_SIZE-y-LANE_WIDTH),
-        Vector(WORLD_SIZE-x_start, WORLD_SIZE-y-LANE_WIDTH)
+        Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y-LANE_WIDTH),
+        Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y-LANE_WIDTH)
     )
     entry_roads.append(entry_road)
-    intersections[NUM_BLOCKS][NUM_BLOCKS-i].addRoad([entry_road], [exit_road])
+    intersections[NUM_COLS][NUM_ROWS-j].addRoad([entry_road], [exit_road])
+
+x_start = BORDER_SIZE + HALF_LANE
+y_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
+y_end   = BORDER_SIZE - CORNER_OFFSET
+for i in range(NUM_COLS+1):
+    x = x_start + NEXT_BLOCK * i
 
     # top entry
     entry_road = IntersectionRoad(
-        Vector(y+LANE_WIDTH, x_start),
-        Vector(y+LANE_WIDTH, x_end)
+        Vector(x+LANE_WIDTH, y_start),
+        Vector(x+LANE_WIDTH, y_end)
     )
     exit_road = TerminalRoad(
-        Vector(y, x_end),
-        Vector(y, x_start)
+        Vector(x, y_end),
+        Vector(x, y_start)
     )
     entry_roads.append(entry_road)
     intersections[i][0].addRoad([entry_road], [exit_road])
 
     # bottom entry
     entry_road = IntersectionRoad(
-        Vector(WORLD_SIZE-y-LANE_WIDTH, WORLD_SIZE-x_start),
-        Vector(WORLD_SIZE-y-LANE_WIDTH, WORLD_SIZE-x_end)
+        Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_start),
+        Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_end)
     )
     exit_road = TerminalRoad(
-        Vector(WORLD_SIZE-y, WORLD_SIZE-x_end),
-        Vector(WORLD_SIZE-y, WORLD_SIZE-x_start)
+        Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_end),
+        Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_start)
     )
     entry_roads.append(entry_road)
-    intersections[NUM_BLOCKS-i][NUM_BLOCKS].addRoad([entry_road], [exit_road])
+    intersections[NUM_COLS-i][NUM_ROWS].addRoad([entry_road], [exit_road])
 
 grass = []
 
 x_start = BORDER_SIZE + ROAD_WIDTH
 y_start = BORDER_SIZE + ROAD_WIDTH
-for i in range(-1, NUM_BLOCKS+1):
+for i in range(-1, NUM_COLS+1):
     x = x_start + NEXT_BLOCK * i
-    for j in range(-1, NUM_BLOCKS+1):
+    for j in range(-1, NUM_ROWS+1):
         y = y_start + NEXT_BLOCK * j
 
         grass.append([
@@ -447,11 +478,24 @@ for i in range(-1, NUM_BLOCKS+1):
         ])
 if __name__ == "__main__":
     print("from util import *")
-    print("from road_network import Road, IntersectionRoad, TerminalRoad, Intersection")
+    print("from road_network import Road, IntersectionRoad, Intersection")
 
     print()
 
-    for road in all_roads:
+    for road in intersection_roads:
+        road.generateName()
+        print("{} = {}".format(road.name, road))
+
+    for road in normal_roads:
+        road.generateName()
+        print("{} = {}".format(road.name, road))
+
+    for road in terminal_roads:
+        road.generateName()
+        print("{} = {}".format(road.name, road))
+
+    for road in crossing_roads:
+        road.generateName()
         print("{} = {}".format(road.name, road))
 
     print()
@@ -468,15 +512,27 @@ if __name__ == "__main__":
                 pair = (i, j)
 
                 if pair in intersection.pairs:
-                    path = [road.name for road in intersection.paths[pair]]
+                    path, turn = intersection.paths[pair]
+
+                    path = [road.name for road in path]
                     path = "[" + ",".join(path) + "]"
 
-                    print("{}.addConnection({}, {}, {})".format(
-                        intersection.name, i, j, path))
+                    if turn == LEFT:
+                        turn = "LEFT"
+                    elif turn == RIGHT:
+                        turn = "RIGHT"
+                    else:
+                        turn = "CENTRE"
+
+                    print("{}.addConnection({}, {}, {}, {})".format(
+                        intersection.name, i, j, path, turn))
 
     print()
 
     for road in normal_roads:
+        print("{}.setNext({})".format(road.name, road.next_road.name))
+
+    for road in crossing_roads:
         print("{}.setNext({})".format(road.name, road.next_road.name))
 
     print()

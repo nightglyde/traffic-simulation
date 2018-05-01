@@ -8,6 +8,7 @@ class Road:
         self.setup()
 
         self.next_road = None
+        self.turn      = None
 
     def setup(self):
         self.vec    = self.end - self.start
@@ -16,6 +17,9 @@ class Road:
 
     def setNext(self, next_road):
         self.next_road = next_road
+
+    def setTurn(self, turn):
+        self.turn = turn
 
     def getDistanceAlong(self, car_position):
         car_vec  = car_position - self.start
@@ -46,18 +50,11 @@ class IntersectionRoad(Road):
         self.input_index  = index
         self.valid_paths  = intersection.connections[index]
 
-    def getPathOptions(self):
-        return self.valid_paths
+    def getExit(self, turn):
+        return self.valid_paths[turn]
 
     def getPath(self, output_index):
         return self.intersection.paths[(self.input_index, output_index)]
-
-class TerminalRoad(Road):
-    def __init__(self, start, end):
-        self.start = start
-        self.end   = end
-
-        self.setup()
 
 class Intersection:
     def __init__(self, i, j, inputs, outputs):
@@ -69,13 +66,19 @@ class Intersection:
         self.pairs = []
         self.paths = {}
 
-        self.connections = [[] for i in range(len(inputs))]
+        self.connections = [[None, None, None] for i in range(len(inputs))]
 
-    def addConnection(self, entrance, exit, path):
+    def addConnection(self, entrance, exit, path, turn):
         pair = (entrance, exit)
         self.pairs.append(pair)
         self.paths[pair] = path
-        self.connections[entrance].append(exit)
+
+        self.connections[entrance][turn] = exit
+
+        for road in path:
+            road.setTurn(turn)
+
+        #self.connections[entrance].append(exit)
 
     def __eq__(self, other):
         if isinstance(other, Intersection):

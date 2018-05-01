@@ -2,12 +2,13 @@ from util import *
 
 from obstacle import Obstacle
 
-from controller import FollowRoad, ChangeSpeed, EnterIntersection, ExitWorld
+from controller import FollowRoad, ChangeSpeed, EnterIntersection
 
 AVOID_CIRCLES = False
 SHOW_WHEELS   = True
+SHOW_LIGHTS   = True
 
-STEERING_RATE = 2*math.pi * 0.5#0.5#0.1
+STEERING_RATE = 2*math.pi * 0.3#0.5#0.1
 
 LOOK_AHEAD_DIST = 3#TURN_RADIUS
 
@@ -120,6 +121,18 @@ class Car(Obstacle):
             print(self.name, "finished mission at time", self.time / 1000)
             self.world.successful_cars += 1
 
+    def crossingSpeed(self, instruction, dist_left):
+        if instruction.checkLights() == GREEN_LIGHT:
+            return MAX_SPEED
+
+        max_speed = calculateMaxSpeed(dist_left, self.speed)
+        if self.speed < max_speed:
+            # you can't stop in time, so keep going and hope for the best
+            return MAX_SPEED
+
+        return max_speed
+
+
     def updateRoute(self):
         while self.route:
 
@@ -161,19 +174,8 @@ class Car(Obstacle):
         self.road = road
 
         if self.time >= self.speed_timeout:
-            if isinstance(instruction, EnterIntersection):
-                if instruction.checkLights() == GREEN_LIGHT:
-                    self.desired_speed = MAX_SPEED
-                else:
-                    dist_left = wayp_dist - self_dist - 2
-                    max_speed = calculateMaxSpeed(dist_left, self.speed)
-                    if self.speed < max_speed:
-                        self.desired_speed = MAX_SPEED
-                    else:
-                        self.desired_speed = max_speed
-
-            elif isinstance(instruction, FollowRoad):
-                self.desired_speed = instruction.speed
+            dist_left = wayp_dist - self_dist - CAR_LENGTH/2
+            self.desired_speed = self.crossingSpeed(instruction, dist_left)
 
         if self_dist + LOOK_AHEAD_DIST <= wayp_dist:
             look_ahead = (self_dist + LOOK_AHEAD_DIST) / wayp_dist
@@ -275,21 +277,41 @@ class Car(Obstacle):
 
         self.generateHull()
 
+    def getNextTurn(self):
+        for instruction in self.route:
+            if isinstance(instruction, EnterIntersection):
+                return instruction.turn
+
+            if isinstance(instruction, FollowRoad):
+                turn = instruction.road.turn
+
+                if turn != None:
+                    return turn
+
+        return CENTRE
+
+
     def draw(self, selected=False):
         screen = self.world.screen
         pos    = self.position
 
         forward = getVector(self.angle)
-        left    = forward.left90()
+        left    = forward.right90()#left90()
+        # TODO: FIX THIS
+        # FOR SOME INSANE REASON, LEFT AND RIGHT ARE SWITCHED!!!
+        # IT'S LIKE THIS FOR THE WHEELS TOO
+
+        if not self.stopped:
+            car_colour   = self.colour
+            line_colour  = BLACK
+        else:
+            car_colour   = LIGHT_GREY
+            line_colour  = GREY
 
         # draw car
         chassis = [self.world.getDrawable(point) for point in self.hull]
-        if self.stopped:
-            pygame.draw.polygon(screen, LIGHT_GREY, chassis)
-            pygame.draw.polygon(screen, GREY,       chassis, 1)
-        else:
-            pygame.draw.polygon(screen, self.colour, chassis)
-            pygame.draw.polygon(screen, BLACK,       chassis, 2)
+        pygame.draw.polygon(screen, car_colour,  chassis)
+        pygame.draw.polygon(screen, line_colour, chassis, 1)
 
         # draw arrow
         stem_front = forward * ARROW_STEM_LENGTH
@@ -307,70 +329,126 @@ class Car(Obstacle):
             self.world.getDrawable(pos              - stem_left)]
 
         if self.stopped:
-            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow, 1)
+            pygame.draw.polygon(screen, self.colour, arrow)
+        elif selected:
+            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
 
-        else:
-            if selected:
-                pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
-            pygame.draw.polygon(screen, BLACK, arrow, 1)
+        pygame.draw.polygon(screen, line_colour, arrow, 1)
 
-            if SHOW_WHEELS:
-                # draw wheels
-                wheel_forward = getVector(self.angle + self.wheel_angle)
+        # draw lights
+        if SHOW_LIGHTS and not self.stopped:
+            turn = self.getNextTurn()
 
-                f_wheel_front = wheel_forward          * WHEEL_LENGTH / 2
-                f_wheel_left  = wheel_forward.left90() * WHEEL_WIDTH  / 2
+            light_front = forward * LIGHT_FRONT
+            light_back  = forward * LIGHT_BACK
 
-                r_wheel_front = forward * WHEEL_LENGTH / 2
-                r_wheel_left  = left    * WHEEL_WIDTH  / 2
+            light_outer = left * LIGHT_OUTER
+            light_mid   = left * LIGHT_MID
+            light_inner = left * LIGHT_INNER
 
-                axle_front = forward * PIVOT_TO_AXLE
-                axle_rear  = forward * (PIVOT_TO_AXLE - AXLE_LENGTH)
-                axle_left  = left    * AXLE_WIDTH / 2
+            left_headlight = [
+                self.world.getDrawable(pos + light_front + light_mid),
+                self.world.getDrawable(pos + light_front + light_inner),
+                self.world.getDrawable(pos + light_back  + light_inner),
+                self.world.getDrawable(pos + light_back  + light_mid),
+            ]
 
-                # front left wheel
-                f_l = pos + axle_front + axle_left
-                front_left_wheel = [
-                    self.world.getDrawable(f_l - f_wheel_left + f_wheel_front),
-                    self.world.getDrawable(f_l + f_wheel_left + f_wheel_front),
-                    self.world.getDrawable(f_l + f_wheel_left - f_wheel_front),
-                    self.world.getDrawable(f_l - f_wheel_left - f_wheel_front),
-                ]
-                pygame.draw.polygon(screen, DARK_GREY, front_left_wheel)
-                pygame.draw.polygon(screen, BLACK,     front_left_wheel, 1)
+            right_headlight = [
+                self.world.getDrawable(pos + light_front - light_inner),
+                self.world.getDrawable(pos + light_front - light_mid),
+                self.world.getDrawable(pos + light_back  - light_mid),
+                self.world.getDrawable(pos + light_back  - light_inner),
+            ]
 
-                # front right wheel
-                f_r = pos + axle_front - axle_left
-                front_right_wheel = [
-                    self.world.getDrawable(f_r - f_wheel_left + f_wheel_front),
-                    self.world.getDrawable(f_r + f_wheel_left + f_wheel_front),
-                    self.world.getDrawable(f_r + f_wheel_left - f_wheel_front),
-                    self.world.getDrawable(f_r - f_wheel_left - f_wheel_front),
-                ]
-                pygame.draw.polygon(screen, DARK_GREY, front_right_wheel)
-                pygame.draw.polygon(screen, BLACK,     front_right_wheel, 1)
+            pygame.draw.polygon(screen, LIGHT_YELLOW, left_headlight)
+            pygame.draw.polygon(screen, LIGHT_YELLOW, right_headlight)
 
-                # rear left wheel
-                r_l = pos + axle_rear + axle_left
-                rear_left_wheel = [
-                    self.world.getDrawable(r_l - r_wheel_left + r_wheel_front),
-                    self.world.getDrawable(r_l + r_wheel_left + r_wheel_front),
-                    self.world.getDrawable(r_l + r_wheel_left - r_wheel_front),
-                    self.world.getDrawable(r_l - r_wheel_left - r_wheel_front),
-                ]
-                pygame.draw.polygon(screen, DARK_GREY, rear_left_wheel)
-                pygame.draw.polygon(screen, BLACK,     rear_left_wheel, 1)
+            left_turning_signal = [
+                self.world.getDrawable(pos + light_front + light_outer),
+                self.world.getDrawable(pos + light_front + light_mid),
+                self.world.getDrawable(pos + light_back  + light_mid),
+                self.world.getDrawable(pos + light_back  + light_outer),
+            ]
 
-                # rear right wheel
-                r_r = pos + axle_rear - axle_left
-                rear_right_wheel = [
-                    self.world.getDrawable(r_r - r_wheel_left + r_wheel_front),
-                    self.world.getDrawable(r_r + r_wheel_left + r_wheel_front),
-                    self.world.getDrawable(r_r + r_wheel_left - r_wheel_front),
-                    self.world.getDrawable(r_r - r_wheel_left - r_wheel_front),
-                ]
-                pygame.draw.polygon(screen, DARK_GREY, rear_right_wheel)
-                pygame.draw.polygon(screen, BLACK,     rear_right_wheel, 1)
+            right_turning_signal = [
+                self.world.getDrawable(pos + light_front - light_mid),
+                self.world.getDrawable(pos + light_front - light_outer),
+                self.world.getDrawable(pos + light_back  - light_outer),
+                self.world.getDrawable(pos + light_back  - light_mid),
+            ]
+
+            if turn == LEFT and (self.time % 1000) < 500:
+                pygame.draw.polygon(screen, AMBER, left_turning_signal)
+            else:
+                pygame.draw.polygon(screen, GREY, left_turning_signal)
+
+            if turn == RIGHT and (self.time % 1000) < 500:
+                pygame.draw.polygon(screen, AMBER, right_turning_signal)
+            else:
+                pygame.draw.polygon(screen, GREY, right_turning_signal)
+
+            pygame.draw.polygon(screen, BLACK, left_headlight,  1)
+            pygame.draw.polygon(screen, BLACK, right_headlight, 1)
+            pygame.draw.polygon(screen, BLACK, left_turning_signal,  1)
+            pygame.draw.polygon(screen, BLACK, right_turning_signal, 1)
+
+        # draw wheels
+        if SHOW_WHEELS and not self.stopped:
+            wheel_forward = getVector(self.angle + self.wheel_angle)
+
+            f_wheel_front = wheel_forward          * WHEEL_LENGTH / 2
+            f_wheel_left  = wheel_forward.left90() * WHEEL_WIDTH  / 2
+
+            r_wheel_front = forward * WHEEL_LENGTH / 2
+            r_wheel_left  = left    * WHEEL_WIDTH  / 2
+
+            axle_front = forward * PIVOT_TO_AXLE
+            axle_rear  = forward * (PIVOT_TO_AXLE - AXLE_LENGTH)
+            axle_left  = left    * AXLE_WIDTH / 2
+
+            # front left wheel
+            f_l = pos + axle_front + axle_left
+            front_left_wheel = [
+                self.world.getDrawable(f_l - f_wheel_left + f_wheel_front),
+                self.world.getDrawable(f_l + f_wheel_left + f_wheel_front),
+                self.world.getDrawable(f_l + f_wheel_left - f_wheel_front),
+                self.world.getDrawable(f_l - f_wheel_left - f_wheel_front),
+            ]
+            pygame.draw.polygon(screen, DARK_GREY, front_left_wheel)
+            pygame.draw.polygon(screen, BLACK,     front_left_wheel, 1)
+
+            # front right wheel
+            f_r = pos + axle_front - axle_left
+            front_right_wheel = [
+                self.world.getDrawable(f_r - f_wheel_left + f_wheel_front),
+                self.world.getDrawable(f_r + f_wheel_left + f_wheel_front),
+                self.world.getDrawable(f_r + f_wheel_left - f_wheel_front),
+                self.world.getDrawable(f_r - f_wheel_left - f_wheel_front),
+            ]
+            pygame.draw.polygon(screen, DARK_GREY, front_right_wheel)
+            pygame.draw.polygon(screen, BLACK,     front_right_wheel, 1)
+
+            # rear left wheel
+            r_l = pos + axle_rear + axle_left
+            rear_left_wheel = [
+                self.world.getDrawable(r_l - r_wheel_left + r_wheel_front),
+                self.world.getDrawable(r_l + r_wheel_left + r_wheel_front),
+                self.world.getDrawable(r_l + r_wheel_left - r_wheel_front),
+                self.world.getDrawable(r_l - r_wheel_left - r_wheel_front),
+            ]
+            pygame.draw.polygon(screen, DARK_GREY, rear_left_wheel)
+            pygame.draw.polygon(screen, BLACK,     rear_left_wheel, 1)
+
+            # rear right wheel
+            r_r = pos + axle_rear - axle_left
+            rear_right_wheel = [
+                self.world.getDrawable(r_r - r_wheel_left + r_wheel_front),
+                self.world.getDrawable(r_r + r_wheel_left + r_wheel_front),
+                self.world.getDrawable(r_r + r_wheel_left - r_wheel_front),
+                self.world.getDrawable(r_r - r_wheel_left - r_wheel_front),
+            ]
+            pygame.draw.polygon(screen, DARK_GREY, rear_right_wheel)
+            pygame.draw.polygon(screen, BLACK,     rear_right_wheel, 1)
 
     def drawExtra(self):
         if self.stopped:

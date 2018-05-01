@@ -1,7 +1,7 @@
 from util import *
 
 from world import World
-from pregen_0 import roads, entry_roads, intersections, \
+from pregen_4 import roads, entry_roads, intersections, \
                      grass, world_width, world_height
 
 INCLUDE_CAPTION = True

@@ -3,7 +3,7 @@ from util import *
 from obstacle import Obstacle
 from car import Car
 from controller import CarController
-from road_network import TrafficLights
+from road_network import TrafficLights, IntersectionRoad
 
 MAX_GHOSTS = 50
 
@@ -72,6 +72,9 @@ class World:
 
     def addCar(self, time):
         random.shuffle(self.entry_roads)
+
+        # make it so that car is added behind the previous car,
+        # instead of just checking to see if the position is clear
 
         colour = GREY
         name   = "default"
@@ -155,21 +158,38 @@ class World:
             self.ghosts.popleft()
 
     def sendMessages(self):
-        messages = {SEND_TO_ALL: []}
-        for controller in self.controllers:
-            messages[controller.name] = []
+        messages = {}#SEND_TO_ALL: []}
+        for recv in self.controllers:
+            messages[recv.name] = []
 
         # send messages
-        for controller in self.controllers:
-            source = controller.name
-            for message in controller.sendMessages():
+        for sender in self.controllers:
+
+            for message in sender.sendMessages():
                 address, message_type, content = message
-                messages[address].append((source, message_type, content))
+                message = (sender.name, address, message_type, content)
+
+                if address == SEND_TO_ALL:
+                    for recv in self.controllers:
+                        if sender == recv:
+                            continue
+                        messages[recv.name].append(message)
+
+                elif address == LINE_OF_SIGHT:
+                    for recv in self.controllers:
+                        if sender == recv:
+                            continue
+
+                        dist = (recv.car.centre - sender.car.centre).mag()
+                        if dist <= SIGHT_RADIUS:
+                            messages[recv.name].append(message)
+
+                elif address in messages:
+                    messages[address].append(message)
 
         # receive messages
         for controller in self.controllers:
-            address = controller.name
-            controller.receiveMessages(messages[SEND_TO_ALL], messages[address])
+            controller.receiveMessages(messages[controller.name])
 
     def scaleDistance(self, distance):
         return round(distance * self.scale)
@@ -228,6 +248,8 @@ class World:
         #    self.panning = False
         #    return
 
+        print(true_mouse_position)
+
         for car in self.cars:
             if car.checkInside(true_mouse_position):
                 self.selected_car = car
@@ -268,6 +290,7 @@ class World:
         for road in self.all_roads:
             start = self.getDrawable(road.start)
             end   = self.getDrawable(road.end)
+
             pygame.draw.line(self.screen, BLACK, start, end, 1)
 
         for intersection in self.traffic_controllers:
@@ -277,7 +300,7 @@ class World:
                 if light == RED_LIGHT:
                     continue
                 elif light == AMBER_LIGHT:
-                    colour = YELLOW
+                    colour = AMBER
                 else:
                     colour = GREEN
 
