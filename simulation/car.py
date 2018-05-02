@@ -54,6 +54,7 @@ class Car(Obstacle):
         self.angle    = angle    # radians
         self.time     = time     # miliseconds
         self.stopped  = False
+        self.generateHull()
 
         # motion
         self.engine_force     = MIN_ENGINE_FORCE # newtons
@@ -61,17 +62,15 @@ class Car(Obstacle):
         self.speed            = 0.0              # metres per second
 
         # control
-        self.route            = deque()
+        self.route            = deque() # modified by the controller
         self.desired_position = self.position
         self.desired_angle    = ANGLE_0
+        self.speed_limit      = -1
+        self.speed_timeout    = -1
+        self.desired_speed    = 0.0
 
-        self.desired_speed = 0.0
-        self.speed_timeout = -1
-
-        self.generateHull()
-
-        # modified by the controller
-        self.path = deque()
+        # visualisation
+        self.path = deque() # modified by the controller
 
     def copy(self):
         car = Car(self.world, self.name, self.colour,
@@ -121,6 +120,10 @@ class Car(Obstacle):
             print(self.name, "finished mission at time", self.time / 1000)
             self.world.successful_cars += 1
 
+    def limitSpeed(self, speed, timeout):
+        self.speed_limit   = speed
+        self.speed_timeout = self.time + timeout
+
     def crossingSpeed(self, instruction, dist_left):
         if instruction.checkLights() == GREEN_LIGHT:
             return MAX_SPEED
@@ -134,16 +137,17 @@ class Car(Obstacle):
 
 
     def updateRoute(self):
-        while self.route:
 
+        # find latest instruction
+        while self.route:
             instruction = self.route[0]
 
-            if isinstance(instruction, ChangeSpeed):
-                self.desired_speed = instruction.speed
-                self.speed_timeout = self.time + instruction.timeout
+            #if isinstance(instruction, ChangeSpeed):
+            #    self.desired_speed = instruction.speed
+            #    self.speed_timeout = self.time + instruction.timeout
 
-                self.route.popleft()
-                continue
+            #    self.route.popleft()
+            #    continue
 
             road     = instruction.road
             waypoint = instruction.waypoint
@@ -163,6 +167,7 @@ class Car(Obstacle):
 
             break
 
+        # check if car has reached the end of its route
         if not self.route:
             self.stop()
 
@@ -171,12 +176,18 @@ class Car(Obstacle):
             self.desired_position = self.position
             return
 
+        # set the car's current road
         self.road = road
 
-        if self.time >= self.speed_timeout:
-            dist_left = wayp_dist - self_dist - CAR_LENGTH/2
-            self.desired_speed = self.crossingSpeed(instruction, dist_left)
+        # find desired speed
+        dist_left = wayp_dist - self_dist - CAR_LENGTH/2
+        speed     = self.crossingSpeed(instruction, dist_left)
+        if self.time < self.speed_timeout:
+            self.desired_speed = min(speed, self.speed_limit)
+        else:
+            self.desired_speed = speed
 
+        # find desired position
         if self_dist + LOOK_AHEAD_DIST <= wayp_dist:
             look_ahead = (self_dist + LOOK_AHEAD_DIST) / wayp_dist
             self.desired_position = road.start + wayp_vec * look_ahead
@@ -205,6 +216,7 @@ class Car(Obstacle):
             else:
                 self.desired_position = waypoint
 
+        # find desired angle
         self.desired_angle = getAngle(self.desired_position - self.position)
 
         if AVOID_CIRCLES:

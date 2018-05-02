@@ -11,8 +11,8 @@ STEP_TIME         = TIME_STEP / 1000
 
 MAX_CARS = 40#30#12
 
-SCREEN_WIDTH  = 1200 # pixels
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH  = 1600 # pixels
+SCREEN_HEIGHT = 900
 
 # physics constants
 DRAG_CONSTANT    = 0.761

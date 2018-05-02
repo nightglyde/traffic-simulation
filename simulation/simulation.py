@@ -93,8 +93,8 @@ while not done:
             if event.key == pygame.K_ESCAPE:
                 world.resetZoom()
 
-        elif event.type == pygame.USEREVENT:
-            paused = True
+        #elif event.type == pygame.USEREVENT:
+        #    paused = True
 
 
     # update world

@@ -99,7 +99,18 @@ class TrafficLights:
         self.num_inputs = len(intersection.inputs)
         self.input_num  = 0
 
-        self.offset    = random.randint(0, CYCLE_DURATION-1)
+        self.batches = []
+        for entrance in range(self.num_inputs):
+
+            batch = []
+            for exit in intersection.connections[entrance]:
+                batch.append((entrance, exit))
+            right_exit = intersection.connections[entrance][RIGHT]
+            batch.append((right_exit, entrance))
+
+            self.batches.append(batch)
+
+        self.offset = random.randint(0, CYCLE_DURATION-1)
 
         self.phase = RED_LIGHT
 
@@ -127,7 +138,14 @@ class TrafficLights:
 
                 self.input_num = (self.input_num + 1) % self.num_inputs
 
-                for pair in self.lights:
-                    if pair[0] == self.input_num:
-                        self.lights[pair] = GREEN_LIGHT
+                for pair in self.batches[self.input_num]:
+                    self.lights[pair] = GREEN_LIGHT
+
+                #for pair in self.lights:
+                #    if pair[0] == self.input_num:
+                #        self.lights[pair] = GREEN_LIGHT
+
+                #right_exit = self.intersection.connections[self.input_num][RIGHT]
+
+                #self.lights[(right_exit, self.input_num)] = GREEN_LIGHT
 

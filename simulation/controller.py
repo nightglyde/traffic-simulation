@@ -124,6 +124,43 @@ class CarController:
         max_speed = calculateMaxSpeed(stop_distB, self.car.speed)
         return max_speed#True, max_speed
 
+    def checkCarsAhead(self):
+        # find people on your route
+        distB = self.car.road.getDistanceAlong(self.car.centre)
+
+        distance = 0
+        options = []
+        for instruction in self.route:
+            if not isinstance(instruction, ChangeSpeed):
+                road = instruction.road
+
+                for car_name in self.car_status:
+                    posA, angleA, speedA, roadA = self.car_status[car_name]
+
+                    if road == roadA:
+                        distA = distance + roadA.getDistanceAlong(posA)
+                        if distA > distB:
+                            options.append((distA, speedA))
+                #if options:
+                #    break
+                distance += road.length
+
+        if not options:#else:
+            # there's no one on your route
+            return MAX_SPEED
+
+        options.sort()
+        distA, speedA = options[0]
+
+        dist_apart = distA - distB
+
+        if dist_apart <= 0:
+            # either they're behind you, or they're already crashed into you
+            return MAX_SPEED
+
+        return self.followCar(dist_apart, speedA)
+
+
     def sendMessages(self):
         if self.car.stopped:
             return []
@@ -160,42 +197,12 @@ class CarController:
                 #if following:
                 #    next_speed = min(next_speed, speed_choice)
 
-        # find people on your route
-        distB = self.car.road.getDistanceAlong(self.car.centre)
-
-        distance = 0
-        options = []
-        for instruction in self.route:
-            if not isinstance(instruction, ChangeSpeed):
-                road = instruction.road
-
-                for car_name in self.car_status:
-                    posA, angleA, speedA, roadA = self.car_status[car_name]
-
-                    if road == roadA:
-                        distA = distance + roadA.getDistanceAlong(posA)
-                        if distA > distB:
-                            options.append((distA, speedA))
-                if options:
-                    break
-                distance += road.length
-        else:
-            # there's no one on your route
-            return
-
-        options.sort()
-        distA, speedA = options[0]
-
-        dist_apart = distA - distB
-
-        if dist_apart <= 0:
-        #    # either they're behind you, or they're already crashed into you
-            return
-
-        next_speed = min(MAX_SPEED, self.followCar(dist_apart, speedA))
+        next_speed = min(MAX_SPEED, self.checkCarsAhead())
 
         if next_speed < MAX_SPEED:
-            self.route.appendleft(ChangeSpeed(next_speed, 1000))
+            self.car.limitSpeed(next_speed, 1000)
+
+            #self.route.appendleft(ChangeSpeed(next_speed, 1000))
 
     def drawRoute(self):
         screen = self.world.screen
