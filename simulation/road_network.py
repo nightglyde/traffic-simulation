@@ -8,7 +8,7 @@ class Road:
         self.setup()
 
         self.next_road = None
-        self.turn      = None
+        self.next_turn = None
 
     def setup(self):
         self.vec    = self.end - self.start
@@ -19,7 +19,7 @@ class Road:
         self.next_road = next_road
 
     def setTurn(self, turn):
-        self.turn = turn
+        self.next_turn = turn
 
     def getDistanceAlong(self, car_position):
         car_vec  = car_position - self.start

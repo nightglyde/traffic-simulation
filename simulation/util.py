@@ -11,8 +11,8 @@ STEP_TIME         = TIME_STEP / 1000
 
 MAX_CARS = 40#30#12
 
-SCREEN_WIDTH  = 1600 # pixels
-SCREEN_HEIGHT = 900
+SCREEN_WIDTH  = 1200 # pixels
+SCREEN_HEIGHT = 800
 
 # physics constants
 DRAG_CONSTANT    = 0.761
@@ -416,12 +416,12 @@ def calculateStopDistance(speed):
         return 0
     return (speed**2) / (2 * BRAKING_DECEL)
 
-def getTurningCircle(direction, car, radius=TURN_RADIUS):
+def getTurningCircle(direction, position, angle, radius=TURN_RADIUS):
     if direction == LEFT:
-        centre_vector = getVector(car.angle - ANGLE_90) * radius
+        centre_vector = getVector(angle - ANGLE_90) * radius
     else:
-        centre_vector = getVector(car.angle + ANGLE_90) * radius
-    return car.position + centre_vector
+        centre_vector = getVector(angle + ANGLE_90) * radius
+    return position + centre_vector
 
 def sign(n):
     return (n > 0) - (n < 0)

@@ -2,15 +2,15 @@ from util import *
 
 from obstacle import Obstacle
 
-from controller import FollowRoad, ChangeSpeed, EnterIntersection
+from controller import FollowRoad, EnterIntersection
 
-AVOID_CIRCLES = False
+#AVOID_CIRCLES = False
 SHOW_WHEELS   = True
 SHOW_LIGHTS   = True
 
 STEERING_RATE = 2*math.pi * 0.3#0.5#0.1
 
-LOOK_AHEAD_DIST = 3#TURN_RADIUS
+#LOOK_AHEAD_DIST = 3#TURN_RADIUS
 
 def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     ang_diff = (desired_car_angle - car_angle).value
@@ -43,13 +43,13 @@ def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     return wheel_angle
 
 class Car(Obstacle):
-    def __init__(self, world, name, colour, road, position, angle, time):
+    def __init__(self, world, name, colour, position, angle, time):
         self.world  = world
         self.name   = name
         self.colour = colour
 
         # status
-        self.road     = road
+        #self.road     = road
         self.position = position # metres
         self.angle    = angle    # radians
         self.time     = time     # miliseconds
@@ -62,35 +62,17 @@ class Car(Obstacle):
         self.speed            = 0.0              # metres per second
 
         # control
-        self.route            = deque() # modified by the controller
+        #self.route            = deque() # modified by the controller
         self.desired_position = self.position
         self.desired_angle    = ANGLE_0
-        self.speed_limit      = -1
-        self.speed_timeout    = -1
+        #self.speed_limit      = -1
+        #self.speed_timeout    = -1
         self.desired_speed    = 0.0
+
+        self.next_turn = CENTRE
 
         # visualisation
         self.path = deque() # modified by the controller
-
-    def copy(self):
-        car = Car(self.world, self.name, self.colour,
-                  self.road, self.position, self.angle, self.time)
-
-        # status
-        car.stopped = self.stopped
-
-        # motion
-        car.engine_force     = self.engine_force
-        car.wheel_angle      = self.wheel_angle
-        car.speed            = self.speed
-
-        # control
-        car.route         = self.route.copy()
-        car.desired_angle = self.desired_angle
-        car.desired_speed = self.desired_speed
-
-        car.generateHull()
-        return car
 
     def generateHull(self):
         forward  = getVector(self.angle)
@@ -124,6 +106,14 @@ class Car(Obstacle):
         self.speed_limit   = speed
         self.speed_timeout = self.time + timeout
 
+    def getNextTurn(self):
+        for instruction in self.route:
+            turn = instruction.turn
+            if turn != None:
+                return turn
+
+        return CENTRE
+
     def crossingSpeed(self, instruction, dist_left):
         if instruction.checkLights() == GREEN_LIGHT:
             return MAX_SPEED
@@ -137,20 +127,10 @@ class Car(Obstacle):
 
 
     def updateRoute(self):
-
         # find latest instruction
         while self.route:
             instruction = self.route[0]
-
-            #if isinstance(instruction, ChangeSpeed):
-            #    self.desired_speed = instruction.speed
-            #    self.speed_timeout = self.time + instruction.timeout
-
-            #    self.route.popleft()
-            #    continue
-
-            road     = instruction.road
-            waypoint = instruction.waypoint
+            road = instruction.road
 
             road_vec = road.end - road.start
             road_len = road_vec.mag()
@@ -158,79 +138,64 @@ class Car(Obstacle):
             self_vec  = self.centre - road.start
             self_dist = dotProduct(self_vec, road.vec) / road.length
 
-            wayp_vec  = waypoint - road.start
-            wayp_dist = wayp_vec.mag()
-
-            if self_dist >= wayp_dist:
+            if self_dist >= road_len:
                 self.route.popleft()
                 continue
-
             break
 
         # check if car has reached the end of its route
         if not self.route:
-            self.stop()
+            return False
 
-            self.desired_speed    = 0.0
-            self.desired_angle    = self.angle
-            self.desired_position = self.position
-            return
-
-        # set the car's current road
+        # this isn't relevant to Car, only to Controller
         self.road = road
+        self.next_turn = self.getNextTurn() # although this is useful for .draw
 
         # find desired speed
-        dist_left = wayp_dist - self_dist - CAR_LENGTH/2
+        dist_left = road_len - self_dist - CAR_LENGTH/2
         speed     = self.crossingSpeed(instruction, dist_left)
         if self.time < self.speed_timeout:
-            self.desired_speed = min(speed, self.speed_limit)
+            desired_speed = min(speed, self.speed_limit)
         else:
-            self.desired_speed = speed
+            desired_speed = speed
 
         # find desired position
-        if self_dist + LOOK_AHEAD_DIST <= wayp_dist:
-            look_ahead = (self_dist + LOOK_AHEAD_DIST) / wayp_dist
-            self.desired_position = road.start + wayp_vec * look_ahead
+        look_ahead = self_dist + LOOK_AHEAD_DIST
+        for instruction in self.route:
+            road = instruction.road
+
+            road_vec = road.end - road.start
+            road_len = road_vec.mag()
+
+            if look_ahead <= road_len:
+                desired_position = road.start + road_vec * (look_ahead/road_len)
+                break
+
+            look_ahead -= road_len
 
         else:
-            dist_left = LOOK_AHEAD_DIST - (wayp_dist - self_dist)
-
-            for i in range(1, len(self.route)):
-                instruction = self.route[i]
-                if isinstance(instruction, ChangeSpeed):
-                    continue
-
-                next_waypoint = instruction.waypoint
-
-                wayp_vec  = next_waypoint - waypoint
-                wayp_dist = wayp_vec.mag()
-
-                if dist_left <= wayp_dist:
-                    look_ahead = dist_left / wayp_dist
-                    self.desired_position = waypoint + wayp_vec * look_ahead
-                    break
-
-                dist_left -= wayp_dist
-                waypoint   = next_waypoint
-
-            else:
-                self.desired_position = waypoint
+            desired_position = road.end
 
         # find desired angle
-        self.desired_angle = getAngle(self.desired_position - self.position)
+        desired_angle = getAngle(desired_position - self.position)
 
         if AVOID_CIRCLES:
-            angle_difference = self.desired_angle - self.angle
+            angle = self.angle
+            pos   = self.position
+
+            angle_difference = desired_angle - angle
             if angle_difference < ANGLE_0:
-                centre   = getTurningCircle(LEFT, self, TURN_RADIUS)
-                distance = (self.desired_position - centre).mag()
+                centre   = getTurningCircle(LEFT, pos, angle, TURN_RADIUS)
+                distance = (desired_position - centre).mag()
                 if distance < TURN_RADIUS:
-                    self.desired_angle = self.angle + ANGLE_90
+                    desired_angle = angle + ANGLE_90
             elif angle_difference > ANGLE_0:
-                centre   = getTurningCircle(RIGHT, self, TURN_RADIUS)
-                distance = (self.desired_position - centre).mag()
+                centre   = getTurningCircle(RIGHT, pos, angle, TURN_RADIUS)
+                distance = (desired_position - centre).mag()
                 if distance < TURN_RADIUS:
-                    self.desired_angle = self.angle - ANGLE_90
+                    desired_angle = angle - ANGLE_90
+
+        return desired_speed, desired_position, desired_angle
 
     def update(self, time):
         if self.stopped:
@@ -242,8 +207,6 @@ class Car(Obstacle):
 
         dt = (time - self.time) / 1000
         self.time = time
-
-        self.updateRoute()
 
         self.wheel_angle = getNextWheelAngle(self.desired_angle, self.angle,
                                              self.wheel_angle,   self.speed, dt)
@@ -289,19 +252,15 @@ class Car(Obstacle):
 
         self.generateHull()
 
-    def getNextTurn(self):
-        for instruction in self.route:
-            if isinstance(instruction, EnterIntersection):
-                return instruction.turn
+    def control(self, instructions):
+        if not instructions:
+            self.stop()
+            return
 
-            if isinstance(instruction, FollowRoad):
-                turn = instruction.road.turn
-
-                if turn != None:
-                    return turn
-
-        return CENTRE
-
+        self.desired_speed    = instructions[0]
+        self.desired_position = instructions[1]
+        self.desired_angle    = instructions[2]
+        self.next_turn        = instructions[3]
 
     def draw(self, selected=False):
         screen = self.world.screen
@@ -349,7 +308,7 @@ class Car(Obstacle):
 
         # draw lights
         if SHOW_LIGHTS and not self.stopped:
-            turn = self.getNextTurn()
+            #turn = self.getNextTurn()
 
             light_front = forward * LIGHT_FRONT
             light_back  = forward * LIGHT_BACK
@@ -358,6 +317,7 @@ class Car(Obstacle):
             light_mid   = left * LIGHT_MID
             light_inner = left * LIGHT_INNER
 
+            # left headlight
             left_headlight = [
                 self.world.getDrawable(pos + light_front + light_mid),
                 self.world.getDrawable(pos + light_front + light_inner),
@@ -365,6 +325,10 @@ class Car(Obstacle):
                 self.world.getDrawable(pos + light_back  + light_mid),
             ]
 
+            pygame.draw.polygon(screen, LIGHT_YELLOW, left_headlight)
+            pygame.draw.polygon(screen, BLACK, left_headlight,  1)
+
+            # right headlight
             right_headlight = [
                 self.world.getDrawable(pos + light_front - light_inner),
                 self.world.getDrawable(pos + light_front - light_mid),
@@ -372,9 +336,10 @@ class Car(Obstacle):
                 self.world.getDrawable(pos + light_back  - light_inner),
             ]
 
-            pygame.draw.polygon(screen, LIGHT_YELLOW, left_headlight)
             pygame.draw.polygon(screen, LIGHT_YELLOW, right_headlight)
+            pygame.draw.polygon(screen, BLACK, right_headlight, 1)
 
+            # left turning signal
             left_turning_signal = [
                 self.world.getDrawable(pos + light_front + light_outer),
                 self.world.getDrawable(pos + light_front + light_mid),
@@ -382,6 +347,13 @@ class Car(Obstacle):
                 self.world.getDrawable(pos + light_back  + light_outer),
             ]
 
+            if self.next_turn == LEFT and (self.time % 1000) < 500:
+                pygame.draw.polygon(screen, AMBER, left_turning_signal)
+            else:
+                pygame.draw.polygon(screen, GREY, left_turning_signal)
+            pygame.draw.polygon(screen, BLACK, left_turning_signal,  1)
+
+            # right turning signal
             right_turning_signal = [
                 self.world.getDrawable(pos + light_front - light_mid),
                 self.world.getDrawable(pos + light_front - light_outer),
@@ -389,19 +361,10 @@ class Car(Obstacle):
                 self.world.getDrawable(pos + light_back  - light_mid),
             ]
 
-            if turn == LEFT and (self.time % 1000) < 500:
-                pygame.draw.polygon(screen, AMBER, left_turning_signal)
-            else:
-                pygame.draw.polygon(screen, GREY, left_turning_signal)
-
-            if turn == RIGHT and (self.time % 1000) < 500:
+            if self.next_turn == RIGHT and (self.time % 1000) < 500:
                 pygame.draw.polygon(screen, AMBER, right_turning_signal)
             else:
                 pygame.draw.polygon(screen, GREY, right_turning_signal)
-
-            pygame.draw.polygon(screen, BLACK, left_headlight,  1)
-            pygame.draw.polygon(screen, BLACK, right_headlight, 1)
-            pygame.draw.polygon(screen, BLACK, left_turning_signal,  1)
             pygame.draw.polygon(screen, BLACK, right_turning_signal, 1)
 
         # draw wheels

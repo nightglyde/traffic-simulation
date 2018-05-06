@@ -84,7 +84,7 @@ class World:
             pos   = road.start
             angle = getAngle(road.end - pos)
 
-            car = Car(self, name, colour, road, pos, angle, time)
+            car = Car(self, name, colour, pos, angle, time)
 
             for existing_car in self.cars:
                 if car.checkCollision(existing_car):
@@ -95,7 +95,7 @@ class World:
                 car.colour = colour
                 car.name   = name
 
-                self.controllers.append(CarController(car))
+                self.controllers.append(CarController(car, road))
                 self.cars.append(car)
                 return
 
@@ -116,8 +116,8 @@ class World:
 
                 dist = (car_i.position - car_j.position).mag()
                 if dist < 10 and car_i.checkCollision(car_j):
-                        car_i.crash(car_j)
-                        car_j.crash(car_i)
+                    car_i.crash(car_j)
+                    car_j.crash(car_i)
 
         get_new_focus = False
         i = 0
@@ -139,7 +139,7 @@ class World:
                 self.resetZoom()
 
         for controller in self.controllers:
-            controller.update()
+            controller.update(time)
 
         for grass in self.grass:
             for car in self.cars:
