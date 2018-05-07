@@ -2,15 +2,12 @@ from util import *
 
 from obstacle import Obstacle
 
-from controller import FollowRoad, EnterIntersection
+#from controller import FollowRoad, EnterIntersection
 
-#AVOID_CIRCLES = False
-SHOW_WHEELS   = True
+SHOW_WHEELS   = False
 SHOW_LIGHTS   = True
 
-STEERING_RATE = 2*math.pi * 0.3#0.5#0.1
-
-#LOOK_AHEAD_DIST = 3#TURN_RADIUS
+STEERING_RATE = 2*math.pi * 0.3#0.3#0.5#0.1
 
 def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     ang_diff = (desired_car_angle - car_angle).value
@@ -49,7 +46,6 @@ class Car(Obstacle):
         self.colour = colour
 
         # status
-        #self.road     = road
         self.position = position # metres
         self.angle    = angle    # radians
         self.time     = time     # miliseconds
@@ -62,17 +58,16 @@ class Car(Obstacle):
         self.speed            = 0.0              # metres per second
 
         # control
-        #self.route            = deque() # modified by the controller
         self.desired_position = self.position
         self.desired_angle    = ANGLE_0
-        #self.speed_limit      = -1
-        #self.speed_timeout    = -1
         self.desired_speed    = 0.0
 
         self.next_turn = CENTRE
 
         # visualisation
         self.path = deque() # modified by the controller
+
+        self.random_offset = random.randint(1, 1000)
 
     def generateHull(self):
         forward  = getVector(self.angle)
@@ -99,103 +94,9 @@ class Car(Obstacle):
     def stop(self):
         if not self.stopped:
             self.stopped = True
-            print(self.name, "finished mission at time", self.time / 1000)
+            #print(self.name, "finished mission at time", self.time / 1000,
+            #      ", position", self.position)
             self.world.successful_cars += 1
-
-    def limitSpeed(self, speed, timeout):
-        self.speed_limit   = speed
-        self.speed_timeout = self.time + timeout
-
-    def getNextTurn(self):
-        for instruction in self.route:
-            turn = instruction.turn
-            if turn != None:
-                return turn
-
-        return CENTRE
-
-    def crossingSpeed(self, instruction, dist_left):
-        if instruction.checkLights() == GREEN_LIGHT:
-            return MAX_SPEED
-
-        max_speed = calculateMaxSpeed(dist_left, self.speed)
-        if self.speed < max_speed:
-            # you can't stop in time, so keep going and hope for the best
-            return MAX_SPEED
-
-        return max_speed
-
-
-    def updateRoute(self):
-        # find latest instruction
-        while self.route:
-            instruction = self.route[0]
-            road = instruction.road
-
-            road_vec = road.end - road.start
-            road_len = road_vec.mag()
-
-            self_vec  = self.centre - road.start
-            self_dist = dotProduct(self_vec, road.vec) / road.length
-
-            if self_dist >= road_len:
-                self.route.popleft()
-                continue
-            break
-
-        # check if car has reached the end of its route
-        if not self.route:
-            return False
-
-        # this isn't relevant to Car, only to Controller
-        self.road = road
-        self.next_turn = self.getNextTurn() # although this is useful for .draw
-
-        # find desired speed
-        dist_left = road_len - self_dist - CAR_LENGTH/2
-        speed     = self.crossingSpeed(instruction, dist_left)
-        if self.time < self.speed_timeout:
-            desired_speed = min(speed, self.speed_limit)
-        else:
-            desired_speed = speed
-
-        # find desired position
-        look_ahead = self_dist + LOOK_AHEAD_DIST
-        for instruction in self.route:
-            road = instruction.road
-
-            road_vec = road.end - road.start
-            road_len = road_vec.mag()
-
-            if look_ahead <= road_len:
-                desired_position = road.start + road_vec * (look_ahead/road_len)
-                break
-
-            look_ahead -= road_len
-
-        else:
-            desired_position = road.end
-
-        # find desired angle
-        desired_angle = getAngle(desired_position - self.position)
-
-        if AVOID_CIRCLES:
-            angle = self.angle
-            pos   = self.position
-
-            angle_difference = desired_angle - angle
-            if angle_difference < ANGLE_0:
-                centre   = getTurningCircle(LEFT, pos, angle, TURN_RADIUS)
-                distance = (desired_position - centre).mag()
-                if distance < TURN_RADIUS:
-                    desired_angle = angle + ANGLE_90
-            elif angle_difference > ANGLE_0:
-                centre   = getTurningCircle(RIGHT, pos, angle, TURN_RADIUS)
-                distance = (desired_position - centre).mag()
-                if distance < TURN_RADIUS:
-                    desired_angle = angle - ANGLE_90
-
-        return desired_speed, desired_position, desired_angle
 
     def update(self, time):
         if self.stopped:
@@ -252,17 +153,13 @@ class Car(Obstacle):
 
         self.generateHull()
 
-    def control(self, instructions):
-        if not instructions:
-            self.stop()
-            return
+    def control(self, speed, position, angle, turn):
+        self.desired_speed    = speed
+        self.desired_position = position
+        self.desired_angle    = angle
+        self.next_turn        = turn
 
-        self.desired_speed    = instructions[0]
-        self.desired_position = instructions[1]
-        self.desired_angle    = instructions[2]
-        self.next_turn        = instructions[3]
-
-    def draw(self, selected=False):
+    def draw(self, selected, paused):
         screen = self.world.screen
         pos    = self.position
 
@@ -272,19 +169,10 @@ class Car(Obstacle):
         # FOR SOME INSANE REASON, LEFT AND RIGHT ARE SWITCHED!!!
         # IT'S LIKE THIS FOR THE WHEELS TOO
 
-        if not self.stopped:
-            car_colour   = self.colour
-            line_colour  = BLACK
-        else:
-            car_colour   = LIGHT_GREY
-            line_colour  = GREY
-
-        # draw car
+        # car outline
         chassis = [self.world.getDrawable(point) for point in self.hull]
-        pygame.draw.polygon(screen, car_colour,  chassis)
-        pygame.draw.polygon(screen, line_colour, chassis, 1)
 
-        # draw arrow
+        # arrow outline
         stem_front = forward * ARROW_STEM_LENGTH
         stem_left  = left    * ARROW_STEM_WIDTH / 2
         head_front = forward * ARROW_LENGTH
@@ -297,78 +185,31 @@ class Car(Obstacle):
             self.world.getDrawable(pos + head_front            ),
             self.world.getDrawable(pos + stem_front - head_left),
             self.world.getDrawable(pos + stem_front - stem_left),
-            self.world.getDrawable(pos              - stem_left)]
+            self.world.getDrawable(pos              - stem_left),
+        ]
 
         if self.stopped:
+            # draw crashed car
+            pygame.draw.polygon(screen, LIGHT_GREY,  chassis)
+            pygame.draw.polygon(screen, GREY, chassis, 1)
             pygame.draw.polygon(screen, self.colour, arrow)
-        elif selected:
+            pygame.draw.polygon(screen, GREY, arrow, 1)
+            return
+
+        # draw active car
+        pygame.draw.polygon(screen, self.colour, chassis)
+        pygame.draw.polygon(screen, BLACK,       chassis, 1)
+        if selected:
             pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
+        pygame.draw.polygon(screen, BLACK, arrow, 1)
 
-        pygame.draw.polygon(screen, line_colour, arrow, 1)
-
-        # draw lights
-        if SHOW_LIGHTS and not self.stopped:
-            #turn = self.getNextTurn()
-
-            light_front = forward * LIGHT_FRONT
-            light_back  = forward * LIGHT_BACK
-
-            light_outer = left * LIGHT_OUTER
-            light_mid   = left * LIGHT_MID
-            light_inner = left * LIGHT_INNER
-
-            # left headlight
-            left_headlight = [
-                self.world.getDrawable(pos + light_front + light_mid),
-                self.world.getDrawable(pos + light_front + light_inner),
-                self.world.getDrawable(pos + light_back  + light_inner),
-                self.world.getDrawable(pos + light_back  + light_mid),
-            ]
-
-            pygame.draw.polygon(screen, LIGHT_YELLOW, left_headlight)
-            pygame.draw.polygon(screen, BLACK, left_headlight,  1)
-
-            # right headlight
-            right_headlight = [
-                self.world.getDrawable(pos + light_front - light_inner),
-                self.world.getDrawable(pos + light_front - light_mid),
-                self.world.getDrawable(pos + light_back  - light_mid),
-                self.world.getDrawable(pos + light_back  - light_inner),
-            ]
-
-            pygame.draw.polygon(screen, LIGHT_YELLOW, right_headlight)
-            pygame.draw.polygon(screen, BLACK, right_headlight, 1)
-
-            # left turning signal
-            left_turning_signal = [
-                self.world.getDrawable(pos + light_front + light_outer),
-                self.world.getDrawable(pos + light_front + light_mid),
-                self.world.getDrawable(pos + light_back  + light_mid),
-                self.world.getDrawable(pos + light_back  + light_outer),
-            ]
-
-            if self.next_turn == LEFT and (self.time % 1000) < 500:
-                pygame.draw.polygon(screen, AMBER, left_turning_signal)
-            else:
-                pygame.draw.polygon(screen, GREY, left_turning_signal)
-            pygame.draw.polygon(screen, BLACK, left_turning_signal,  1)
-
-            # right turning signal
-            right_turning_signal = [
-                self.world.getDrawable(pos + light_front - light_mid),
-                self.world.getDrawable(pos + light_front - light_outer),
-                self.world.getDrawable(pos + light_back  - light_outer),
-                self.world.getDrawable(pos + light_back  - light_mid),
-            ]
-
-            if self.next_turn == RIGHT and (self.time % 1000) < 500:
-                pygame.draw.polygon(screen, AMBER, right_turning_signal)
-            else:
-                pygame.draw.polygon(screen, GREY, right_turning_signal)
-            pygame.draw.polygon(screen, BLACK, right_turning_signal, 1)
+        #font = pygame.font.SysFont('Helvetica', 12, bold=True)
+        #text = font.render(self.name, False, BLACK)
+        #rect = text.get_rect(center=self.world.getDrawable(self.centre))
+        #screen.blit(text, rect)
 
         # draw wheels
-        if SHOW_WHEELS and not self.stopped:
+        if SHOW_WHEELS and self.world.scale >= 5:
             wheel_forward = getVector(self.angle + self.wheel_angle)
 
             f_wheel_front = wheel_forward          * WHEEL_LENGTH / 2
@@ -425,6 +266,104 @@ class Car(Obstacle):
             pygame.draw.polygon(screen, DARK_GREY, rear_right_wheel)
             pygame.draw.polygon(screen, BLACK,     rear_right_wheel, 1)
 
+        # draw lights
+        if SHOW_LIGHTS:
+
+            turning_signal_on = paused or (self.time % 1000) < 500
+
+            if self.next_turn != CENTRE:
+
+                light_front = forward * (PIVOT_TO_CENTRE + 0.5)
+                light_mid   = forward * (PIVOT_TO_CENTRE)
+                light_back  = forward * (PIVOT_TO_CENTRE - 0.5)
+
+                light_outer = left * (CAR_WIDTH/2 + 1)
+                light_inner = left * (CAR_WIDTH/2 + 0.5)
+
+                if self.next_turn == LEFT:
+                    left_arrow = [
+                        self.world.getDrawable(pos + light_front + light_inner),
+                        self.world.getDrawable(pos + light_mid   + light_outer),
+                        self.world.getDrawable(pos + light_back  + light_inner),
+                    ]
+                    pygame.draw.polygon(screen, AMBER, left_arrow)
+                    pygame.draw.polygon(screen, BLACK, left_arrow, 1)
+
+                if self.next_turn == RIGHT:
+                    right_arrow = [
+                        self.world.getDrawable(pos + light_front - light_inner),
+                        self.world.getDrawable(pos + light_mid   - light_outer),
+                        self.world.getDrawable(pos + light_back  - light_inner),
+                    ]
+                    pygame.draw.polygon(screen, AMBER, right_arrow)
+                    pygame.draw.polygon(screen, BLACK, right_arrow, 1)
+
+            #if self.world.scale >= 15:
+
+            #    light_front = forward * LIGHT_FRONT
+            #    light_back  = forward * LIGHT_BACK
+
+            #    light_outer = left * LIGHT_OUTER
+            #    light_mid   = left * LIGHT_MID
+            #    light_inner = left * LIGHT_INNER
+
+            #    # left headlight
+            #    left_headlight = [
+            #        self.world.getDrawable(pos + light_front + light_mid),
+            #        self.world.getDrawable(pos + light_front + light_inner),
+            #        self.world.getDrawable(pos + light_back  + light_inner),
+            #        self.world.getDrawable(pos + light_back  + light_mid),
+            #    ]
+
+            #    pygame.draw.polygon(screen, LIGHT_YELLOW, left_headlight)
+            #    pygame.draw.polygon(screen, BLACK, left_headlight,  1)
+
+            #    # right headlight
+            #    right_headlight = [
+            #        self.world.getDrawable(pos + light_front - light_inner),
+            #        self.world.getDrawable(pos + light_front - light_mid),
+            #        self.world.getDrawable(pos + light_back  - light_mid),
+            #        self.world.getDrawable(pos + light_back  - light_inner),
+            #    ]
+
+            #    pygame.draw.polygon(screen, LIGHT_YELLOW, right_headlight)
+            #    pygame.draw.polygon(screen, BLACK, right_headlight, 1)
+
+            #    # left turning signal
+            #    left_turning_signal = [
+            #        self.world.getDrawable(pos + light_front + light_outer),
+            #        self.world.getDrawable(pos + light_front + light_mid),
+            #        self.world.getDrawable(pos + light_back  + light_mid),
+            #        self.world.getDrawable(pos + light_back  + light_outer),
+            #    ]
+
+            #    if self.next_turn == LEFT and turning_signal_on:
+            #        pygame.draw.polygon(screen, AMBER, left_turning_signal)
+            #    else:
+            #        pygame.draw.polygon(screen, GREY, left_turning_signal)
+            #    pygame.draw.polygon(screen, BLACK, left_turning_signal,  1)
+
+            #    # right turning signal
+            #    right_turning_signal = [
+            #        self.world.getDrawable(pos + light_front - light_mid),
+            #        self.world.getDrawable(pos + light_front - light_outer),
+            #        self.world.getDrawable(pos + light_back  - light_outer),
+            #        self.world.getDrawable(pos + light_back  - light_mid),
+            #    ]
+
+            #    if self.next_turn == RIGHT and turning_signal_on:
+            #        pygame.draw.polygon(screen, AMBER, right_turning_signal)
+            #    else:
+            #        pygame.draw.polygon(screen, GREY, right_turning_signal)
+            #    pygame.draw.polygon(screen, BLACK, right_turning_signal, 1)
+
+        #stop_dist = getStopDistance(self.speed)
+        #point = self.world.getDrawable(self.rear + forward * stop_dist)
+        #pygame.draw.circle(screen, DARKER[car_colour], point,  3)
+
+        #point = self.world.getDrawable(self.rear + forward * (stop_dist-2))
+        #pygame.draw.circle(screen, DARKER[car_colour], point,  3)
+
     def drawExtra(self):
         if self.stopped:
             return
@@ -471,6 +410,7 @@ class Car(Obstacle):
 
     def drawPath(self):
         if len(self.path) > 1:
+            colour = LIGHTER[self.colour]
             path = [self.world.getDrawable(point) for point in self.path]
-            pygame.draw.lines(self.world.screen, GREY, False, path, 1)
+            pygame.draw.lines(self.world.screen, colour, False, path, 3)
 

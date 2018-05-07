@@ -1,9 +1,14 @@
 from util import *
 
+################
+# Road Objects #
+################
+
 class Road:
-    def __init__(self, start, end):
-        self.start = start
-        self.end   = end
+    def __init__(self, start, end, danger):
+        self.start  = start
+        self.end    = end
+        self.danger = danger
 
         self.setup()
 
@@ -35,9 +40,10 @@ class Road:
         return "Road({}, {})".format(self.start, self.end)
 
 class IntersectionRoad(Road):
-    def __init__(self, start, end):
-        self.start = start
-        self.end   = end
+    def __init__(self, start, end, danger):
+        self.start  = start
+        self.end    = end
+        self.danger = danger
 
         self.setup()
 
@@ -78,8 +84,6 @@ class Intersection:
         for road in path:
             road.setTurn(turn)
 
-        #self.connections[entrance].append(exit)
-
     def __eq__(self, other):
         if isinstance(other, Intersection):
             return self.id == other.id
@@ -87,6 +91,65 @@ class Intersection:
 
     def __hash__(self):
         return hash(self.id)
+
+######################
+# Route Instructions #
+######################
+
+class FollowRoad:
+    def __init__(self, road):
+        self.road      = road
+        self.turn      = road.next_turn
+        self.next_road = road.next_road
+
+        self.danger = road.danger
+
+    def checkLights(self):
+        return GREEN_LIGHT
+
+    def getNextRoad(self):
+        return self.next_road
+
+    def __repr__(self):
+        return "FollowRoad({})".format(self.road)
+
+class EnterIntersection:
+    def __init__(self, road, turn):
+        self.road       = road
+        self.turn       = turn
+        self.controller = None
+
+        exit = road.getExit(turn)
+        self.pair      = (road.input_index, exit)
+        self.next_road = road.getPath(exit)[0]
+
+        self.danger = road.danger
+
+    def setController(self, controller):
+        self.controller = controller
+
+    def checkLights(self):
+        if self.controller != None:
+            return self.controller.lights[self.pair]
+        return RED_LIGHT
+
+    def getNextRoad(self):
+        return self.next_road
+
+    def __repr__(self):
+        turn = self.turn
+        if turn == LEFT:
+            turn = "LEFT"
+        elif turn == RIGHT:
+            turn = "RIGHT"
+        else:
+            turn = "CENTRE"
+
+        return "EnterIntersection({})".format(self.road, turn)
+
+#######################
+# Traffic Controllers #
+#######################
 
 class TrafficLights:
     def __init__(self, intersection):

@@ -1,68 +1,36 @@
 from util import *
 
-from road_network import IntersectionRoad
+from road_network import IntersectionRoad, FollowRoad, EnterIntersection
 
-PATH_MEMORY = 50
+PATH_MEMORY = 10#50
 
 MIN_ROUTE_PIECES = 20
 
 LOOK_AHEAD_DIST = 3
 AVOID_CIRCLES   = False
 
-class FollowRoad:
-    def __init__(self, road, speed):
-        self.road     = road
-        self.waypoint = road.end
-        self.speed    = speed
-
-        self.turn = road.next_turn
-
-        self.next_road = road.next_road
-
-    def checkLights(self):
-        return GREEN_LIGHT
-
-    def getNextRoad(self):
-        return self.next_road
-
-class EnterIntersection(FollowRoad):
-    def __init__(self, road, speed, controller, turn):
-        self.road     = road
-        self.waypoint = road.end
-        self.speed    = speed
-
-        self.controller = controller
-        self.turn       = turn
-
-        exit = road.getExit(turn)
-        self.pair      = (road.input_index, exit)
-        self.next_road = road.getPath(exit)[0]
-
-    def checkLights(self):
-        return self.controller.lights[self.pair]
+BEFORE_INTERSECTION = 0
+DURING_INTERSECTION = 1
+DURING_TURN         = 2
+AFTER_TURN          = 3
 
 class CarController:
-    def __init__(self, car, road):
+    def __init__(self, car, road, route):
         self.car  = car
-        self.road = road
-        self.time = car.time
-
-        self.route         = deque()
-        self.speed_limit   = -1
-        self.speed_timeout = -1
 
         self.world  = car.world
         self.name   = car.name
         self.colour = car.colour
+        self.time   = car.time
+
+        self.route      = deque(route)
+        self.road       = route[0].road
+        self.dist_along = road.getDistanceAlong(self.car.centre)
 
         self.path = car.path
         self.path.append(self.car.position)
 
-        self.messages = []
-        self.car_status = {}
-
-        self.addInstruction(self.road)
-        self.generateRoute()
+        self.knowledge = {}
 
     def addInstruction(self, road):
         if isinstance(road, IntersectionRoad):
@@ -72,12 +40,12 @@ class CarController:
                     break
 
             controller = self.world.traffic_controllers[road.intersection]
-            instruction = EnterIntersection(road, MAX_SPEED,
-                                            controller, turn)
+            instruction = EnterIntersection(road, turn)
+            instruction.setController(controller)
+            self.route.append(instruction)
         else:
-            instruction = FollowRoad(road, MAX_SPEED)
-
-        self.route.append(instruction)
+            instruction = FollowRoad(road)
+            self.route.append(instruction)
 
     def generateRoute(self):
         if not self.route:
@@ -89,73 +57,131 @@ class CarController:
                 return
             self.addInstruction(road)
 
-    def limitSpeed(self, speed, timeout):
-        self.speed_limit   = speed
-        self.speed_timeout = self.time + timeout
+    def followCar(self, dist_apart, speedA):
 
-    def getNextTurn(self):
-        for instruction in self.route:
-            turn = instruction.turn
-            if turn != None:
-                return turn
+        stop_distA = getStopDistance(speedA)
+        stop_distB = dist_apart + stop_distA - CAR_LENGTH - SAFETY_GAP
 
-        return CENTRE
+        if stop_distB <= 0:
+            #print("TOO CLOSE", self.name, dist_apart)
+            return 0
 
-    def crossingSpeed(self, instruction, dist_left):
-        if instruction.checkLights() == GREEN_LIGHT:
-            return MAX_SPEED
-
-        speed = self.car.speed
-        max_speed = calculateMaxSpeed(dist_left, speed)
-        if speed < max_speed:
-            # you can't stop in time, so keep going and hope for the best
-            return MAX_SPEED
-
+        max_speed = getSpeedToStop(stop_distB, self.car.speed)
         return max_speed
 
-    def updateRoute(self):
-        # find latest instruction
-        while self.route:
-            instruction = self.route[0]
+    def checkCarsAhead(self):
+        # find people on your route
+        cars_ahead   = []
+        cars_turning = []
+
+        distB = self.dist_along
+
+        cars_left = set(self.knowledge.keys())
+        distance  = 0
+
+        entrance_distance = None
+        exit_distance     = None
+
+        turn_status = BEFORE_INTERSECTION
+        for instruction in self.route:
+
+            if turn_status == BEFORE_INTERSECTION:
+                if isinstance(instruction, EnterIntersection):
+                    turn_status = DURING_INTERSECTION
+            elif turn_status == DURING_INTERSECTION:
+                if isinstance(instruction, FollowRoad):
+                    turn_status = DURING_TURN
+                    entrance_distance = distance
+            elif turn_status == DURING_TURN:
+                if not instruction.danger:
+                    turn_status = AFTER_TURN
+                    exit_distance = distance
+            elif turn_status == AFTER_TURN:
+                if instruction.danger:
+                    break
+
             road = instruction.road
+            cars_done = set()
+            for car_name in cars_left:
+                speedA, roadA, distA, turnA = self.knowledge[car_name]
 
-            road_vec = road.end - road.start
-            road_len = road_vec.mag()
+                if road == roadA:
+                    cars_done.add(car_name)
+                    distA += distance
+                    if distA > distB:
+                        cars_ahead.append((distA, speedA, car_name))
 
-            self_vec  = self.car.centre - road.start
-            self_dist = dotProduct(self_vec, road.vec) / road.length
+                        if turn_status == DURING_INTERSECTION:
+                            if turnA == instruction.turn:
+                                cars_turning.append((distA, speedA, car_name))
+                        elif turn_status == DURING_TURN:
+                            cars_turning.append((distA, speedA, car_name))
+                        elif turn_status == AFTER_TURN:
+                            cars_turning.append((distA, speedA, car_name))
 
-            if self_dist >= road_len:
-                self.route.popleft()
-                continue
-            break
+            cars_left -= cars_done
+            distance  += road.length
 
-        # check if car has reached the end of its route
-        if not self.route:
-            return False
+            if not cars_left:
+                break
 
-        # save the current road
-        self.road = road
-        self.next_turn = self.getNextTurn()
+        if not cars_ahead:
+            return MAX_SPEED
 
-        # find desired speed
-        dist_left = road_len - self_dist - CAR_LENGTH/2
-        speed     = self.crossingSpeed(instruction, dist_left)
-        if self.time < self.speed_timeout:
-            desired_speed = min(speed, self.speed_limit)
+        cars_ahead.sort()
+
+        distA, speedA, car_name = cars_ahead[0]
+        following_speed = self.followCar(distA - self.dist_along, speedA)
+
+        if (not cars_turning) or (exit_distance == None):
+            return following_speed
+
+        cars_turning.sort()
+
+        distA, speedA, car_name = cars_turning[-1]
+        distA += getStopDistance(speedA)
+        safe_space = distA - exit_distance - CAR_LENGTH/2
+        # for some reason this gets different values for different turns...
+
+        cars_fit = safe_space / (CAR_LENGTH + SAFETY_GAP)
+
+        if cars_fit < 0:
+            return following_speed
+
+        #else:
+        #    print("#"+self.name, car_name, len(cars_turning), cars_fit, safe_space, self.time / 1000)
+
+        if cars_fit >= len(cars_turning):
+            return following_speed
+
+        dist_left = entrance_distance - self.dist_along - CAR_LENGTH/2
+        turn_speed = getSpeedToStop(dist_left, self.car.speed)
+        return min(following_speed, turn_speed)
+
+    def getDesiredSpeed(self):
+        if self.route[0].checkLights() == GREEN_LIGHT:
+            desired_speed = MAX_SPEED
+
         else:
-            desired_speed = speed
+            dist_left     = self.road.length - self.dist_along - CAR_LENGTH/2
+            speed         = self.car.speed
+            speed_to_stop = getSpeedToStop(dist_left, speed)
+            if speed < speed_to_stop:
+                # you can't stop in time, so keep going and hope for the best
+                desired_speed = MAX_SPEED
+            else:
+                desired_speed = speed_to_stop
 
-        # find desired position
-        look_ahead = self_dist + LOOK_AHEAD_DIST
+        return min(desired_speed, self.checkCarsAhead())
+
+    def getDesiredPosition(self):
+        look_ahead = self.dist_along + LOOK_AHEAD_DIST
         for instruction in self.route:
             road = instruction.road
-
-            road_vec = road.end - road.start
-            road_len = road_vec.mag()
+            road_len = road.length
 
             if look_ahead <= road_len:
-                desired_position = road.start + road_vec * (look_ahead/road_len)
+                desired_position = road.start + road.vec * (look_ahead/road_len)
                 break
 
             look_ahead -= road_len
@@ -163,7 +189,6 @@ class CarController:
         else:
             desired_position = road.end
 
-        # find desired angle
         desired_angle = getAngle(desired_position - self.car.position)
 
         if AVOID_CIRCLES:
@@ -182,7 +207,15 @@ class CarController:
                 if distance < TURN_RADIUS:
                     desired_angle = angle - ANGLE_90
 
-        return desired_speed, desired_position, desired_angle, self.next_turn
+        return desired_position, desired_angle
+
+    def getTurningSignal(self):
+        for instruction in self.route:
+            turn = instruction.turn
+            if turn != None:
+                return turn
+
+        return CENTRE
 
     def update(self, time):
         if self.car.stopped:
@@ -196,95 +229,49 @@ class CarController:
 
         self.generateRoute()
 
-        self.car.control(self.updateRoute())
-
-    def followCar(self, dist_apart, speedA):
-
-        stop_distA = calculateStopDistance(speedA)
-        stop_distB = dist_apart + stop_distA - CAR_LENGTH - SAFETY_GAP
-
-        if stop_distB <= 0:
-            return 0
-
-        max_speed = calculateMaxSpeed(stop_distB, self.car.speed)
-        return max_speed
-
-    def checkCarsAhead(self):
-        # find people on your route
-        distB = self.road.getDistanceAlong(self.car.centre)
-
-        intersection_count = 0
-        is_intersection = False
-
-        distance = 0
-        options = []
-        options2 = []
-        for instruction in self.route:
-
-            if isinstance(instruction, EnterIntersection):
-                intersection_count += 1
-                is_intersection = True
-
-            else:
-                if intersection_count > 1:
-                    break
-                is_intersection = False
-
+        # update route
+        while self.route:
+            instruction = self.route[0]
             road = instruction.road
 
-            for car_name in self.car_status:
-                posA, angleA, speedA, roadA, turnA = self.car_status[car_name]
+            dist_along = road.getDistanceAlong(self.car.centre)
+            if dist_along >= road.length:
+                self.route.popleft()
+                continue
 
-                if road == roadA:
+            # save the current road
+            self.road       = road
+            self.dist_along = dist_along
+            break
 
-                    distA = distance + roadA.getDistanceAlong(posA)
-                    if distA > distB:
-                        options.append((distA, speedA))
+        # check if car has reached the end of its route
+        if not self.route:
+            self.car.stop()
+            return
 
-                        if is_intersection:
-                            if intersection_count == 1:
-                                if turnA == instruction.turn:
-                                    options2.append((distA, speedA))
-                            elif intersection_count == 2:
-                                options2.append((distA, speedA))
-                        else:
-                            if intersection_count == 1:
-                                options2.append((distA, speedA))
+        # generate control signal
+        desired_speed                   = self.getDesiredSpeed()
+        desired_position, desired_angle = self.getDesiredPosition()
+        self.next_turn                  = self.getTurningSignal()
 
-            distance += road.length
-
-        if not options:
-            # there's no one on your route
-            return MAX_SPEED
-
-        options.sort()
-        distA, speedA = options[0]
-
-        dist_apart = distA - distB
-
-        #if dist_apart <= 0:
-        #    # either they're behind you, or they're already crashed into you
-        #    return MAX_SPEED
-
-        return self.followCar(dist_apart, speedA)
-
+        self.car.control(desired_speed, desired_position,
+                         desired_angle, self.next_turn)
 
     def sendMessages(self):
+        messages = []
         if self.car.stopped:
-            return []
+            return messages
 
-        status = (self.car.centre, self.car.angle, self.car.speed,
-                  self.road, self.next_turn)
-        self.messages.append((LINE_OF_SIGHT, CURRENT_DETAILS, status))
-        return self.messages
+        status = (self.car.speed, self.road, self.dist_along, self.next_turn)
+        messages.append((LINE_OF_SIGHT, CURRENT_DETAILS, status))
+
+        return messages
 
     def receiveMessages(self, messages):
         if self.car.stopped:
             return
 
-        self.messages.clear()
-
-        self.car_status.clear()
+        self.knowledge.clear()
 
         next_speed = MAX_SPEED
         for message in messages:
@@ -294,23 +281,15 @@ class CarController:
                 continue
 
             elif message_type == CURRENT_DETAILS:
-                self.car_status[source] = content
-
-        next_speed = self.checkCarsAhead()
-        if next_speed < MAX_SPEED:
-            self.limitSpeed(next_speed, 1000)
+                self.knowledge[source] = content
 
     def drawRoute(self):
         screen = self.world.screen
         colour = self.colour
         for instruction in self.route:
-            if isinstance(instruction, ChangeSpeed):
-                continue
             road = instruction.road
-            waypoint = instruction.waypoint
             a = self.world.getDrawable(road.start)
             b = self.world.getDrawable(road.end)
-            w = self.world.getDrawable(waypoint)
             pygame.draw.line(screen,   LIGHTER[colour], a, b, 3)
-            pygame.draw.circle(screen, DARKER[colour],  w, 3, 2)
+            #pygame.draw.circle(screen, DARKER[colour],  w, 3, 2)
 

@@ -3,7 +3,7 @@ from util import *
 from obstacle import Obstacle
 from car import Car
 from controller import CarController
-from road_network import TrafficLights, IntersectionRoad
+from road_network import TrafficLights, IntersectionRoad, EnterIntersection
 
 MAX_GHOSTS = 50
 
@@ -26,6 +26,7 @@ class World:
 
         self.all_roads           = []
         self.entry_roads         = []
+        self.recent_cars         = []
         self.traffic_controllers = {}
 
         self.cars          = []
@@ -58,11 +59,13 @@ class World:
         self.panning      = False
         self.selected_car = None
 
-    def buildWorld(self, roads, entry_roads, intersections, grass):
-        self.all_roads   = roads
-        self.entry_roads = entry_roads
+    def buildWorld(self, roads, entry_roads, intersections, valid_routes, grass):
+        self.all_roads    = roads
+        self.entry_roads  = entry_roads
+        self.valid_routes = valid_routes
 
         # TODO: Switch between different types of traffic controllers
+
         for intersection in intersections:
             self.traffic_controllers[intersection] = TrafficLights(intersection)
 
@@ -70,34 +73,43 @@ class World:
             grass_area = Obstacle(self, "grass", LIGHT_GREEN, points)
             self.grass.append(grass_area)
 
+        for routes in valid_routes:
+            for route in routes:
+                for instruction in route:
+                    if isinstance(instruction, EnterIntersection):
+                        intersection = instruction.road.intersection
+                        controller = self.traffic_controllers[intersection]
+                        instruction.setController(controller)
+
+        for i in range(len(entry_roads)):
+            self.recent_cars.append(None)
+
     def addCar(self, time):
-        random.shuffle(self.entry_roads)
+        i = random.randint(0, len(self.entry_roads)-1)
+        road       = self.entry_roads[i]
+        recent_car = self.recent_cars[i]
 
-        # make it so that car is added behind the previous car,
-        # instead of just checking to see if the position is clear
+        if recent_car != None:
+            dist_along = road.getDistanceAlong(recent_car.position)
 
-        colour = GREY
-        name   = "default"
-
-        for road in self.entry_roads:
-
-            pos   = road.start
-            angle = getAngle(road.end - pos)
-
-            car = Car(self, name, colour, pos, angle, time)
-
-            for existing_car in self.cars:
-                if car.checkCollision(existing_car):
-                    break
-
+            if dist_along >= CAR_LENGTH + SAFETY_GAP:
+                pos = road.start
             else:
-                colour, name = next(self.car_generator)
-                car.colour = colour
-                car.name   = name
+                dist = dist_along - CAR_LENGTH - SAFETY_GAP
+                pos = road.start + road.vec * (dist / road.length)
 
-                self.controllers.append(CarController(car, road))
-                self.cars.append(car)
-                return
+        else:
+            pos = road.start
+
+        colour, name = next(self.car_generator)
+        angle        = road.angle
+
+        car = Car(self, name, colour, pos, angle, time)
+        self.cars.append(car)
+        self.recent_cars[i] = car
+
+        route = random.choice(self.valid_routes[i])
+        self.controllers.append(CarController(car, road, route))
 
     def update(self, time):
         for intersection in self.traffic_controllers:
@@ -248,8 +260,6 @@ class World:
         #    self.panning = False
         #    return
 
-        print(true_mouse_position)
-
         for car in self.cars:
             if car.checkInside(true_mouse_position):
                 self.selected_car = car
@@ -273,7 +283,7 @@ class World:
     def stopPan(self):
         self.panning = False
 
-    def draw(self):
+    def draw(self, paused):
         if self.panning:
             self.updatePan(Vector(*pygame.mouse.get_pos()))
 
@@ -314,7 +324,7 @@ class World:
 
         for ghost in self.ghosts:
             #ghost.drawPath()
-            ghost.draw()
+            ghost.draw(False, paused)
 
         #for controller in self.controllers:
         #    controller.drawRoute()
@@ -326,7 +336,7 @@ class World:
         #    car.drawPath()
 
         for car in self.cars:
-            car.draw(car is self.selected_car)
+            car.draw(car is self.selected_car, paused)
             #car.drawExtra()
 
         #for car in self.cars:

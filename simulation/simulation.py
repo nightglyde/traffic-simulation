@@ -1,7 +1,7 @@
 from util import *
 
 from world import World
-from pregen_4 import roads, entry_roads, intersections, \
+from pregen_0 import roads, entry_roads, intersections, valid_routes,\
                      grass, world_width, world_height
 
 INCLUDE_CAPTION = True
@@ -17,7 +17,7 @@ clock  = pygame.time.Clock()
 world = World(screen, world_width, world_height)
 
 # build world
-world.buildWorld(roads, entry_roads, intersections, grass)
+world.buildWorld(roads, entry_roads, intersections, valid_routes, grass)
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
@@ -63,8 +63,10 @@ while not done:
         string  = "Car Simulator | FPS: {}".format(fps)
         string += " | Score: {} | Crash: {} | Active cars: {}".format(
             world.successful_cars, world.crashed_cars, len(world.cars))
+        string += " | T: {}".format(world_time/1000)
         if paused:
             string += " | PAUSED"
+
         pygame.display.set_caption(string)
 
     # deal with events
@@ -104,7 +106,7 @@ while not done:
 
     # draw to screen
     screen.fill(WHITE)
-    world.draw()
+    world.draw(paused)
     pygame.display.flip()
 
 pygame.quit()

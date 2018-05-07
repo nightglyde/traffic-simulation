@@ -9,10 +9,10 @@ FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
-MAX_CARS = 40#30#12
+MAX_CARS = 100#40#30#12
 
-SCREEN_WIDTH  = 1200 # pixels
-SCREEN_HEIGHT = 800
+SCREEN_WIDTH  = 1600#1200 # pixels
+SCREEN_HEIGHT = 900#800
 
 # physics constants
 DRAG_CONSTANT    = 0.761
@@ -40,10 +40,11 @@ WHEEL_WIDTH  = 0.225
 AXLE_LENGTH  = 2.7
 AXLE_WIDTH   = 1.5
 
-PIVOT_TO_FRONT = CAR_LENGTH/2 + AXLE_LENGTH/2 # 3.6
-PIVOT_TO_REAR  = CAR_LENGTH - PIVOT_TO_FRONT
+PIVOT_TO_CENTRE = AXLE_LENGTH/2 # 1.35
+PIVOT_TO_FRONT  = PIVOT_TO_CENTRE + CAR_LENGTH/2 # 3.6 + AXLE_LENGTH/2 # 3.6
+PIVOT_TO_REAR   = CAR_LENGTH - PIVOT_TO_FRONT # 0.9
 
-PIVOT_TO_AXLE = PIVOT_TO_FRONT - (CAR_LENGTH - AXLE_LENGTH) / 2
+PIVOT_TO_AXLE = AXLE_LENGTH #PIVOT_TO_FRONT - (CAR_LENGTH - AXLE_LENGTH) / 2
 
 ARROW_LENGTH      = PIVOT_TO_AXLE #1.35 #2.7
 ARROW_WIDTH       = 0.9
@@ -82,7 +83,9 @@ SEND_TO_ALL   = 0
 LINE_OF_SIGHT = 1
 # for direct messages, use the destination car's name
 
-SIGHT_RADIUS = 20 # metres
+SIGHT_RADIUS = 40 # metres
+# must be at least
+# sqrt(2*((ROAD_WIDTH + CORNER_OFFSET*2 + CAR_LENGTH - HALF_LANE)**2))
 
 ##########
 # VECTOR #
@@ -400,7 +403,7 @@ NAME_TO_COLOUR = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
 # MISCELLANEOUS #
 #################
 
-def calculateMaxSpeed(distance, curr_speed):
+def getSpeedToStop(distance, curr_speed):
     dt = TIME_STEP / 1000
     new_speed = curr_speed + (MAX_ENGINE_FORCE / CAR_MASS) * dt
 
@@ -408,10 +411,10 @@ def calculateMaxSpeed(distance, curr_speed):
     if distance <= 0:
         return 0
 
-    max_speed = math.sqrt(2 * BRAKING_DECEL * distance)
-    return min(max_speed, MAX_SPEED)
+    speed_to_stop = math.sqrt(2 * BRAKING_DECEL * distance)
+    return min(speed_to_stop, MAX_SPEED)
 
-def calculateStopDistance(speed):
+def getStopDistance(speed):
     if speed <= 0:
         return 0
     return (speed**2) / (2 * BRAKING_DECEL)
