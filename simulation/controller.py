@@ -32,31 +32,6 @@ class CarController:
 
         self.knowledge = {}
 
-    def addInstruction(self, road):
-        if isinstance(road, IntersectionRoad):
-            while True:
-                turn = random.choice([LEFT, CENTRE, RIGHT])
-                if road.getExit(turn) != None:
-                    break
-
-            controller = self.world.traffic_controllers[road.intersection]
-            instruction = EnterIntersection(road, turn)
-            instruction.setController(controller)
-            self.route.append(instruction)
-        else:
-            instruction = FollowRoad(road)
-            self.route.append(instruction)
-
-    def generateRoute(self):
-        if not self.route:
-            return
-
-        while len(self.route) < MIN_ROUTE_PIECES:
-            road = self.route[-1].getNextRoad()
-            if road == None:
-                return
-            self.addInstruction(road)
-
     def followCar(self, dist_apart, speedA):
 
         stop_distA = getStopDistance(speedA)
@@ -226,8 +201,6 @@ class CarController:
         self.path.append(self.car.position)
         if len(self.path) > PATH_MEMORY:
             self.path.popleft()
-
-        self.generateRoute()
 
         # update route
         while self.route:

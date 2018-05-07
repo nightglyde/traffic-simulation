@@ -56,7 +56,10 @@ while not done:
         total = 0.0
         for frame in frames:
             total += frame
-        fps = round(10/total)
+        if total == 0.0:
+            fps = "UNDEFINED"
+        else:
+            fps = round(10/total)
 
         # generate screen caption
         string  = "Car Simulator | FPS: {}".format(fps)

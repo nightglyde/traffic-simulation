@@ -85,7 +85,7 @@ SEND_TO_ALL   = 0
 LINE_OF_SIGHT = 1
 # for direct messages, use the destination car's name
 
-SIGHT_RADIUS = 40 # metres
+SIGHT_RADIUS = 50 # metres
 # must be at least
 # sqrt(2*((ROAD_WIDTH + CORNER_OFFSET*2 + CAR_LENGTH - HALF_LANE)**2))
 
