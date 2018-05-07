@@ -1,8 +1,9 @@
 from util import *
 
 from world import World
-from pregen_0 import roads, entry_roads, intersections, valid_routes,\
-                     grass, world_width, world_height
+from scenario_0 import roads, entry_roads, intersections, valid_routes,\
+                      grass, world_width, world_height
+from schedule_0 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -17,12 +18,10 @@ clock  = pygame.time.Clock()
 world = World(screen, world_width, world_height)
 
 # build world
-world.buildWorld(roads, entry_roads, intersections, valid_routes, grass)
+world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule)
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
-
-print()
 
 # set up for FPS
 if INCLUDE_CAPTION:

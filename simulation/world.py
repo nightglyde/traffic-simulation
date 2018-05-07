@@ -22,11 +22,14 @@ class World:
         #             Vector(0, self.height)]
         #self.centre = Vector(self.width/2, self.height/2)
 
-        self.grass = []
 
-        self.all_roads           = []
-        self.entry_roads         = []
-        self.recent_cars         = []
+        self.all_roads = []
+        self.grass     = []
+
+        self.entry_roads = []
+        self.recent_cars = []
+        self.schedule    = deque()
+
         self.traffic_controllers = {}
 
         self.cars          = []
@@ -59,13 +62,17 @@ class World:
         self.panning      = False
         self.selected_car = None
 
-    def buildWorld(self, roads, entry_roads, intersections, valid_routes, grass):
+    def setup(self, roads, intersections, grass,
+              entry_roads, valid_routes, schedule):
+
         self.all_roads    = roads
         self.entry_roads  = entry_roads
         self.valid_routes = valid_routes
+        self.schedule     = schedule
 
         # TODO: Switch between different types of traffic controllers
 
+        #random.seed(TRAFFIC_LIGHT_SEED)
         for intersection in intersections:
             self.traffic_controllers[intersection] = TrafficLights(intersection)
 
@@ -84,11 +91,16 @@ class World:
         for i in range(len(entry_roads)):
             self.recent_cars.append(None)
 
-    def addCar(self, time):
-        i = random.randint(0, len(self.entry_roads)-1)
-        road       = self.entry_roads[i]
-        recent_car = self.recent_cars[i]
+    def addCar(self, time, entry_num, route_num):
+        #i = random.randint(0, len(self.entry_roads)-1)
+        #road       = self.entry_roads[i]
+        #recent_car = self.recent_cars[i]
 
+        road  = self.entry_roads[entry_num]
+        route = self.valid_routes[entry_num][route_num]
+        angle = road.angle
+
+        recent_car = self.recent_cars[entry_num]
         if recent_car != None:
             dist_along = road.getDistanceAlong(recent_car.position)
 
@@ -102,13 +114,11 @@ class World:
             pos = road.start
 
         colour, name = next(self.car_generator)
-        angle        = road.angle
 
         car = Car(self, name, colour, pos, angle, time)
         self.cars.append(car)
-        self.recent_cars[i] = car
+        self.recent_cars[entry_num] = car
 
-        route = random.choice(self.valid_routes[i])
         self.controllers.append(CarController(car, road, route))
 
     def update(self, time):
@@ -163,8 +173,14 @@ class World:
 
         self.sendMessages()
 
-        if len(self.cars) < MAX_CARS:
-            self.addCar(time)
+        while self.schedule:
+            start_time, entry_num, route_num = self.schedule[0]
+
+            if start_time <= time:
+                self.addCar(time, entry_num, route_num)
+                self.schedule.popleft()
+            else:
+                break
 
         while len(self.ghosts) > MAX_GHOSTS:
             self.ghosts.popleft()

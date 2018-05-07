@@ -5,14 +5,14 @@ import string
 
 from collections import deque
 
+random.seed(0)
+
 FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 
-MAX_CARS = 100#40#30#12
-
-SCREEN_WIDTH  = 1600#1200 # pixels
-SCREEN_HEIGHT = 900#800
+SCREEN_WIDTH  = 1200 # pixels
+SCREEN_HEIGHT = 800
 
 # physics constants
 DRAG_CONSTANT    = 0.761
@@ -66,6 +66,8 @@ RIGHT  = 1
 CENTRE = 0
 
 # traffic lights
+#TRAFFIC_LIGHT_SEED = 39842728374
+
 AMBER_PHASE    = 8000
 RED_PHASE      = 9000
 CYCLE_DURATION = 10000
