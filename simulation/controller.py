@@ -1,6 +1,6 @@
 from util import *
 
-from road_network import IntersectionRoad, FollowRoad, EnterIntersection
+from road_network import IntersectionRoad, FollowRoad, EnterIntersection, VirtualTrafficLights
 
 PATH_MEMORY = 10#50
 
@@ -23,7 +23,10 @@ class CarController:
         self.colour = car.colour
         self.time   = car.time
 
-        self.route      = deque(route)
+        self.route              = deque()
+        self.traffic_controller = None
+        self.setupRoute(route)
+
         self.road       = route[0].road
         self.dist_along = road.getDistanceAlong(self.car.centre)
 
@@ -31,6 +34,22 @@ class CarController:
         self.path.append(self.car.position)
 
         self.knowledge = {}
+
+    def setupRoute(self, route):
+        if CONTROLLER_MODE == VIRTUAL_TRAFFIC_LIGHTS_MODE:
+            controller = VirtualTrafficLights(self)
+
+            for instruction in route:
+                if isinstance(instruction, EnterIntersection):
+                    instruction = instruction.copy()
+                    instruction.setController(controller)
+                self.route.append(instruction)
+
+            self.traffic_controller = controller
+
+        else:
+            self.route = deque(route)
+            self.traffic_controller = None
 
     def followCar(self, dist_apart, speedA):
 
@@ -211,16 +230,20 @@ class CarController:
             if dist_along >= road.length:
                 self.route.popleft()
                 continue
-
-            # save the current road
-            self.road       = road
-            self.dist_along = dist_along
             break
 
         # check if car has reached the end of its route
         if not self.route:
             self.car.stop()
             return
+
+        # save the current road
+        self.road       = road
+        self.dist_along = dist_along
+
+        # update traffic controller
+        if self.traffic_controller != None:
+            self.traffic_controller.update(instruction)
 
         # generate control signal
         desired_speed                   = self.getDesiredSpeed()
@@ -235,8 +258,11 @@ class CarController:
         if self.car.stopped:
             return messages
 
-        status = (self.car.speed, self.road, self.dist_along, self.next_turn)
-        messages.append((LINE_OF_SIGHT, CURRENT_DETAILS, status))
+        content = (self.car.speed, self.road, self.dist_along, self.next_turn)
+        messages.append((LINE_OF_SIGHT, VISIBLE_DETAILS, content))
+
+        if self.traffic_controller != None:
+            messages += self.traffic_controller.sendMessages()
 
         return messages
 
@@ -246,15 +272,17 @@ class CarController:
 
         self.knowledge.clear()
 
-        next_speed = MAX_SPEED
         for message in messages:
             source, destination, message_type, content = message
 
             if source == self.name:
                 continue
 
-            elif message_type == CURRENT_DETAILS:
+            if message_type == VISIBLE_DETAILS:
                 self.knowledge[source] = content
+
+        if self.traffic_controller != None:
+            self.traffic_controller.receiveMessages(messages)
 
     def drawRoute(self):
         screen = self.world.screen
@@ -265,4 +293,8 @@ class CarController:
             b = self.world.getDrawable(road.end)
             pygame.draw.line(screen,   LIGHTER[colour], a, b, 3)
             #pygame.draw.circle(screen, DARKER[colour],  w, 3, 2)
+
+    def draw(self):
+        if self.traffic_controller != None:
+            self.traffic_controller.draw()
 

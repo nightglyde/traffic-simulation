@@ -65,29 +65,54 @@ LEFT   = -1
 RIGHT  = 1
 CENTRE = 0
 
-# traffic lights
-#TRAFFIC_LIGHT_SEED = 39842728374
-
-AMBER_PHASE    = 8000
-RED_PHASE      = 9000
-CYCLE_DURATION = 10000
-
+# traffic control
 RED_LIGHT   = 0
 AMBER_LIGHT = 1
 GREEN_LIGHT = 2
 
-# message types
-CURRENT_DETAILS = 0
-FUTURE_DETAILS  = 1
+# traffic control modes
+TRAFFIC_LIGHTS_MODE         = 0
+VIRTUAL_TRAFFIC_LIGHTS_MODE = 1
 
-# message addresses
-SEND_TO_ALL   = 0
-LINE_OF_SIGHT = 1
+CONTROLLER_MODE = TRAFFIC_LIGHTS_MODE
+
+#################
+# MESSAGE TYPES #
+#################
+
+# traffic lights
+VISIBLE_DETAILS   = 0
+
+# virtual traffic lights
+VTL_STATUS        = 1
+VTL_GREEN_REQUEST = 2
+VTL_ACKNOWLEDGE   = 3
+VTL_REFUSAL       = 4
+VTL_RETRY         = 5
+VTL_GREEN         = 6
+
+#####################
+# MESSAGE ADDRESSES #
+#####################
+SEND_TO_ALL    = 0
+LINE_OF_SIGHT  = 1
+CONTROL_CENTRE = 2
 # for direct messages, use the destination car's name
 
-SIGHT_RADIUS = 50 # metres
+########
+# MISC #
+########
+SIGHT_RADIUS = 50 # metres, maximum range for line-of-sight messages
 # must be at least
 # sqrt(2*((ROAD_WIDTH + CORNER_OFFSET*2 + CAR_LENGTH - HALF_LANE)**2))
+
+# traffic lights
+AMBER_PHASE    = 8000
+RED_PHASE      = 9000
+CYCLE_DURATION = 10000
+
+# virtual traffic lights
+NR_MAX = 1
 
 ##########
 # VECTOR #

@@ -30,11 +30,11 @@ class World:
         self.recent_cars = []
         self.schedule    = deque()
 
-        self.traffic_controllers = {}
-
         self.cars          = []
         self.controllers   = []
         self.car_generator = nextColour(self.cars)
+
+        self.traffic_lights = {}
 
         self.successful_cars = 0
         self.crashed_cars    = 0
@@ -65,31 +65,33 @@ class World:
     def setup(self, roads, intersections, grass,
               entry_roads, valid_routes, schedule):
 
-        self.all_roads    = roads
-        self.entry_roads  = entry_roads
-        self.valid_routes = valid_routes
-        self.schedule     = schedule
-
-        # TODO: Switch between different types of traffic controllers
-
-        #random.seed(TRAFFIC_LIGHT_SEED)
-        for intersection in intersections:
-            self.traffic_controllers[intersection] = TrafficLights(intersection)
+        self.all_roads     = roads
+        self.intersections = intersections
 
         for points in grass:
             grass_area = Obstacle(self, "grass", LIGHT_GREEN, points)
             self.grass.append(grass_area)
 
-        for routes in valid_routes:
-            for route in routes:
-                for instruction in route:
-                    if isinstance(instruction, EnterIntersection):
-                        intersection = instruction.road.intersection
-                        controller = self.traffic_controllers[intersection]
-                        instruction.setController(controller)
-
+        self.entry_roads  = entry_roads
         for i in range(len(entry_roads)):
             self.recent_cars.append(None)
+
+        self.valid_routes = valid_routes
+        self.schedule     = schedule
+
+        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+
+            for intersection in intersections:
+                self.traffic_lights[intersection] = TrafficLights(self,
+                                                                  intersection)
+
+            for routes in valid_routes:
+                for route in routes:
+                    for instruction in route:
+                        if isinstance(instruction, EnterIntersection):
+                            intersection = instruction.road.intersection
+                            controller = self.traffic_lights[intersection]
+                            instruction.setController(controller)
 
     def addCar(self, time, entry_num, route_num):
         #i = random.randint(0, len(self.entry_roads)-1)
@@ -122,8 +124,10 @@ class World:
         self.controllers.append(CarController(car, road, route))
 
     def update(self, time):
-        for intersection in self.traffic_controllers:
-            self.traffic_controllers[intersection].update(time)
+
+        # traffic lights mode only
+        for intersection in self.traffic_lights:
+            self.traffic_lights[intersection].update(time)
 
         for car in self.cars:
             car.update(time)
@@ -319,21 +323,12 @@ class World:
 
             pygame.draw.line(self.screen, BLACK, start, end, 1)
 
-        for intersection in self.traffic_controllers:
-            controller = self.traffic_controllers[intersection]
-            for pair in controller.lights:
-                light = controller.lights[pair]
-                if light == RED_LIGHT:
-                    continue
-                elif light == AMBER_LIGHT:
-                    colour = AMBER
-                else:
-                    colour = GREEN
-
-                for road in intersection.paths[pair]:
-                    start = self.getDrawable(road.start)
-                    end   = self.getDrawable(road.end)
-                    pygame.draw.line(self.screen, colour, start, end, 2)
+        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+            for intersection in self.traffic_lights:
+                self.traffic_lights[intersection].draw()
+        else:
+            for controller in self.controllers:
+                controller.draw()
 
         #box = [self.getDrawable(point) for point in self.hull]
         #pygame.draw.polygon(self.screen, BLACK, box, 1)
