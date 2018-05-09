@@ -326,9 +326,6 @@ class World:
         if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
             for intersection in self.traffic_lights:
                 self.traffic_lights[intersection].draw()
-        else:
-            for controller in self.controllers:
-                controller.draw()
 
         #box = [self.getDrawable(point) for point in self.hull]
         #pygame.draw.polygon(self.screen, BLACK, box, 1)
@@ -352,4 +349,7 @@ class World:
 
         #for car in self.cars:
         #    car.drawDesiredPosition()
+
+        for controller in self.controllers:
+            controller.draw()
 

@@ -243,7 +243,7 @@ class CarController:
 
         # update traffic controller
         if self.traffic_controller != None:
-            self.traffic_controller.update(instruction)
+            self.traffic_controller.update(time, instruction)
 
         # generate control signal
         desired_speed                   = self.getDesiredSpeed()
