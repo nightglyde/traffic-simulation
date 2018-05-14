@@ -198,8 +198,8 @@ class World:
         for sender in self.controllers:
 
             for message in sender.sendMessages():
-                address, message_type, content = message
-                message = (sender.name, address, message_type, content)
+                address, message_type, context, content = message
+                message = (sender.name, address, message_type, context, content)
 
                 if address == SEND_TO_ALL:
                     for recv in self.controllers:

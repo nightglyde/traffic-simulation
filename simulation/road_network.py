@@ -275,6 +275,9 @@ class VirtualTrafficLights:
 
         self.timeout = -1
 
+    def getLight(self, entrance, exit):
+        return self.light
+
     def resetAll(self):
         self.intersection = None
         self.entrance     = None
@@ -287,11 +290,36 @@ class VirtualTrafficLights:
 
         self.nr   = None
         self.acks = None
-        self.nf   = None
 
         self.timeout = None
 
-    def stepTwentyFour(self):
+    def chooseNewLeader(self):
+        N = len(self.intersection.inputs)
+
+        priorities = [None for i in range(N)]
+        for car_name in self.knowledge:
+            dist_left, entrance = self.knowledge[car_name]
+
+            if not priorities[entrance]:
+                priorities[entrance] = (dist_left, car_name)
+
+            elif dist_left < priorities[entrance][0]:
+                priorities[entrance] = (dist_left, car_name)
+
+        for i in range(1, N):
+            w = (self.entrance + i) % N
+
+            if not priorities[w]:
+                continue
+
+            dist_left, car_name = priorities[w]
+
+            if dist_left < VTL_LEADER_DIST:
+                self.messages.append((car_name,          VTL_GREEN,
+                                      self.intersection, VTL_NF_DEFAULT))
+                print(self.intersection, self.name, "new leader chosen:", car_name)
+                break
+
         self.resetAll()
 
     def update(self, time, instruction):
@@ -306,134 +334,69 @@ class VirtualTrafficLights:
                 self.resetAll()
 
             elif self.step == 24:
-                self.stepTwentyFour()
+                self.chooseNewLeader()
 
             self.intersection = intersection
             self.entrance     = instruction.entrance
 
             self.light = AMBER_LIGHT
             self.nr    = 1
-
-            self.step = 3
-
-            self.my_priority = None
-
-
-        elif not instruction.danger:
-            if self.step == 23:
-                self.resetAll()
-
-            elif self.step == 24:
-                self.stepTwentyFour()
-
-        if self.step == 23 and not instruction.danger:
-            self.resetAll()
-
-        if self.step == 24 and not instruction.danger:
-            self.stepTwentyFour()
-
-        #if self.step == 1 and not instruction.danger:
-        #    if self.next_car != None:
-        #        self.messages.append(
-        #            (self.next_car, VTL_GREEN, VTL_NF_DEFAULT))
-
-        #if isinstance(instruction, EnterIntersection):
-        #    intersection = instruction.intersection
-        #    if intersection == self.intersection:
-        #        return
-
-        #    self.intersection = intersection
-        #    self.entrance     = instruction.entrance
-
-        #    self.light = AMBER_LIGHT
-        #    self.nr    = 1
-
-        #    self.step = 3
-
-        #    self.my_priority = None
+            self.step  = 3
 
         #elif not instruction.danger:
-        #    self.intersection = None
-        #    self.step = 1
+        #    if self.step == 23:
+        #        self.resetAll()
 
-    def stepThree(self):
-        # STEP 3: find the leader of each road segment
+        #    elif self.step == 24:
+        #        self.chooseNewLeader()
+
+    def assignRoles(self):
         roads = self.intersection.inputs
-        priorities = [[] for road in roads]
+        priorities = [None for road in roads]
         for car_name in self.knowledge:
-            position, entrance = self.knowledge[car_name]
+            dist_left, entrance = self.knowledge[car_name]
 
-            if car_name == self.name:
-                my_entrance = entrance
+            if not priorities[entrance]:
+                priorities[entrance] = (dist_left, car_name)
 
-            road = roads[entrance]
-            dist_along = road.getDistanceAlong(position)
-            dist_left  = road.length - dist_along - CAR_LENGTH/2
+            elif dist_left < priorities[entrance][0]:
+                priorities[entrance] = (dist_left, car_name)
 
-            priorities[entrance].append((dist_left, car_name))
-
-        for car_list in priorities:
-            car_list.sort()
-
-        # STEP 4: Put the leaders in order
         if self.nr >= VTL_NR_MAX:
-            # go to step 5
-
-            # STEP 5: sort by road ID
-
             order = [(road, i) for i, road in enumerate(roads) \
                                if priorities[i]]
             order.sort()
             priorities = [priorities[i] for road, i in order]
-            # go to step 6
 
         else:
             # sort by normalised distance
-            order = [(priorities[i][0], i) for i in range(len(roads)) \
-                                           if priorities[i]]
-            order.sort()
-            priorities = [priorities[i] for entry, i in order]
-            # go to step 6
+            priorities = [pair for pair in priorities if pair]
+            priorities.sort()
 
-        # STEP 6: Get the intersection leader
-        dist_left, intersection_leader = priorities[0][0]
+        dist_left, intersection_leader = priorities[0]
         if dist_left >= VTL_LEADER_DIST:
-            # if the minimum normalised distance >= 1, go back to step 3
             return
-        # got to step 7
 
-        self.leaders = [car_list[0][1] for car_list in priorities]
+        self.leaders = [car_name for dist, car_name in priorities]
 
-        # STEP 7: Check if you're the intersection leader
         if intersection_leader == self.name:
             self.role = VTL_INTERSECTION_LEADER
             self.acks = set()
-            #self.acks.clear()
             self.acks.add(self.name)
 
-            # go to step 9
-
-            # STEP 9: Check how many other leaders there are
             if len(self.leaders) > 1:
                 # send a message to all the other leaders
                 for leader in self.leaders:
                     if leader != intersection_leader:
-                        self.messages.append((leader, VTL_GREEN_REQUEST, None))
-                # go to step 11
 
+                        self.messages.append((leader, VTL_GREEN_REQUEST,
+                                              self.intersection, None))
             else:
-                # you're the only leader, go to step 10
-
-                # STEP 10: Alert mode
                 # send a message to the control centre, and start a timer
-                self.messages.append((CONTROL_CENTRE, VTL_GREEN_REQUEST, None))
-                # go to step 11
-
+                self.messages.append((CONTROL_CENTRE,    VTL_GREEN_REQUEST,
+                                      self.intersection, None))
         else:
             # you're not the intersection leader
-            # go to step 8
-
-            # STEP 8: Set traffic light to red
             self.light = RED_LIGHT
 
             # check if you are a leader or a follower
@@ -442,260 +405,215 @@ class VirtualTrafficLights:
                 if leader == self.name:
                     self.role = VTL_LEADER
                     break
-            # go to step 11
 
-        # STEP 11: Start a timer
+        # start a timer
         self.timeout = self.time + VTL_TIMEOUT
-        #print(self.name, "set a timer", self.timeout, "at time", self.time)
-        # go to step 12
-
-        # STEP 12: Wait
         self.step = 12
 
-    def stepSixteen(self):
-        self.light = RED_LIGHT
-        self.step = 3
+    def activateGreenLight(self, source, nf=None):
 
-    def stepFifteen(self):
-        self.nr += 1
-        self.stepSixteen()
-
-    def stepFourteen(self):
-        for leader in self.leaders:
-            self.messages.append((leader, VTL_RETRY, None))
-        self.stepFifteen()
-
-    def stepThirteen(self, position, entrance):
-        road = self.intersection.inputs[entrance]
-
-        dist_along = road.getDistanceAlong(position)
-        dist_left  = road.length - dist_along
-
-        if dist_left < VTL_LEADER_DIST:
-            self.stepFourteen()
-
-    def stepSeventeen(self, source):
-        if self.leaders[0] == source:
-            self.messages.append((source, VTL_ACKNOWLEDGE, None))
+        if nf is None:
+            print(self.intersection, self.name, "leader by priority")
+            nf = VTL_NF_DEFAULT
         else:
-            self.messages.append((source, VTL_REFUSAL, None))
-        self.step = 12
+            print(self.intersection, self.name, "leader by gift")
 
-    def stepTwentyOne(self, source):
+        # check if this car can cross the intersection
+        if self.car_controller.blocked:
+            print(self.intersection, self.name, "gives up leadership")
+            self.chooseNewLeader()
+            return
+
         self.light = GREEN_LIGHT
-        print(self.name, "GREEN")
+        self.role  = VTL_INTERSECTION_LEADER
 
         if source != CONTROL_CENTRE:
-            self.messages.append((CONTROL_CENTRE, VTL_GREEN, None))
+            self.messages.append((CONTROL_CENTRE, VTL_GREEN,
+                                  self.intersection, None))
 
-        #if True:
-        #    self.step = 1
-        #    return
-
-        # THE BIT BELOW IS BROKEN
-        # Also, it might be a good idea to re-calculate all the probabilities
-        # every time a new car appears
-        # And then, once that's working, I could make it so that I only need
-        # to update the probabilities
-
-        if self.nf > 0:
-
-            my_position, my_entrance = self.knowledge[self.name]
-
-            road = self.intersection.inputs[my_entrance]
-            dist = road.length - CAR_LENGTH/2
-
-            my_dist = dist - road.getDistanceAlong(my_position)
+        if nf > 0:
+            my_dist, my_entrance = self.knowledge[self.name]
 
             followers = []
             for car_name in self.knowledge:
                 if car_name == self.name:
                     continue
 
-                position, entrance = self.knowledge[car_name]
+                dist_left, entrance = self.knowledge[car_name]
                 if entrance != my_entrance:
                     continue
-
-                dist_left = dist - road.getDistanceAlong(position)
-
-                print(self.name, car_name, dist_left, my_dist, dist_left > my_dist)
 
                 if dist_left > my_dist:
                     followers.append((dist_left, car_name))
 
             if followers:
                 followers.sort()
-
                 dist_left, car_name = followers[0]
 
-                print(self.name, car_name, dist_left, my_dist, dist_left-my_dist)
-
                 if dist_left - my_dist < VTL_FOLLOW_DIST:
-                    self.messages.append((car_name, VTL_GREEN, self.nf-1))
+                    self.messages.append((car_name,          VTL_GREEN,
+                                          self.intersection, nf-1))
 
                     self.step = 23
-                    #self.role = None
                     return
 
-            #car_list = self.priorities[self.my_priority]
-
-            #if len(car_list) > 1:
-            #    my_dist = car_list[0][0]
-
-            #    dist_left, car_name = car_list[1]
-
-            #    if dist_left - my_dist < VTL_FOLLOW_DIST:
-            #        self.messages.append((car_name, VTL_GREEN, self.nf-1))
-
-            #        self.step = 1
-            #        self.role = None
-            #        return
-
         self.step = 24
-
-        #for i in range(1, len(self.leaders)):
-        #    dist_left, car_name = self.priorities[i][0]
-
-        #    if dist_left < VTL_LEADER_DIST:
-        #        self.next_car = car_name
-
-        #        self.step = 1
-        #        return
-
-        #self.step = 1
         return
 
-    def stepEighteen(self):
+    def sendResponse(self, source):
+        if self.leaders[0] == source:
+            self.messages.append((source, VTL_ACKNOWLEDGE,
+                                  self.intersection, None))
+        else:
+            self.messages.append((source, VTL_REFUSAL, self.intersection, None))
+        self.step = 12
+
+    def sendRetry(self):
+        for leader in self.leaders:
+            self.messages.append((leader, VTL_RETRY, self.intersection, None))
+        self.nr += 1
+
+    def checkResponses(self):
+        # check timer
+        if self.time >= self.timeout:
+            #print(self.name, "timed out")
+
+            if self.role != VTL_FOLLOWER:
+                self.sendRetry()
+
+            self.light = RED_LIGHT
+            self.step  = 3
+            return
+
         if self.role != VTL_INTERSECTION_LEADER:
             return
 
+        # if there are no other leaders, check if the control centre responded
         if len(self.leaders) == 1:
             if True: # for now, let's just assume the controller said yes
             #if CONTROL_CENTRE in self.acks:
-                self.nf = VTL_NF_DEFAULT
-                self.stepTwentyOne(CONTROL_CENTRE)
+                self.activateGreenLight(CONTROL_CENTRE)
             return
 
+        # check responses received
         for leader in self.leaders:
             if not leader in self.acks:
                 return
 
-        self.nf = VTL_NF_DEFAULT
-        self.stepTwentyOne(leader)
-
-    def stepTwelve(self):
-        if self.time < self.timeout:
-            self.stepEighteen()
-            return
-
-        #print(self.name, "ran out of time at time", self.time)
-
-        print(self.name, "timed out")
-
-        # timer timed out
-        if self.role == VTL_FOLLOWER:
-            self.stepSixteen()
-        else:
-            self.stepFourteen()
+        self.activateGreenLight(leader)
 
     def sendMessages(self):
 
         #self.knowledge.clear()
 
-        # STEP 1: Update own position
-        self.knowledge[self.name] = (self.car.centre, self.entrance)
-        content = (self.intersection, self.car.centre, self.entrance)
-        self.messages.append((SEND_TO_ALL, VTL_STATUS, content))
-        # go to step 2
+        position = self.car.centre
+        road     = self.car_controller.road
 
-        #print(self.name, self.messages)
+        dist_along = road.getDistanceAlong(position)
+        dist_left  = road.length - dist_along - CAR_LENGTH/2
 
+        self.knowledge[self.name] = (dist_left, self.entrance)
+
+        self.messages.append((SEND_TO_ALL, VTL_STATUS, self.intersection,
+                              (dist_left, self.entrance)))
         return self.messages
 
     def receiveMessages(self, messages):
         self.messages.clear()
 
-        #if self.intersection == None:
-        #    return
+        new_knowledge = {}
+
+        new_knowledge[self.name] = self.knowledge[self.name]
 
         for message in messages:
-            source, destination, message_type, content = message
+            source, destination, message_type, context, content = message
 
             if source == self.name:
                 continue
 
+            if context != self.intersection:
+                #if source in self.knowledge:
+                #    del self.knowledge[source]
+                continue
+
             if message_type == VTL_STATUS:
-                intersection, position, entrance = content
-
-                #if intersection != self.intersection:
-
-                if intersection != self.intersection:
-                    if source in self.knowledge:
-                        del self.knowledge[source]
-                    continue
+                dist_left, entrance = content
 
                 if self.step == 12 and self.role != VTL_FOLLOWER:
                     if not source in self.leaders:
-                        self.stepThirteen(position, entrance)
+                        if dist_left < VTL_LEADER_DIST:
+                            self.sendRetry()
+                            self.light = RED_LIGHT
+                            self.step  = 3
 
-                self.knowledge[source] = (position, entrance)
-
-            elif not source in self.knowledge:
-                continue
+                new_knowledge[source] = (dist_left, entrance)
 
             elif message_type == VTL_REFUSAL:
-                print(source, destination, "VTL_REFUSAL")
+                #print(source, destination, "VTL_REFUSAL")
                 if self.step == 12 and self.role != VTL_FOLLOWER:
-                    self.stepFourteen()
+                    self.sendRetry()
+                    self.light = RED_LIGHT
+                    self.step  = 3
 
             elif message_type == VTL_RETRY:
-                print(source, destination, "VTL_RETRY")
+                #print(source, destination, "VTL_RETRY")
                 if self.step == 12 and self.role != VTL_FOLLOWER:
-                    self.stepFifteen()
+                    self.nr += 1
+                    self.light = RED_LIGHT
+                    self.step  = 3
 
             elif message_type == VTL_GREEN_REQUEST:
-                print(source, destination, "VTL_GREEN_REQUEST")
+                #print(source, destination, "VTL_GREEN_REQUEST")
                 if self.step == 12 and self.role != VTL_FOLLOWER:
-                    self.stepSeventeen(source)
+                    self.sendResponse(source)
 
             elif message_type == VTL_ACKNOWLEDGE:
-                print(source, destination, "VTL_ACKNOWLEDGE")
+                #print(source, destination, "VTL_ACKNOWLEDGE")
                 if self.step == 12 and self.role == VTL_INTERSECTION_LEADER:
+                    #print(self.leaders)
                     self.acks.add(source)
 
             elif message_type == VTL_GREEN:
                 print(source, destination, "VTL_GREEN", content)
+                print(self.step)
                 if self.step == 12:
-                    self.nf = content
-                    self.stepTwentyOne(source)
+                    self.activateGreenLight(source, content)
+
+        self.knowledge = new_knowledge
 
         if self.step == 3:
-            self.stepThree()
+            self.assignRoles()
 
-        if self.step == 12:
-            self.stepTwelve()
-
-    def getLight(self, entrance, exit):
-        return self.light
+        elif self.step == 12:
+            self.checkResponses()
 
     def draw(self):
         world  = self.world
         screen = world.screen
-        #colour = self.colour
 
         point = world.getDrawable(self.car.centre)
 
         if self.role == VTL_INTERSECTION_LEADER:
             pygame.draw.circle(screen, BLACK, point, 5)
 
-        elif self.role == VTL_LEADER:
-            pygame.draw.circle(screen, BLACK, point, 5, 1)
+            #for leader in self.leaders:
+            #    if leader == self.name:
+            #        continue
 
-        #a = world.getDrawable(self.car.centre)
+            #    for car in world.cars:
+            #        if car.name == leader:
+            #            b = world.getDrawable(car.centre)
+            #            pygame.draw.line(screen, DARKER[self.colour], point, b, 5)
 
-        #for car_name in self.knowledge:
-        #    position, entrance = self.knowledge[car_name]
+        else:
+            if self.leaders:
+                leader = self.leaders[0]
+                for car in world.cars:
+                    if car.name == leader:
+                        b = world.getDrawable(car.centre)
+                        pygame.draw.line(screen, car.colour, point, b, 3)
+                        break
 
-        #    b = world.getDrawable(position)
-        #    pygame.draw.line(screen, colour, a, b, 3)
+            if self.role == VTL_LEADER:
+                pygame.draw.circle(screen, BLACK, point, 5, 1)
 

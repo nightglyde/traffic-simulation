@@ -35,6 +35,9 @@ class CarController:
 
         self.knowledge = {}
 
+        self.following_speed = MAX_SPEED
+        self.blocked         = False
+
     def setupRoute(self, route):
         if CONTROLLER_MODE == VIRTUAL_TRAFFIC_LIGHTS_MODE:
             controller = VirtualTrafficLights(self)
@@ -73,8 +76,7 @@ class CarController:
         cars_left = set(self.knowledge.keys())
         distance  = 0
 
-        entrance_distance = None
-        exit_distance     = None
+        exit_distance = None
 
         turn_status = BEFORE_INTERSECTION
         for instruction in self.route:
@@ -85,7 +87,6 @@ class CarController:
             elif turn_status == DURING_INTERSECTION:
                 if isinstance(instruction, FollowRoad):
                     turn_status = DURING_TURN
-                    entrance_distance = distance
             elif turn_status == DURING_TURN:
                 if not instruction.danger:
                     turn_status = AFTER_TURN
@@ -120,40 +121,33 @@ class CarController:
                 break
 
         if not cars_ahead:
-            return MAX_SPEED
+            self.following_speed = MAX_SPEED
+            self.blocked = False
+            return
 
         cars_ahead.sort()
-
         distA, speedA, car_name = cars_ahead[0]
-        following_speed = self.followCar(distA - self.dist_along, speedA)
+        self.following_speed = self.followCar(distA - self.dist_along, speedA)
 
         if (not cars_turning) or (exit_distance == None):
-            return following_speed
+            self.blocked = False
+            return
 
         cars_turning.sort()
-
         distA, speedA, car_name = cars_turning[-1]
         distA += getStopDistance(speedA)
+
         safe_space = distA - exit_distance - CAR_LENGTH/2
-        # for some reason this gets different values for different turns...
+        if safe_space <= 0:
+            self.blocked = False
+            return
 
         cars_fit = safe_space / (CAR_LENGTH + SAFETY_GAP)
 
-        if cars_fit < 0:
-            return following_speed
-
-        #else:
-        #    print("#"+self.name, car_name, len(cars_turning), cars_fit, safe_space, self.time / 1000)
-
-        if cars_fit >= len(cars_turning):
-            return following_speed
-
-        dist_left = entrance_distance - self.dist_along - CAR_LENGTH/2
-        turn_speed = getSpeedToStop(dist_left, self.car.speed)
-        return min(following_speed, turn_speed)
+        self.blocked = cars_fit < len(cars_turning)
 
     def getDesiredSpeed(self):
-        if self.route[0].checkLights() == GREEN_LIGHT:
+        if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:
             desired_speed = MAX_SPEED
 
         else:
@@ -166,7 +160,7 @@ class CarController:
             else:
                 desired_speed = speed_to_stop
 
-        return min(desired_speed, self.checkCarsAhead())
+        return min(desired_speed, self.following_speed)#self.checkCarsAhead())
 
     def getDesiredPosition(self):
         look_ahead = self.dist_along + LOOK_AHEAD_DIST
@@ -241,6 +235,10 @@ class CarController:
         self.road       = road
         self.dist_along = dist_along
 
+        # check if the road ahead is blocked, and
+        # check if you are closely following a car
+        self.checkCarsAhead()
+
         # update traffic controller
         if self.traffic_controller != None:
             self.traffic_controller.update(time, instruction)
@@ -259,7 +257,7 @@ class CarController:
             return messages
 
         content = (self.car.speed, self.road, self.dist_along, self.next_turn)
-        messages.append((LINE_OF_SIGHT, VISIBLE_DETAILS, content))
+        messages.append((LINE_OF_SIGHT, VISIBLE_DETAILS, None, content))
 
         if self.traffic_controller != None:
             messages += self.traffic_controller.sendMessages()
@@ -273,7 +271,7 @@ class CarController:
         self.knowledge.clear()
 
         for message in messages:
-            source, destination, message_type, content = message
+            source, destination, message_type, context, content = message
 
             if source == self.name:
                 continue
