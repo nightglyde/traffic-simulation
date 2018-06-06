@@ -150,6 +150,8 @@ class CarController:
         if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:
             desired_speed = MAX_SPEED
 
+            print(self.name, self.blocked, desired_speed, self.following_speed)
+
         else:
             dist_left     = self.road.length - self.dist_along - CAR_LENGTH/2
             speed         = self.car.speed
@@ -159,6 +161,8 @@ class CarController:
                 desired_speed = MAX_SPEED
             else:
                 desired_speed = speed_to_stop
+
+            print(self.name, self.blocked, desired_speed, self.following_speed, dist_left, self.road.length, self.dist_along, CAR_LENGTH/2)
 
         return min(desired_speed, self.following_speed)#self.checkCarsAhead())
 

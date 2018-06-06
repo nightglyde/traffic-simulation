@@ -212,8 +212,11 @@ class World:
                         if sender == recv:
                             continue
 
-                        dist = (recv.car.centre - sender.car.centre).mag()
-                        if dist <= SIGHT_RADIUS:
+                        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+                            dist = (recv.car.centre - sender.car.centre).mag()
+                            if dist <= SIGHT_RADIUS:
+                                messages[recv.name].append(message)
+                        else:
                             messages[recv.name].append(message)
 
                 elif address in messages:
