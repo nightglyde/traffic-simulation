@@ -78,7 +78,14 @@ class CarController:
 
         exit_distance = None
 
-        turn_status = BEFORE_INTERSECTION
+        # this might get rid of the stopping in the middle of the intersection
+        # problem. however, also consider that when the car is blocked, it
+        # should be able to safely move forward until it reaches the intersection
+        if isinstance(self.road, IntersectionRoad):#not self.road.danger:
+            turn_status = BEFORE_INTERSECTION
+        else:
+            turn_status = None
+
         for instruction in self.route:
 
             if turn_status == BEFORE_INTERSECTION:
@@ -120,6 +127,9 @@ class CarController:
             if not cars_left:
                 break
 
+            if cars_ahead and turn_status == None:
+                break
+
         if not cars_ahead:
             self.following_speed = MAX_SPEED
             self.blocked = False
@@ -138,6 +148,9 @@ class CarController:
         distA += getStopDistance(speedA)
 
         safe_space = distA - exit_distance - CAR_LENGTH/2
+
+        print(self.name, car_name, self.time, distA, self.dist_along, safe_space)
+
         if safe_space <= 0:
             self.blocked = False
             return
