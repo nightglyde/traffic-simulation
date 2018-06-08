@@ -9,10 +9,9 @@ MIN_ROUTE_PIECES = 20
 LOOK_AHEAD_DIST = 3
 AVOID_CIRCLES   = False
 
-BEFORE_INTERSECTION = 0
-DURING_INTERSECTION = 1
-DURING_TURN         = 2
-AFTER_TURN          = 3
+DURING_INTERSECTION = 0
+DURING_TURN         = 1
+AFTER_TURN          = 2
 
 class CarController:
     def __init__(self, car, road, route):
@@ -82,16 +81,14 @@ class CarController:
         # problem. however, also consider that when the car is blocked, it
         # should be able to safely move forward until it reaches the intersection
         if isinstance(self.road, IntersectionRoad):#not self.road.danger:
-            turn_status = BEFORE_INTERSECTION
+            turn_status = DURING_INTERSECTION
         else:
             turn_status = None
 
         for instruction in self.route:
+            road = instruction.road
 
-            if turn_status == BEFORE_INTERSECTION:
-                if isinstance(instruction, EnterIntersection):
-                    turn_status = DURING_INTERSECTION
-            elif turn_status == DURING_INTERSECTION:
+            if turn_status == DURING_INTERSECTION:
                 if isinstance(instruction, FollowRoad):
                     turn_status = DURING_TURN
             elif turn_status == DURING_TURN:
@@ -102,7 +99,6 @@ class CarController:
                 if instruction.danger:
                     break
 
-            road = instruction.road
             cars_done = set()
             for car_name in cars_left:
                 speedA, roadA, distA, turnA = self.knowledge[car_name]
@@ -124,6 +120,8 @@ class CarController:
             cars_left -= cars_done
             distance  += road.length
 
+            #last_road = road
+
             if not cars_left:
                 break
 
@@ -143,13 +141,21 @@ class CarController:
             self.blocked = False
             return
 
-        cars_turning.sort()
-        distA, speedA, car_name = cars_turning[-1]
-        distA += getStopDistance(speedA)
+        if True:#if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+            cars_turning.sort()
+            distA, speedA, car_name = cars_turning[-1]
+            stop_distA = distA + getStopDistance(speedA)
 
-        safe_space = distA - exit_distance - CAR_LENGTH/2
+            safe_space = stop_distA - exit_distance - CAR_LENGTH/2
 
-        print(self.name, car_name, self.time, distA, self.dist_along, safe_space)
+        else:
+            safe_space = distance - exit_distance - CAR_LENGTH/2
+
+        #cars_turning.sort()
+        #distA, speedA, car_name = cars_turning[-1]
+        #stop_distA = distA + getStopDistance(speedA)
+
+        #safe_space = stop_distA - exit_distance - CAR_LENGTH/2
 
         if safe_space <= 0:
             self.blocked = False
@@ -159,25 +165,34 @@ class CarController:
 
         self.blocked = cars_fit < len(cars_turning)
 
+    def followCar(self, dist_apart, speedA):
+
+        stop_distA = getStopDistance(speedA)
+        stop_distB = dist_apart + stop_distA - CAR_LENGTH - SAFETY_GAP
+
+        if stop_distB <= 0:
+            #print("TOO CLOSE", self.name, dist_apart)
+            return 0
+
+        max_speed = getSpeedToStop(stop_distB, self.car.speed)
+        return max_speed
+
     def getDesiredSpeed(self):
         if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:
             desired_speed = MAX_SPEED
 
-            print(self.name, self.blocked, desired_speed, self.following_speed)
-
         else:
-            dist_left     = self.road.length - self.dist_along - CAR_LENGTH/2
-            speed         = self.car.speed
-            speed_to_stop = getSpeedToStop(dist_left, speed)
-            if speed < speed_to_stop:
+            dist_left = self.road.length - self.dist_along
+            speed     = self.car.speed
+            stop_dist = getStopDistance(speed)
+
+            if dist_left < stop_dist:
                 # you can't stop in time, so keep going and hope for the best
                 desired_speed = MAX_SPEED
             else:
-                desired_speed = speed_to_stop
+                desired_speed = getSpeedToStop(dist_left - CAR_LENGTH/2, speed)
 
-            print(self.name, self.blocked, desired_speed, self.following_speed, dist_left, self.road.length, self.dist_along, CAR_LENGTH/2)
-
-        return min(desired_speed, self.following_speed)#self.checkCarsAhead())
+        return min(desired_speed, self.following_speed)
 
     def getDesiredPosition(self):
         look_ahead = self.dist_along + LOOK_AHEAD_DIST

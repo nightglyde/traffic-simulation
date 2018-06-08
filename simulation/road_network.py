@@ -268,15 +268,20 @@ class VirtualTrafficLights:
 
         self.vehicles = set()
 
-        self.stage   = VTL_NO_INTERSECTION
-        self.leaders = None
-        self.role    = None
+        self.stage = VTL_NO_INTERSECTION
 
-        self.num_retries   = None
-        self.num_followers = None
-        self.acks          = None
+        # STAGE 1
+        self.num_retries = None
 
-        self.timeout = -1
+        # STAGE 2
+        self.leaders     = None
+        self.role        = None
+        self.acks        = None
+        self.timeout     = -1
+
+        # STAGE 3
+        self.num_followers  = None
+        self.first_follower = None
 
     def getLight(self, entrance, exit):
         return self.light
@@ -305,8 +310,8 @@ class VirtualTrafficLights:
             if dist_left < VTL_LEADER_DIST:
                 self.messages.append((car_name,          VTL_GREEN,
                                       self.intersection, VTL_NF_DEFAULT))
-                print(self.intersection, self.name,
-                      "new leader chosen:", car_name, "D")
+                #print(self.intersection, self.name,
+                #      "new leader chosen:", car_name, "D")
                 break
 
     def update(self, time, instruction):
@@ -329,6 +334,12 @@ class VirtualTrafficLights:
             self.stage       = VTL_CALCULATE_LEADERS
 
         elif not instruction.danger:
+
+            if self.stage == VTL_CHOOSE_NEW_LEADER:
+                self.chooseNewLeader()
+
+            self.stage = VTL_NO_INTERSECTION
+
             self.intersection = None
             self.road         = None
             self.entrance     = None
@@ -402,9 +413,69 @@ class VirtualTrafficLights:
         self.stage   = VTL_GET_APPROVALS
         self.timeout = self.time + VTL_TIMEOUT
 
-    def activateGreenLight(self, num_followers):
+    def getApprovals(self, new_vehicles, requests, acks, refusals, retries):
+
+        if self.time >= self.timeout:
+            self.retry()
+            return False
+
+        if retries:
+            self.retry(False)
+            return False
+
+        if self.role != VTL_FOLLOWER:
+            for car_name in new_vehicles:
+                dist_left, entrance, blocked = self.knowledge[car_name]
+
+                if dist_left < VTL_LEADER_DIST:
+                    self.retry()
+                    return False
+
+        if requests:
+            if self.role == VTL_LEADER:
+                intersection_leader = self.leaders[0]
+                for car_name in requests:
+                    if car_name == intersection_leader:
+                        self.messages.append((car_name, VTL_ACKNOWLEDGE,
+                                              self.intersection, None))
+                    else:
+                        self.messages.append((car_name, VTL_REFUSAL,
+                                              self.intersection, None))
+            else:
+                for car_name in requests:
+                    self.messages.append((car_name, VTL_REFUSAL,
+                                          self.intersection, None))
+
+        if self.role != VTL_INTERSECTION_LEADER:
+            return False
+
+        if refusals:
+            self.retry()
+            return False
+
+        self.acks |= acks
+
+        if len(self.leaders) == 1:
+            if True: # for now, let's just assume the controller said yes
+            #if CONTROL_CENTRE in self.acks:
+                #print(self.intersection,
+                #      "new leader chosen by control centre:",
+                #      self.name, "A")
+                return True
+
+        # check responses received
+        for leader in self.leaders:
+            if not leader in self.acks:
+                return False
+
+        #print(self.intersection,
+        #      "new leader approved:", self.name, "B", self.acks)
+        # TODO: Notify control centre
+        return True
+
+    def activateGreenLight(self):
         if self.car_controller.blocked:
-            print(self.name, "gave up leadership")
+            #print(self.name, "gave up leadership")
             self.retry()
             return
 
@@ -412,8 +483,16 @@ class VirtualTrafficLights:
         self.role    = VTL_CROSSING
         self.leaders = None
 
-        if num_followers > 0:
-            my_dist, my_entrance, blocked = self.knowledge[self.name]
+        self.stage = VTL_CHOOSE_NEW_LEADER
+        self.first_follower = None
+
+    def checkFollower(self):
+        if self.num_followers <= 0:
+            return
+
+        my_dist, my_entrance, blocked = self.knowledge[self.name]
+
+        if self.first_follower == None:
 
             followers = []
             for car_name in self.knowledge:
@@ -427,22 +506,24 @@ class VirtualTrafficLights:
                 if dist_left > my_dist:
                     followers.append((dist_left, car_name, blocked))
 
-            if followers:
-                followers.sort()
-                dist_left, car_name, blocked = followers[0]
+            if not followers:
+                return
 
-                if not blocked and dist_left - my_dist < VTL_FOLLOW_DIST:
-                    self.messages.append((car_name,          VTL_GREEN,
-                                          self.intersection, num_followers-1))
+            followers.sort()
+            dist_left, car_name, blocked = followers[0]
+            self.first_follower = car_name
 
-                    print(self.intersection, self.name,
-                          "new leader chosen:", car_name, "C")
+        else:
+            dist_left, entrance, blocked = self.knowledge[self.first_follower]
 
-                    self.stage = VTL_NO_INTERSECTION
-                    return
+        if blocked or dist_left - my_dist > VTL_FOLLOW_DIST:
+            return
 
-        self.stage = VTL_CHOOSE_NEW_LEADER
-        return
+        self.messages.append((self.first_follower, VTL_GREEN,
+                              self.intersection,  self.num_followers-1))
+        #print(self.intersection, self.name, "new leader chosen:",
+        #      self.first_follower, "C")
+        self.stage = VTL_NO_INTERSECTION
 
     def sendMessages(self):
 
@@ -466,10 +547,11 @@ class VirtualTrafficLights:
     def receiveMessages(self, messages):
         self.messages.clear()
 
-        vehicles = set()
+        new_vehicles = set()
+        vehicles     = set()
 
         requests = []
-        acks     = []
+        acks     = set()
         refusals = []
         retries  = []
         greens   = []
@@ -484,6 +566,10 @@ class VirtualTrafficLights:
                 continue
 
             if message_type == VTL_STATUS:
+
+                if not source in self.knowledge:
+                    new_vehicles.add(source)
+
                 vehicles.add(source)
                 self.knowledge[source] = content
 
@@ -491,7 +577,7 @@ class VirtualTrafficLights:
                 requests.append(source)
 
             elif message_type == VTL_ACKNOWLEDGE:
-                acks.append(source)
+                acks.add(source)
 
             elif message_type == VTL_REFUSAL:
                 refusals.append(source)
@@ -511,126 +597,77 @@ class VirtualTrafficLights:
 
             new_vehicles = set()
 
-        else:
-            # identify new vehicles
-            new_vehicles  = vehicles - self.vehicles
-
         # update vehicles list
         self.vehicles = vehicles
 
         if self.stage == VTL_GET_APPROVALS:
+            #print(self.name, "new_vehicles:", new_vehicles,
+            #      "requests:", requests, "acks:", acks,
+            #      "refusals:", refusals, "retries", retries)
 
-            if self.time >= self.timeout:
-                self.retry()
-                return
+            turn_green = self.getApprovals(new_vehicles, requests,
+                                           acks, refusals, retries)
 
-            if retries:
-                self.retry(False)
-                return
+            if turn_green:
+                self.num_followers = VTL_NF_DEFAULT
 
-            if self.role != VTL_FOLLOWER:
-                for car_name in new_vehicles:
-                    dist_left, entrance, blocked = self.knowledge[car_name]
-
-                    if dist_left < VTL_LEADER_DIST:
-                        self.retry()
-                        return
-
-            for car_name in requests:
-                if self.role != VTL_LEADER or self.leaders[0] != car_name:
-                    self.messages.append((car_name,          VTL_REFUSAL,
-                                          self.intersection, None))
-
-                else:
-                    self.messages.append((car_name,          VTL_ACKNOWLEDGE,
-                                          self.intersection, None))
-
-            turn_green = False
-
-            if self.role == VTL_INTERSECTION_LEADER:
-                for car_name in refusals:
-                    if not car_name in self.leaders:
-                        raise Exception("Car {} received refusal from {}, but {} isn't a leader".format(self.name, car_name, car_name))
-
-                if refusals:
-                    self.retry()
-                    return
-
-                for car_name in acks:
-                    #if self.role != VTL_INTERSECTION_LEADER:
-                    #    raise Exception("Car {} received ack from {}, but {} isn't an intersection leader".format(self.name, car_name, self.name))
-
-                    self.acks.add(car_name)
-
-                if len(self.leaders) == 1:
-                    if True: # for now, let's just assume the controller said yes
-                    #if CONTROL_CENTRE in self.acks:
-                        turn_green = True
-                        num_followers = VTL_NF_DEFAULT
-                        print(self.intersection,
-                              "new leader chosen by control centre:",
-                              self.name, "A")
-
-                else:
-                    # check responses received
-                    for leader in self.leaders:
-                        if not leader in self.acks:
-                            break
-                    else:
-                        turn_green = True
-                        num_followers = VTL_NF_DEFAULT
-                        print(self.intersection,
-                              "new leader approved:", self.name, "B", self.acks)
-                        # TODO: Notify control centre
-
-            if not turn_green:
-                for car_name, nf in greens:
+            else:
+                for car_name, num_followers in greens:
                     turn_green = True
-                    num_followers = nf
+                    self.num_followers = num_followers
                     # TODO: Notify control centre
                     break
 
             if turn_green:
-                self.activateGreenLight(num_followers)
+                self.activateGreenLight()
+
+        if self.stage == VTL_CHOOSE_NEW_LEADER:
+            self.checkFollower()
 
     def draw(self):
         world  = self.world
         screen = world.screen
 
-        point = world.getDrawable(self.car.centre)
-
-        if self.role == VTL_INTERSECTION_LEADER:
-            pygame.draw.circle(screen, BLACK, point, 10)
-
-            for leader in self.leaders:
-                if leader == self.name:
-                    continue
-
-                for car in world.cars:
-                    if car.name == leader:
-                        b = world.getDrawable(car.centre)
-                        pygame.draw.circle(screen, self.colour, b, 15, 2)
-
-        elif self.role == VTL_CROSSING:
-            pygame.draw.circle(screen, WHITE, point, 10)
-            pygame.draw.circle(screen, BLACK, point, 10, 2)
-
-        else:
-            if self.leaders:
-                leader = self.leaders[0]
-                for car in world.cars:
-                    if car.name == leader:
-                        b = world.getDrawable(car.centre)
-                        pygame.draw.line(screen, car.colour, point, b, 3)
-                        break
-
-            elif self.role == VTL_LEADER:
-                pygame.draw.circle(screen, BLACK, point, 10, 2)
+        point  = world.getDrawable(self.car.centre)
+        radius = world.scaleDistance(CAR_WIDTH/2 + 0.1)
 
         if self.light == GREEN_LIGHT:
-            pygame.draw.circle(screen, GREEN, point, 5)
+            colour = GREEN
         elif self.light == AMBER_LIGHT:
-            pygame.draw.circle(screen, AMBER, point, 5)
-        elif self.light == RED_LIGHT:
-            pygame.draw.circle(screen, RED,   point, 5)
+            colour = AMBER
+        else:
+            colour = RED
+
+        pygame.draw.circle(screen, colour, point, radius)
+        pygame.draw.circle(screen, BLACK,  point, radius, 1)
+
+        if False:
+
+            if self.role == VTL_INTERSECTION_LEADER:
+                pygame.draw.circle(screen, BLACK, point, 10)
+
+                for leader in self.leaders:
+                    if leader == self.name:
+                        continue
+
+                    for car in world.cars:
+                        if car.name == leader:
+                            b = world.getDrawable(car.centre)
+                            pygame.draw.circle(screen, self.colour, b, 15, 2)
+
+            elif self.role == VTL_CROSSING:
+                pygame.draw.circle(screen, WHITE, point, 10)
+                pygame.draw.circle(screen, BLACK, point, 10, 2)
+
+            else:
+                if self.leaders:
+                    leader = self.leaders[0]
+                    for car in world.cars:
+                        if car.name == leader:
+                            b = world.getDrawable(car.centre)
+                            pygame.draw.line(screen, car.colour, point, b, 3)
+                            break
+
+                elif self.role == VTL_LEADER:
+                    pygame.draw.circle(screen, BLACK, point, 10, 2)
 
