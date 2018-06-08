@@ -16,6 +16,8 @@ class World:
         self.width  = width
         self.height = height
 
+        self.results = []
+
         #self.hull = [Vector(0, 0),
         #             Vector(self.width, 0),
         #             Vector(self.width, self.height),
@@ -212,12 +214,12 @@ class World:
                         if sender == recv:
                             continue
 
-                        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
-                            dist = (recv.car.centre - sender.car.centre).mag()
-                            if dist <= SIGHT_RADIUS:
-                                messages[recv.name].append(message)
-                        else:
-                            messages[recv.name].append(message)
+                        #if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+                        #    dist = (recv.car.centre - sender.car.centre).mag()
+                        #    if dist <= SIGHT_RADIUS:
+                        #        messages[recv.name].append(message)
+                        #else:
+                        messages[recv.name].append(message)
 
                 elif address in messages:
                     messages[address].append(message)
@@ -286,7 +288,7 @@ class World:
         for car in self.cars:
             if car.checkInside(true_mouse_position):
                 self.selected_car = car
-                print("Selected car:", car.name)
+                #print("Selected car:", car.name)
                 self.panning = False
                 return
 

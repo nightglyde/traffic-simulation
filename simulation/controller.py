@@ -141,7 +141,7 @@ class CarController:
             self.blocked = False
             return
 
-        if True:#if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+        if False:#if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
             cars_turning.sort()
             distA, speedA, car_name = cars_turning[-1]
             stop_distA = distA + getStopDistance(speedA)

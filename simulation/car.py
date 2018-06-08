@@ -45,6 +45,9 @@ class Car(Obstacle):
         self.name   = name
         self.colour = colour
 
+        # for results
+        self.start_time = time
+
         # status
         self.position = position # metres
         self.angle    = angle    # radians
@@ -84,9 +87,9 @@ class Car(Obstacle):
     def crash(self, other):
         if not self.stopped:
             self.stopped = True
-            print(self.name, "crashed into", other.name,
-                  "at time", self.time / 1000,
-                  "going speed", self.speed*3.6)
+            #print(self.name, "crashed into", other.name,
+            #      "at time", self.time / 1000,
+            #      "going speed", self.speed*3.6)
 
             self.world.crashed_cars += 1
             self.world.ghosts.append(self)
@@ -98,13 +101,17 @@ class Car(Obstacle):
             #      ", position", self.position)
             self.world.successful_cars += 1
 
+            # for results
+            duration = self.time - self.start_time
+            self.world.results.append(duration)
+            print(duration)
+
     def update(self, time):
         if self.stopped:
             return
 
         if time <= self.time:
-            print("BAD UPDATE")
-            return
+            raise Exception("BAD UPDATE: new time <= current time")
 
         dt = (time - self.time) / 1000
         self.time = time

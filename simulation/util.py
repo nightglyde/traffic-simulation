@@ -108,9 +108,9 @@ SIGHT_RADIUS = 50 # metres, maximum range for line-of-sight messages
 # sqrt(2*((ROAD_WIDTH + CORNER_OFFSET*2 + CAR_LENGTH - HALF_LANE)**2))
 
 # traffic lights
-AMBER_PHASE    = 5000
-RED_PHASE      = 6000
-CYCLE_DURATION = 7000
+AMBER_PHASE    = 4000
+RED_PHASE      = AMBER_PHASE + 1000
+CYCLE_DURATION = RED_PHASE   + 1000
 
 # virtual traffic lights
 VTL_NR_MAX     = 10
