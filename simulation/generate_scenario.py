@@ -440,6 +440,19 @@ class Intersection:
 
             in_road.setIntersection(self, i)
 
+    def generateIndexMapping(self):
+        num_roads = len(self.inputs)
+
+        index_mapping = [0 for i in range(num_roads)]
+
+        index = 0
+        for i in range(num_roads):
+            index_mapping[index] = i
+
+            index = self.connections[index][LEFT]
+
+        return index_mapping
+
     def __eq__(self, other):
         if isinstance(other, Intersection):
             return self.id == other.id
@@ -630,29 +643,56 @@ if __name__ == "__main__":
     for intersection in all_intersections:
         print("{} = {}".format(intersection.name, intersection))
 
+        index_mapping = intersection.generateIndexMapping()
+
         for i in range(len(intersection.inputs)):
+            new_i = index_mapping[i]
+
             road = intersection.inputs[i]
             print("{}.setIntersection({}, {})".format(
-                road.name, intersection.name, i))
+                road.name, intersection.name, new_i))
 
             for j in range(len(intersection.outputs)):
+                new_j = index_mapping[j]
+
                 pair = (i, j)
 
-                if pair in intersection.pairs:
-                    path, turn = intersection.paths[pair]
+                if not pair in intersection.paths:
+                    continue
 
-                    path = [road.name for road in path]
-                    path = "[" + ",".join(path) + "]"
+                path, turn = intersection.paths[pair]
 
-                    if turn == LEFT:
-                        turn = "LEFT"
-                    elif turn == RIGHT:
-                        turn = "RIGHT"
-                    else:
-                        turn = "CENTRE"
+                path = [road.name for road in path]
+                path = "[" + ",".join(path) + "]"
 
-                    print("{}.addConnection({}, {}, {}, {})".format(
-                        intersection.name, i, j, path, turn))
+                if turn == LEFT:
+                    turn = "LEFT"
+                elif turn == RIGHT:
+                    turn = "RIGHT"
+                else:
+                    turn = "CENTRE"
+
+                print("{}.addConnection({}, {}, {}, {})".format(
+                      intersection.name, new_i, new_j, path, turn))
+
+
+                #pair = (i, j)
+
+                #if pair in intersection.pairs:
+                #    path, turn = intersection.paths[pair]
+
+                #    path = [road.name for road in path]
+                #    path = "[" + ",".join(path) + "]"
+
+                #    if turn == LEFT:
+                #        turn = "LEFT"
+                #    elif turn == RIGHT:
+                #        turn = "RIGHT"
+                #    else:
+                #        turn = "CENTRE"
+
+                #    print("{}.addConnection({}, {}, {}, {})".format(
+                #        intersection.name, i, j, path, turn))
 
     print()
 

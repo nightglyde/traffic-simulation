@@ -79,14 +79,14 @@ class Intersection:
         self.inputs  = inputs
         self.outputs = outputs
 
-        self.pairs = []
+        self.pairs = {}
         self.paths = {}
 
         self.connections = [[None, None, None] for i in range(len(inputs))]
 
     def addConnection(self, entrance, exit, path, turn):
         pair = (entrance, exit)
-        self.pairs.append(pair)
+        self.pairs[pair] = turn
         self.paths[pair] = path
 
         self.connections[entrance][turn] = exit
@@ -171,32 +171,69 @@ class EnterIntersection:
 # Traffic Controllers #
 #######################
 
+EMPTY_LIGHTS   = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
+ALL_THE_LIGHTS = [[1, 1, 1], [1, 1, 1], [1, 1, 1], [1, 1, 1]]
+
+LIGHT_COMBINATIONS = [
+    # [CENTRE, RIGHT, LEFT]
+
+    # lane 0     lane 1     lane 2     lane 3
+
+    # three branches from one road, and one left turn
+    [[1, 1, 1], [0, 0, 0], [0, 0, 0], [0, 0, 1]],
+    [[0, 0, 1], [1, 1, 1], [0, 0, 0], [0, 0, 0]],
+    [[0, 0, 0], [0, 0, 1], [1, 1, 1], [0, 0, 0]],
+    [[0, 0, 0], [0, 0, 0], [0, 0, 1], [1, 1, 1]],
+
+    # one road straight across, and three left turns
+    [[1, 0, 1], [0, 0, 0], [0, 0, 1], [0, 0, 1]],
+    [[0, 0, 1], [1, 0, 1], [0, 0, 0], [0, 0, 1]],
+    [[0, 0, 1], [0, 0, 1], [1, 0, 1], [0, 0, 0]],
+    [[0, 0, 0], [0, 0, 1], [0, 0, 1], [1, 0, 1]],
+
+    # two lanes straight across, and two left turns
+    [[1, 0, 1], [0, 0, 0], [1, 0, 1], [0, 0, 0]],
+    [[0, 0, 0], [1, 0, 1], [0, 0, 0], [1, 0, 1]],
+
+    # one right turn, and three left turns
+    [[0, 1, 1], [0, 0, 1], [0, 0, 0], [0, 0, 1]],
+    [[0, 0, 1], [0, 1, 1], [0, 0, 1], [0, 0, 0]],
+    [[0, 0, 0], [0, 0, 1], [0, 1, 1], [0, 0, 1]],
+    [[0, 0, 1], [0, 0, 0], [0, 0, 1], [0, 1, 1]],
+
+    # two right turns, and two left turns
+    [[0, 1, 0], [0, 0, 1], [0, 1, 0], [0, 0, 1]],
+    [[0, 0, 1], [0, 1, 0], [0, 0, 1], [0, 1, 0]],
+
+    # four left turns
+    [[0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1]],
+]
+
+SIMPLE_SEQUENCE = [0, 1, 2, 3]
+
+def loopingIterator(items, start):
+    for i in range(start, len(items)):
+        yield items[i]
+
+    while True:
+        for item in items:
+            yield item
+
 class TrafficLights:
     def __init__(self, world, intersection):
         self.world        = world
         self.intersection = intersection
 
-        self.lights = {}
-        for pair in intersection.pairs:
-            self.lights[pair] = RED_LIGHT
+        combs = [LIGHT_COMBINATIONS[i] for i in SIMPLE_SEQUENCE]
+        start = random.randint(0, len(combs)-1)
+        self.comb_gen = loopingIterator(combs, start)
 
-        self.num_inputs = len(intersection.inputs)
-        self.input_num  = 0
-
-        self.batches = []
-        for entrance in range(self.num_inputs):
-
-            batch = []
-            for exit in intersection.connections[entrance]:
-                batch.append((entrance, exit))
-            right_exit = intersection.connections[entrance][RIGHT]
-            batch.append((right_exit, entrance))
-
-            self.batches.append(batch)
+        self.prev_lights = EMPTY_LIGHTS
+        self.curr_lights = next(self.comb_gen)
 
         self.offset = random.randint(0, CYCLE_DURATION-1)
 
-        self.phase = RED_LIGHT
+        self.phase = GREEN_LIGHT
 
     def update(self, time):
         cycle_time = (time + self.offset) % CYCLE_DURATION
@@ -205,47 +242,60 @@ class TrafficLights:
             if cycle_time >= AMBER_PHASE:
                 self.phase = AMBER_LIGHT
 
-                for pair in self.lights:
-                    if self.lights[pair] == GREEN_LIGHT:
-                        self.lights[pair] = AMBER_LIGHT
+                self.prev_lights = self.curr_lights
+                self.curr_lights = next(self.comb_gen)
 
         elif self.phase == AMBER_LIGHT:
             if cycle_time >= RED_PHASE:
                 self.phase = RED_LIGHT
 
-                for pair in self.lights:
-                    self.lights[pair] = RED_LIGHT
-
         elif self.phase == RED_LIGHT:
             if cycle_time < AMBER_PHASE:
                 self.phase = GREEN_LIGHT
 
-                self.input_num = (self.input_num + 1) % self.num_inputs
-
-                for pair in self.batches[self.input_num]:
-                    self.lights[pair] = GREEN_LIGHT
-
     def getLight(self, entrance, exit):
-        return self.lights[(entrance, exit)]
+        turn = getTurn(entrance, exit)
+
+        prev_light = self.prev_lights[entrance][turn]
+        curr_light = self.curr_lights[entrance][turn]
+        if self.phase == GREEN_LIGHT:
+            if curr_light:
+                return GREEN_LIGHT
+            else:
+                return RED_LIGHT
+
+        if prev_light and curr_light:
+            return GREEN_LIGHT
+
+        if self.phase == RED_LIGHT:
+            return RED_LIGHT
+
+        if prev_light:
+            return AMBER_LIGHT
+        else:
+            return RED_LIGHT
 
     def draw(self):
         world  = self.world
         screen = world.screen
 
-        for pair in self.lights:
-            light = self.lights[pair]
+        for entrance in range(4):
+            for turn in range(3):
 
-            if light == RED_LIGHT:
-                continue
-            elif light == AMBER_LIGHT:
-                colour = AMBER
-            else:
-                colour = GREEN
+                exit  = getExit(entrance, turn)
 
-            for road in self.intersection.paths[pair]:
-                start = world.getDrawable(road.start)
-                end   = world.getDrawable(road.end)
-                pygame.draw.line(screen, colour, start, end, 2)
+                light = self.getLight(entrance, exit)
+                if light == RED_LIGHT:
+                    continue
+                elif light == AMBER_LIGHT:
+                    colour = AMBER
+                else:
+                    colour = GREEN
+
+                for road in self.intersection.paths[(entrance, exit)]:
+                    start = world.getDrawable(road.start)
+                    end   = world.getDrawable(road.end)
+                    pygame.draw.line(screen, colour, start, end, 2)
 
 class VirtualTrafficLights:
     def __init__(self, car_controller):

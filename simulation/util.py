@@ -446,6 +446,11 @@ NAME_TO_COLOUR = {"RED": RED,   "ORA": ORANGE, "YEL": YELLOW,  "LIM": LIME,
 #################
 # MISCELLANEOUS #
 #################
+def getTurn(entrance, exit):
+    return ((exit - entrance) % 4 + 2) % 3 - 1
+
+def getExit(entrance, turn):
+    return ((turn + 1) % 3 + entrance + 1) % 4
 
 def getSpeedToStop(distance, curr_speed):
     dt = TIME_STEP / 1000
