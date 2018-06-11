@@ -1,6 +1,6 @@
 from util import *
 
-from road_network import IntersectionRoad, FollowRoad, EnterIntersection, VirtualTrafficLights
+from road_network import IntersectionRoad, FollowRoad, EnterIntersection, VirtualTrafficLights, MyTrafficController
 
 #PATH_MEMORY = 10#50
 
@@ -39,8 +39,18 @@ class CarController:
         self.blocked         = False
 
     def setupRoute(self, route):
-        if CONTROLLER_MODE == VIRTUAL_TRAFFIC_LIGHTS_MODE:
-            controller = VirtualTrafficLights(self)
+        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+            for instruction in route:
+                self.route.append(instruction)
+                self.roads.add(instruction.road)
+
+            self.traffic_controller = None
+
+        else:
+            if CONTROLLER_MODE == VIRTUAL_TRAFFIC_LIGHTS_MODE:
+                controller = VirtualTrafficLights(self)
+            elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
+                controller = MyTrafficController(self)
 
             for instruction in route:
                 if isinstance(instruction, EnterIntersection):
@@ -50,14 +60,6 @@ class CarController:
                 self.roads.add(instruction.road)
 
             self.traffic_controller = controller
-
-        else:
-
-            for instruction in route:
-                self.route.append(instruction)
-                self.roads.add(instruction.road)
-
-            self.traffic_controller = None
 
     def followCar(self, dist_apart, speedA):
 
