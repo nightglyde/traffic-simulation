@@ -68,7 +68,7 @@ class Car(Obstacle):
         self.next_turn = CENTRE
 
         # visualisation
-        self.path = deque() # modified by the controller
+        #self.path = deque() # modified by the controller
 
         self.random_offset = random.randint(1, 1000)
 
@@ -415,9 +415,9 @@ class Car(Obstacle):
             pygame.draw.circle(screen, DARKER[self.colour], pos, radius)
             pygame.draw.circle(screen, BLACK,               pos, radius, 1)
 
-    def drawPath(self):
-        if len(self.path) > 1:
-            colour = LIGHTER[self.colour]
-            path = [self.world.getDrawable(point) for point in self.path]
-            pygame.draw.lines(self.world.screen, colour, False, path, 3)
+    #def drawPath(self):
+    #    if len(self.path) > 1:
+    #        colour = LIGHTER[self.colour]
+    #        path = [self.world.getDrawable(point) for point in self.path]
+    #        pygame.draw.lines(self.world.screen, colour, False, path, 3)
 

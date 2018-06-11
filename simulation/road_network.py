@@ -381,7 +381,7 @@ class VirtualTrafficLights:
 
             self.light       = AMBER_LIGHT
             self.num_retries = 1
-            self.stage       = VTL_CALCULATE_LEADERS
+            self.stage       = VTL_JOIN_INTERSECTION
 
         elif not instruction.danger:
 
@@ -428,7 +428,7 @@ class VirtualTrafficLights:
             priorities.sort()
 
         blocked, dist_left, intersection_leader = priorities[0]
-        if dist_left >= VTL_LEADER_DIST:
+        if dist_left > VTL_LEADER_DIST:
             return
 
         self.leaders = [car_name for blocked, dist, car_name in priorities]
@@ -584,7 +584,13 @@ class VirtualTrafficLights:
         road     = self.road
 
         dist_along = road.getDistanceAlong(position)
-        dist_left  = road.length - dist_along - CAR_LENGTH/2
+        dist_left  = road.length - dist_along
+
+        if self.stage == VTL_JOIN_INTERSECTION:
+            if dist_left > VTL_THRESHOLD:
+                return self.messages
+
+            self.stage = VTL_CALCULATE_LEADERS
 
         content = (dist_left, self.entrance, self.car_controller.blocked)
 

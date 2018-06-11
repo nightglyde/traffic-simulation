@@ -2,7 +2,7 @@ from util import *
 
 from road_network import IntersectionRoad, FollowRoad, EnterIntersection, VirtualTrafficLights
 
-PATH_MEMORY = 10#50
+#PATH_MEMORY = 10#50
 
 MIN_ROUTE_PIECES = 20
 
@@ -22,15 +22,16 @@ class CarController:
         self.colour = car.colour
         self.time   = car.time
 
-        self.route              = deque()
+        self.route = deque()
+        self.roads = set()
         self.traffic_controller = None
         self.setupRoute(route)
 
         self.road       = route[0].road
         self.dist_along = road.getDistanceAlong(self.car.centre)
 
-        self.path = car.path
-        self.path.append(self.car.position)
+        #self.path = car.path
+        #self.path.append(self.car.position)
 
         self.knowledge = {}
 
@@ -46,17 +47,22 @@ class CarController:
                     instruction = instruction.copy()
                     instruction.setController(controller)
                 self.route.append(instruction)
+                self.roads.add(instruction.road)
 
             self.traffic_controller = controller
 
         else:
-            self.route = deque(route)
+
+            for instruction in route:
+                self.route.append(instruction)
+                self.roads.add(instruction.road)
+
             self.traffic_controller = None
 
     def followCar(self, dist_apart, speedA):
 
         stop_distA = getStopDistance(speedA)
-        stop_distB = dist_apart + stop_distA - CAR_LENGTH - SAFETY_GAP
+        stop_distB = dist_apart + stop_distA - MIN_DIST_APART
 
         if stop_distB <= 0:
             #print("TOO CLOSE", self.name, dist_apart)
@@ -65,77 +71,51 @@ class CarController:
         max_speed = getSpeedToStop(stop_distB, self.car.speed)
         return max_speed
 
-    def checkCarsAhead(self):
-        # find people on your route
-        cars_ahead   = []
-        cars_turning = []
-
+    def checkBlocked(self):
         distB = self.dist_along
 
-        cars_left = set(self.knowledge.keys())
-        distance  = 0
+        if not isinstance(self.road, IntersectionRoad):
+            self.blocked = False
+            return
 
+        dist_left = self.road.length - distB
+        if dist_left > VTL_THRESHOLD:
+            self.blocked = False
+            return
+
+        cars_turning  = []
         exit_distance = None
 
-        # this might get rid of the stopping in the middle of the intersection
-        # problem. however, also consider that when the car is blocked, it
-        # should be able to safely move forward until it reaches the intersection
-        if isinstance(self.road, IntersectionRoad):#not self.road.danger:
-            turn_status = DURING_INTERSECTION
-        else:
-            turn_status = None
+        turn_status = DURING_INTERSECTION
 
+        distance = 0
         for instruction in self.route:
             road = instruction.road
 
             if turn_status == DURING_INTERSECTION:
                 if isinstance(instruction, FollowRoad):
                     turn_status = DURING_TURN
+
             elif turn_status == DURING_TURN:
                 if not instruction.danger:
                     turn_status = AFTER_TURN
                     exit_distance = distance
+
             elif turn_status == AFTER_TURN:
                 if instruction.danger:
                     break
 
-            cars_done = set()
-            for car_name in cars_left:
-                speedA, roadA, distA, turnA = self.knowledge[car_name]
-
-                if road == roadA:
-                    cars_done.add(car_name)
+            if road in self.knowledge:
+                for car_name, speedA, distA, turnA in self.knowledge[road]:
                     distA += distance
-                    if distA > distB:
-                        cars_ahead.append((distA, speedA, car_name))
 
-                        if turn_status == DURING_INTERSECTION:
-                            if turnA == instruction.turn:
-                                cars_turning.append((distA, speedA, car_name))
-                        elif turn_status == DURING_TURN:
+                    if turn_status == DURING_INTERSECTION:
+                        if distA > distB and turnA == instruction.turn:
                             cars_turning.append((distA, speedA, car_name))
-                        elif turn_status == AFTER_TURN:
-                            cars_turning.append((distA, speedA, car_name))
+                    else:
+                        cars_turning.append((distA, speedA, car_name))
 
-            cars_left -= cars_done
-            distance  += road.length
-
-            #last_road = road
-
-            if not cars_left:
-                break
-
-            if cars_ahead and turn_status == None:
-                break
-
-        if not cars_ahead:
-            self.following_speed = MAX_SPEED
-            self.blocked = False
-            return
-
-        cars_ahead.sort()
-        distA, speedA, car_name = cars_ahead[0]
-        self.following_speed = self.followCar(distA - self.dist_along, speedA)
+            distance += road.length
 
         if (not cars_turning) or (exit_distance == None):
             self.blocked = False
@@ -151,31 +131,45 @@ class CarController:
         else:
             safe_space = distance - exit_distance - CAR_LENGTH/2
 
-        #cars_turning.sort()
-        #distA, speedA, car_name = cars_turning[-1]
-        #stop_distA = distA + getStopDistance(speedA)
-
-        #safe_space = stop_distA - exit_distance - CAR_LENGTH/2
-
         if safe_space <= 0:
             self.blocked = False
             return
 
-        cars_fit = safe_space / (CAR_LENGTH + SAFETY_GAP)
-
+        cars_fit = safe_space / MIN_DIST_APART
         self.blocked = cars_fit < len(cars_turning)
 
-    def followCar(self, dist_apart, speedA):
+    def checkCarsAhead(self):
+        distB = self.dist_along
 
-        stop_distA = getStopDistance(speedA)
-        stop_distB = dist_apart + stop_distA - CAR_LENGTH - SAFETY_GAP
+        distance   = 0
+        cars_ahead = []
 
-        if stop_distB <= 0:
-            #print("TOO CLOSE", self.name, dist_apart)
-            return 0
+        dist_thresh = distB + getStopDistance(self.car.speed) + MIN_DIST_APART
 
-        max_speed = getSpeedToStop(stop_distB, self.car.speed)
-        return max_speed
+        for instruction in self.route:
+            road = instruction.road
+
+            if road in self.knowledge:
+                for car_name, speedA, distA, turnA in self.knowledge[road]:
+                    distA += distance
+
+                    if distA > distB:
+                        cars_ahead.append((distA, speedA, car_name))
+
+                if cars_ahead:
+                    break
+
+            distance += road.length
+            if distance > dist_thresh: # follow distance
+                break
+
+        if not cars_ahead:
+            self.following_speed = MAX_SPEED
+            return
+
+        cars_ahead.sort()
+        distA, speedA, car_name = cars_ahead[0]
+        self.following_speed = self.followCar(distA - self.dist_along, speedA)
 
     def getDesiredSpeed(self):
         if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:
@@ -243,9 +237,9 @@ class CarController:
 
         self.time = time
 
-        self.path.append(self.car.position)
-        if len(self.path) > PATH_MEMORY:
-            self.path.popleft()
+        #self.path.append(self.car.position)
+        #if len(self.path) > PATH_MEMORY:
+        #    self.path.popleft()
 
         # update route
         while self.route:
@@ -255,6 +249,7 @@ class CarController:
             dist_along = road.getDistanceAlong(self.car.centre)
             if dist_along >= road.length:
                 self.route.popleft()
+                self.roads.remove(road)
                 continue
             break
 
@@ -267,9 +262,8 @@ class CarController:
         self.road       = road
         self.dist_along = dist_along
 
-        # check if the road ahead is blocked, and
-        # check if you are closely following a car
-        self.checkCarsAhead()
+        self.checkBlocked()   # check if the road ahead is blocked
+        self.checkCarsAhead() # check if you are closely following a car
 
         # update traffic controller
         if self.traffic_controller != None:
@@ -309,7 +303,19 @@ class CarController:
                 continue
 
             if message_type == VISIBLE_DETAILS:
-                self.knowledge[source] = content
+                #self.knowledge[source] = content
+
+                speed, road, dist_along, next_turn = content
+
+                if not road in self.roads:
+                    continue
+
+                new_content = (source, speed, dist_along, next_turn)
+
+                if road in self.knowledge:
+                    self.knowledge[road].append(new_content)
+                else:
+                    self.knowledge[road] = [new_content]
 
         if self.traffic_controller != None:
             self.traffic_controller.receiveMessages(messages)
