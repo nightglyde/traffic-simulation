@@ -24,17 +24,18 @@ class World:
         #             Vector(0, self.height)]
         #self.centre = Vector(self.width/2, self.height/2)
 
-
         self.all_roads = []
         self.grass     = []
 
-        self.entry_roads = []
-        self.recent_cars = []
-        self.schedule    = deque()
+        self.time = -1
+
+        self.entry_roads  = []
+        self.entry_queues = []
+        self.recent_cars  = []
+        self.schedule     = deque()
 
         self.cars          = []
         self.controllers   = []
-        self.car_generator = nextColour(self.cars)
 
         self.traffic_lights = {}
 
@@ -76,10 +77,18 @@ class World:
 
         self.entry_roads  = entry_roads
         for i in range(len(entry_roads)):
+            self.entry_queues.append(deque())
             self.recent_cars.append(None)
 
         self.valid_routes = valid_routes
-        self.schedule     = schedule
+
+        car_generator = nextColour()
+        for start_time, entry_num, route_num in schedule:
+            colour, name = next(car_generator)
+            self.schedule.append((start_time, entry_num, route_num,
+                                  colour, name))
+
+        #self.schedule     = schedule
 
         if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
 
@@ -95,37 +104,45 @@ class World:
                             controller = self.traffic_lights[intersection]
                             instruction.setController(controller)
 
-    def addCar(self, time, entry_num, route_num):
-        #i = random.randint(0, len(self.entry_roads)-1)
-        #road       = self.entry_roads[i]
-        #recent_car = self.recent_cars[i]
+    def addSuccessfulCar(self, car):
+        self.successful_cars += 1
 
-        road  = self.entry_roads[entry_num]
-        route = self.valid_routes[entry_num][route_num]
+        duration = car.time - car.start_time
+        self.results.append((car.start_time, car.time, duration))
+        print(car.time, car.start_time, duration)
+
+    def addCar(self, road, entry, speed):
+        start_time, route_num, colour, name = self.entry_queues[entry].popleft()
+
+        route = self.valid_routes[entry][route_num]
+        pos   = road.start
         angle = road.angle
 
-        recent_car = self.recent_cars[entry_num]
-        if recent_car != None:
-            dist_along = road.getDistanceAlong(recent_car.position)
+        car = Car(self, name, colour, pos, angle, self.time, start_time)
+        car.speed = speed
 
-            if dist_along >= CAR_LENGTH + SAFETY_GAP:
-                pos = road.start
-            else:
-                dist = dist_along - CAR_LENGTH - SAFETY_GAP
-                pos = road.start + road.vec * (dist / road.length)
-
-        else:
-            pos = road.start
-
-        colour, name = next(self.car_generator)
-
-        car = Car(self, name, colour, pos, angle, time)
         self.cars.append(car)
-        self.recent_cars[entry_num] = car
+        self.recent_cars[entry] = car
 
         self.controllers.append(CarController(car, road, route))
 
+    def addCars(self):
+        for entry, road in enumerate(self.entry_roads):
+            if not self.entry_queues[entry]:
+                continue
+
+            recent_car = self.recent_cars[entry]
+            if recent_car == None:
+                self.addCar(road, entry, MAX_SPEED)
+
+            else:
+                dist_along = road.getDistanceAlong(recent_car.position)
+                if dist_along >= MIN_DIST_APART:
+                    speed = getFollowSpeed(dist_along, 0, recent_car.speed)
+                    self.addCar(road, entry, speed)
+
     def update(self, time):
+        self.time = time
 
         # traffic lights mode only
         for intersection in self.traffic_lights:
@@ -180,13 +197,18 @@ class World:
         self.sendMessages()
 
         while self.schedule:
-            start_time, entry_num, route_num = self.schedule[0]
+            start_time, entry_num, route_num, colour, name = self.schedule[0]
 
             if start_time <= time:
-                self.addCar(time, entry_num, route_num)
+
+                self.entry_queues[entry_num].append((start_time, route_num,
+                                                     colour,     name))
+                #self.addCar(time, entry_num, route_num)
                 self.schedule.popleft()
             else:
                 break
+
+        self.addCars()
 
         while len(self.ghosts) > MAX_GHOSTS:
             self.ghosts.popleft()
@@ -327,6 +349,20 @@ class World:
             end   = self.getDrawable(road.end)
 
             pygame.draw.line(self.screen, BLACK, start, end, 1)
+
+        font = pygame.font.SysFont('Helvetica', 12, bold=True)
+        for entry_num, road in enumerate(self.entry_roads):
+            if not self.entry_queues[entry_num]:
+                continue
+
+            num_cars = len(self.entry_queues[entry_num])
+
+            position = road.start + (road.start - road.end).norm()
+            pos      = self.getDrawable(position)
+
+            text = font.render("+{}".format(num_cars), False, BLACK)
+            rect = text.get_rect(center=pos)
+            self.screen.blit(text, rect)
 
         if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
             for intersection in self.traffic_lights:

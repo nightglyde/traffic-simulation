@@ -61,18 +61,6 @@ class CarController:
 
             self.traffic_controller = controller
 
-    def followCar(self, dist_apart, speedA):
-
-        stop_distA = getStopDistance(speedA)
-        stop_distB = dist_apart + stop_distA - MIN_DIST_APART
-
-        if stop_distB <= 0:
-            #print("TOO CLOSE", self.name, dist_apart)
-            return 0
-
-        max_speed = getSpeedToStop(stop_distB, self.car.speed)
-        return max_speed
-
     def checkBlocked(self):
         distB = self.dist_along
 
@@ -171,7 +159,8 @@ class CarController:
 
         cars_ahead.sort()
         distA, speedA, car_name = cars_ahead[0]
-        self.following_speed = self.followCar(distA - self.dist_along, speedA)
+        self.following_speed = getFollowSpeed(distA - self.dist_along,
+                                              self.car.speed, speedA)
 
     def getDesiredSpeed(self):
         if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:

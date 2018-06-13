@@ -84,8 +84,8 @@ TRAFFIC_LIGHTS_MODE         = 0
 VIRTUAL_TRAFFIC_LIGHTS_MODE = 1
 MY_TRAFFIC_CONTROLLER_MODE  = 2
 
-#CONTROLLER_MODE = TRAFFIC_LIGHTS_MODE
-CONTROLLER_MODE = VIRTUAL_TRAFFIC_LIGHTS_MODE
+CONTROLLER_MODE = TRAFFIC_LIGHTS_MODE
+#CONTROLLER_MODE = VIRTUAL_TRAFFIC_LIGHTS_MODE
 #CONTROLLER_MODE = MY_TRAFFIC_CONTROLLER_MODE
 
 #################
@@ -432,32 +432,15 @@ CAR_COLOURS = [
     GREEN, SPRING, CYAN,    AZURE,
     BLUE,  VIOLET, MAGENTA, ROSE,
 ]
+random.shuffle(CAR_COLOURS)
 
-def nextColour(cars_list):
-
-    colour_indices = {colour: 0 for colour in CAR_COLOURS}
-
+def nextColour():
+    index = 0
     while True:
-
-        colour_counts = {colour: 0 for colour in CAR_COLOURS}
-        for car in cars_list:
-            colour_counts[car.colour] += 1
-
-        min_count = 10000000000
-        for colour in colour_counts:
-            min_count = min(colour_counts[colour], min_count)
-
-        random.shuffle(CAR_COLOURS)
         for colour in CAR_COLOURS:
-            if colour_counts[colour] == min_count:
-
-                index = colour_indices[colour]
-                colour_indices[colour] += 1
-
-                name = COLOUR_NAME[colour] + "_" + str(index)
-                yield colour, name
-
-                break
+            name = COLOUR_NAME[colour] + "_" + str(index)
+            yield colour, name
+        index += 1
 
 COLOUR_NAME = {RED:   "RED", ORANGE: "ORA", YELLOW:  "YEL", LIME:  "LIM",
                GREEN: "GRN", SPRING: "SPR", CYAN:    "CYA", AZURE: "AZU",
@@ -491,6 +474,14 @@ def getStopDistance(speed):
     if speed <= 0:
         return 0
     return (speed**2) / (2 * BRAKING_DECEL)
+
+def getFollowSpeed(distance, my_speed, their_speed):
+    their_stop_dist = getStopDistance(their_speed)
+    my_stop_dist    = distance + their_stop_dist - MIN_DIST_APART
+
+    if my_stop_dist <= 0:
+        return 0
+    return getSpeedToStop(my_stop_dist, my_speed)
 
 def getTurningCircle(direction, position, angle, radius=TURN_RADIUS):
     if direction == LEFT:

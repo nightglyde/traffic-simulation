@@ -40,13 +40,13 @@ def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     return wheel_angle
 
 class Car(Obstacle):
-    def __init__(self, world, name, colour, position, angle, time):
+    def __init__(self, world, name, colour, position, angle, time, start_time):
         self.world  = world
         self.name   = name
         self.colour = colour
 
         # for results
-        self.start_time = time
+        self.start_time = start_time
 
         # status
         self.position = position # metres
@@ -97,14 +97,7 @@ class Car(Obstacle):
     def stop(self):
         if not self.stopped:
             self.stopped = True
-            #print(self.name, "finished mission at time", self.time / 1000,
-            #      ", position", self.position)
-            self.world.successful_cars += 1
-
-            # for results
-            duration = self.time - self.start_time
-            self.world.results.append(duration)
-            print(duration)
+            self.world.addSuccessfulCar(self)
 
     def update(self, time):
         if self.stopped:
