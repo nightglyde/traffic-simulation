@@ -266,7 +266,8 @@ class CarController:
         self.next_turn                  = self.getTurningSignal()
 
         self.car.control(desired_speed, desired_position,
-                         desired_angle, self.next_turn)
+                         desired_angle, self.next_turn,
+                         self.road)
 
     def sendMessages(self):
         messages = []

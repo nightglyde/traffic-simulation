@@ -70,7 +70,10 @@ class Car(Obstacle):
         # visualisation
         #self.path = deque() # modified by the controller
 
-        self.random_offset = random.randint(1, 1000)
+        self.controller = None
+
+    def setController(self, controller):
+        self.controller = controller
 
     def generateHull(self):
         forward  = getVector(self.angle)
@@ -153,7 +156,7 @@ class Car(Obstacle):
 
         self.generateHull()
 
-    def control(self, speed, position, angle, turn):
+    def control(self, speed, position, angle, turn, road):
         self.desired_speed    = speed
         self.desired_position = position
         self.desired_angle    = angle
@@ -363,6 +366,11 @@ class Car(Obstacle):
 
         #point = self.world.getDrawable(self.rear + forward * (stop_dist-2))
         #pygame.draw.circle(screen, DARKER[car_colour], point,  3)
+
+        #font = pygame.font.SysFont('Helvetica', 12, bold=True)
+        #text = font.render(str(round(self.speed)), False, BLACK)
+        #rect = text.get_rect(center=self.world.getDrawable(self.centre))
+        #screen.blit(text, rect)
 
     def drawExtra(self):
         if self.stopped:

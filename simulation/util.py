@@ -84,9 +84,9 @@ TRAFFIC_LIGHTS_MODE         = 0
 VIRTUAL_TRAFFIC_LIGHTS_MODE = 1
 MY_TRAFFIC_CONTROLLER_MODE  = 2
 
-CONTROLLER_MODE = TRAFFIC_LIGHTS_MODE
+#CONTROLLER_MODE = TRAFFIC_LIGHTS_MODE
 #CONTROLLER_MODE = VIRTUAL_TRAFFIC_LIGHTS_MODE
-#CONTROLLER_MODE = MY_TRAFFIC_CONTROLLER_MODE
+CONTROLLER_MODE = MY_TRAFFIC_CONTROLLER_MODE
 
 #################
 # MESSAGE TYPES #
@@ -104,12 +104,9 @@ VTL_RETRY         = 5
 VTL_GREEN         = 6
 
 # my traffic controller
-MTC_CAR_STATUS          =  7 #
-MTC_QUERY_STATUS        =  8
-MTC_INTERSECTION_STATUS =  9
-MTC_CHANGE_LEADER       = 10 #
-MTC_CROSS_INTERSECTION  = 11 #
-MTC_LEAVE_INTERSECTION  = 12 #
+MTC_CAR_STATUS         = 7
+MTC_ANNOUNCE_LIGHTS    = 8
+MTC_LEAVE_INTERSECTION = 9
 
 #####################
 # MESSAGE ADDRESSES #
@@ -153,7 +150,15 @@ VTL_GET_APPROVALS     = 3
 VTL_CHOOSE_NEW_LEADER = 4
 
 # my traffic controller
-MTC_CROSS_TIME = 1000
+MTC_GREEN_TIME = 500
+
+MTC_TURN_TIMES = [
+    1200, # centre
+    1200, # right
+    500, # left
+]
+
+MTC_CROSS_DIST = 10
 
 ##########
 # VECTOR #
@@ -458,6 +463,10 @@ def getTurn(entrance, exit):
 
 def getExit(entrance, turn):
     return ((turn + 1) % 3 + entrance + 1) % 4
+
+def getInitialSpeed(distance):
+    speed_to_stop = math.sqrt(2 * BRAKING_DECEL * distance)
+    return min(speed_to_stop, MAX_SPEED)
 
 def getSpeedToStop(distance, curr_speed):
     dt = TIME_STEP / 1000

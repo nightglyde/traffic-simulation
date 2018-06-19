@@ -9,6 +9,9 @@ MAX_GHOSTS = 50
 
 SCALE_CHANGE = 1.25
 
+# between 8 and 40
+CAR_ADDING_DIST = 40
+
 class World:
     def __init__(self, screen, width, height):
         self.screen = screen
@@ -115,7 +118,7 @@ class World:
         start_time, route_num, colour, name = self.entry_queues[entry].popleft()
 
         route = self.valid_routes[entry][route_num]
-        pos   = road.start
+        pos   = road.end + (road.start - road.end).norm() * CAR_ADDING_DIST#road.start
         angle = road.angle
 
         car = Car(self, name, colour, pos, angle, self.time, start_time)
@@ -124,7 +127,9 @@ class World:
         self.cars.append(car)
         self.recent_cars[entry] = car
 
-        self.controllers.append(CarController(car, road, route))
+        controller = CarController(car, road, route)
+        self.controllers.append(controller)
+        car.setController(controller)
 
     def addCars(self):
         for entry, road in enumerate(self.entry_roads):
@@ -132,11 +137,17 @@ class World:
                 continue
 
             recent_car = self.recent_cars[entry]
-            if recent_car == None:
-                self.addCar(road, entry, MAX_SPEED)
+            if recent_car == None or recent_car.controller.road != road:
+
+                speed = getInitialSpeed(CAR_ADDING_DIST - CAR_LENGTH/2)
+
+                self.addCar(road, entry, speed)
 
             else:
                 dist_along = road.getDistanceAlong(recent_car.position)
+
+                dist_along += CAR_ADDING_DIST - road.length
+
                 if dist_along >= MIN_DIST_APART:
                     speed = getFollowSpeed(dist_along, 0, recent_car.speed)
                     self.addCar(road, entry, speed)
@@ -350,6 +361,8 @@ class World:
 
             pygame.draw.line(self.screen, BLACK, start, end, 1)
 
+
+
         font = pygame.font.SysFont('Helvetica', 12, bold=True)
         for entry_num, road in enumerate(self.entry_roads):
             if not self.entry_queues[entry_num]:
@@ -357,16 +370,26 @@ class World:
 
             num_cars = len(self.entry_queues[entry_num])
 
-            position = road.start + (road.start - road.end).norm()
+            position = road.end + (road.start - road.end).norm() \
+                                  * (CAR_ADDING_DIST + 3.5)
             pos      = self.getDrawable(position)
 
             text = font.render("+{}".format(num_cars), False, BLACK)
             rect = text.get_rect(center=pos)
+
+            border = rect.inflate(4, 2)
+            pygame.draw.rect(self.screen, WHITE, border)
+            pygame.draw.rect(self.screen, BLACK, border, 1)
+
             self.screen.blit(text, rect)
 
         if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
             for intersection in self.traffic_lights:
                 self.traffic_lights[intersection].draw()
+
+        elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
+            for controller in self.controllers:
+                controller.traffic_controller.drawBackground()
 
         #box = [self.getDrawable(point) for point in self.hull]
         #pygame.draw.polygon(self.screen, BLACK, box, 1)

@@ -751,6 +751,7 @@ for entrance in range(4):
         connection = (entrance, getExit(entrance, turn))
         combs_including_connection[connection] = combs
 
+ALL_ROUTES  = set()
 VALID_PAIRS = {}
 for connectionA in combs_including_connection:
     combsA = combs_including_connection[connectionA]
@@ -763,7 +764,29 @@ for connectionA in combs_including_connection:
         if combsA & combsB:
             valid_B.add(connectionB)
 
+    ALL_ROUTES.add(connectionA)
+
     VALID_PAIRS[connectionA] = valid_B
+
+
+def checkValidLights(lights, route):
+    return lights.keys() <= VALID_PAIRS[route]
+
+    #routes = ALL_ROUTES
+
+    #for light in lights:
+    #    routes = routes & VALID_PAIRS[light]
+
+    #return route in routes
+
+
+    #valid_pairs = VALID_PAIRS[route]
+
+    #for light in lights:
+    #    if not light in valid_pairs:
+    #        return False
+
+    #return True
 
 class MyTrafficController:
     def __init__(self, car_controller):
@@ -787,15 +810,19 @@ class MyTrafficController:
 
         self.leader = None
 
-    def getLight(self, entrance, exit):
-        if (entrance, exit) in self.lights:
-            return GREEN_LIGHT
-        else:
-            return RED_LIGHT
+        self.crossing = False
 
-    def announceLeavingIntersection(self):
-        self.messages.append((SEND_TO_ALL,       MTC_LEAVE_INTERSECTION,
-                              self.intersection, self.route))
+    def getLight(self, entrance, exit):
+        route = (entrance, exit)
+        if route in self.lights:
+            amber_time = self.lights[route][0]
+
+            if amber_time <= self.time:
+                return AMBER_LIGHT
+
+            return GREEN_LIGHT
+
+        return RED_LIGHT
 
     def update(self, time, instruction):
         self.time = time
@@ -805,52 +832,65 @@ class MyTrafficController:
             if intersection == self.intersection:
                 return
 
-            if self.intersection != None:
-                self.announceLeavingIntersection()
-
             self.intersection = intersection
             self.road         = instruction.road
             self.route        = (instruction.entrance, instruction.exit)
             self.start_time   = time
 
-            print(self.name, self.intersection)
+            self.leader   = None
+            self.crossing = False
 
             self.lights = {}
 
-        elif not instruction.danger:
+        elif instruction.danger:
+            self.crossing = True
+            self.leader   = None
 
-            self.announceLeavingIntersection()
-
+        else:
             self.intersection = None
             self.road         = None
             self.route        = None
             self.start_time   = None
 
+            self.leader   = None
+            self.crossing = False
+
             self.lights = {}
 
-    def generatePriorities(self):
-        roads = self.intersection.inputs
-        priorities = [None for road in roads]
+    def getLeadCars(self):
+        car_queues = [[] for entrance_road in self.intersection.inputs]
+
         for car_name in self.knowledge:
             dist_left, wait_time, route, blocked = self.knowledge[car_name]
-
             entrance, exit = route
+            car_queues[entrance].append((dist_left, car_name))
 
-            priority = (blocked, -wait_time, dist_left, car_name)
+        lead_cars = []
+        for car_queue in car_queues:
+            if car_queue:
+                car_queue.sort()
 
-            if not priorities[entrance]:
-                priorities[entrance] = priority
+                car_name = car_queue[0][-1]
+                dist_left, wait_time, route, blocked = self.knowledge[car_name]
 
-            elif dist_left < priorities[entrance][2]:
-                priorities[entrance] = priority
+                lead_cars.append((blocked, -wait_time, car_name))
 
-        priorities = [priority for priority in priorities if priority]
-        priorities.sort()
-        return [priority[-1] for priority in priorities]
+        lead_cars.sort()
+        return [details[-1] for details in lead_cars]
+
+    def chooseLeader(self):
+        options = []
+        for car_name in self.knowledge:
+            dist_left, wait_time, route, blocked = self.knowledge[car_name]
+            options.append((-wait_time, car_name))
+        options.sort()
+        return options[0][1]
 
     def sendMessages(self):
 
-        if self.intersection == None:
+        self.knowledge.clear()
+
+        if self.intersection == None or self.crossing:
             return self.messages
 
         position = self.car.centre
@@ -873,9 +913,7 @@ class MyTrafficController:
     def receiveMessages(self, messages):
         self.messages.clear()
 
-        change_leaders        = []
-        crossing_intersection = []
-        left_intersection     = []
+        lights_announce = []
 
         for message in messages:
             source, destination, message_type, context, content = message
@@ -889,121 +927,112 @@ class MyTrafficController:
             if message_type == MTC_CAR_STATUS:
                 self.knowledge[source] = content
 
-            elif message_type == MTC_CHANGE_LEADER:
-                change_leaders.append((source, content))
+            elif message_type == MTC_ANNOUNCE_LIGHTS:
+                lights_announce.append((source, content))
 
-            elif message_type == MTC_CROSS_INTERSECTION:
-                crossing_intersection.append((source, content))
-
-            elif message_type == MTC_LEAVE_INTERSECTION:
-                left_intersection.append((source, content))
-
-        if self.intersection == None:
+        if self.intersection == None or self.crossing:
             return
 
-        # car crosses intersection
-        for car_name, content in crossing_intersection:
-            if car_name == self.leader or self.leader == None:
-
-                lights, new_leader = content
-
-                self.lights = lights.copy()
-                self.leader = new_leader
-
-                del self.knowledge[car_name]
-
-        # change leader
-        for car_name, content in change_leaders:
-            if car_name == self.leader or self.leader == None:
-
-                lights, new_leader = content
-
-                self.lights = lights.copy()
-                self.leader = new_leader
-
-        # car leaves intersection
-        for car_name, route in left_intersection:
-
-            if route in self.lights:
-                car_in_charge, time_out = self.lights[route]
-                if car_name == car_in_charge:
-                    del self.lights[route]
-
-        # light time out
-        timed_out = []
-        for route in self.lights:
-            car_in_charge, time_out = self.lights[route]
-            if time_out <= self.time:
-                timed_out.append(route)
-
-        for route in timed_out:
-            del self.lights[route]
+        # update lights
+        for car_name, lights in lights_announce:
+            #if car_name == self.leader or self.leader == None:
+            self.lights = lights.copy()
 
         # choose leader
-        if self.leader == None:
-
-            wait_time = self.time - self.start_time
-
-            if wait_time > 1000:
-
-                priorities = self.generatePriorities()
-                if priorities:
-                    self.leader = priorities[0]
+        self.leader = self.chooseLeader()
 
         # lead intersection
         if self.leader == self.name:
 
-            priorities = self.generatePriorities()
+            # light time out
+            timed_out = []
+            for route in self.lights:
+                red_time = self.lights[route][1]
+                if red_time <= self.time:
+                    timed_out.append(route)
+            for route in timed_out:
+                del self.lights[route]
 
-            if self.lights.keys() <= VALID_PAIRS[self.route]:
+            lead_cars = self.getLeadCars()
+            for car_name in lead_cars:
 
-                for car_name in priorities:
-                    if car_name != self.name:
-                        next_leader = car_name
-                        break
-                else:
-                    next_leader = None
+                dist_left, wait_time, route, blocked = self.knowledge[car_name]
 
-                time = self.time + MTC_CROSS_TIME
-                self.lights[self.route] = (self.name, time)
+                if dist_left > MTC_CROSS_DIST:
+                    continue
 
-                self.messages.append(
-                    (SEND_TO_ALL,       MTC_CROSS_INTERSECTION,
-                     self.intersection, (self.lights, next_leader)))
+                if checkValidLights(self.lights, route):
 
-            #else:
-            #    for i, car_name in enumerate(priorities):
-            #        if car_name == self.name:
-            #            next_leader = priorities[(i+1) % len(priorities)]
+                    amber_time = self.time  + MTC_GREEN_TIME
+                    red_time   = amber_time + MTC_TURN_TIMES[getTurn(*route)]
 
-            #    self.messages.append(
-            #        (SEND_TO_ALL,       MTC_CHANGE_LEADER,
-            #         self.intersection, (self.lights, next_leader)))
+                    self.lights[route] = (amber_time, red_time)
 
-    def draw(self):
+            self.messages.append(
+                (SEND_TO_ALL,       MTC_ANNOUNCE_LIGHTS,
+                 self.intersection, self.lights.copy()))
+
+    def drawBackground(self):
+        if self.leader != self.name:
+            return
+
         world  = self.world
         screen = world.screen
 
-        point  = world.getDrawable(self.car.centre)
-        radius = world.scaleDistance(CAR_WIDTH/2 + 0.1)
+        for route in self.lights:
+            amber_time = self.lights[route][0]
+            if amber_time <= self.time:
+                colour = AMBER
+            else:
+                colour = GREEN
 
-        if self.leader == self.name:
-            colour = BLACK
+            for road in self.intersection.paths[route]:
+                start = world.getDrawable(road.start)
+                end   = world.getDrawable(road.end)
+                pygame.draw.line(screen, colour, start, end, 2)
+
+    def draw(self):
+        if self.intersection == None:
+            return
+
+        world  = self.world
+        screen = world.screen
+
+        if self.crossing:
+            colour = GREEN
+        elif self.leader == self.name:
+            colour = YELLOW
         else:
             colour = WHITE
 
-            for car in self.world.cars:
-                if car.name == self.leader:
-                    b = world.getDrawable(car.centre)
+        radius = CAR_WIDTH/2 + 0.1
 
-                    pygame.draw.line(screen, self.colour, point, b, 3)
+        pos = world.getDrawable(self.car.centre)
+        rad = world.scaleDistance(CAR_WIDTH/2 + 0.1)
 
-        pygame.draw.circle(screen, colour, point, radius)
-        pygame.draw.circle(screen, BLACK,  point, radius, 1)
+        pygame.draw.circle(screen, colour, pos, rad)
+        pygame.draw.circle(screen, BLACK,  pos, rad, 1)
 
-        for pair in self.lights:
-            for road in self.intersection.paths[pair]:
-                start = world.getDrawable(road.start)
-                end   = world.getDrawable(road.end)
-                pygame.draw.line(screen, self.colour, start, end, 2)
+        #if self.leader == self.name:
+
+            #rad1 = world.scaleDistance(radius*0.65)
+            #rad2 = world.scaleDistance(radius*0.3)
+
+            #pygame.draw.circle(screen, BLACK, pos, rad1)
+            #pygame.draw.circle(screen, WHITE, pos, rad2)
+
+            #rect = generateRect(self.car.centre, radius/2, self.world)
+
+            #pygame.draw.rect(screen, BLACK, rect)
+
+            #font = pygame.font.SysFont('Helvetica', radius, bold=True)
+
+            #text = font.render(" L ", False, BLACK)
+            #rect = text.get_rect(center=point)
+            #screen.blit(text, rect)
+
+            #border = rect.inflate(8, 2)
+            #pygame.draw.rect(screen, BLACK, rect, 1)
+
+            #pygame.draw.circle(screen, AMBER, point, radius//2)
 
