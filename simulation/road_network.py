@@ -349,7 +349,7 @@ class VirtualTrafficLights:
 
         priorities = [None for i in range(N)]
         for car_name in self.knowledge:
-            dist_left, entrance, blocked = self.knowledge[car_name]
+            dist_left, entrance, spaces = self.knowledge[car_name]
 
             if not priorities[entrance]:
                 priorities[entrance] = (dist_left, car_name)
@@ -416,7 +416,9 @@ class VirtualTrafficLights:
         roads = self.intersection.inputs
         priorities = [None for road in roads]
         for car_name in self.knowledge:
-            dist_left, entrance, blocked = self.knowledge[car_name]
+            dist_left, entrance, spaces = self.knowledge[car_name]
+
+            blocked = spaces < 1
 
             if not priorities[entrance]:
                 priorities[entrance] = (blocked, dist_left, car_name)
@@ -483,7 +485,7 @@ class VirtualTrafficLights:
 
         if self.role != VTL_FOLLOWER:
             for car_name in new_vehicles:
-                dist_left, entrance, blocked = self.knowledge[car_name]
+                dist_left, entrance, spaces = self.knowledge[car_name]
 
                 if dist_left < VTL_LEADER_DIST:
                     self.retry()
@@ -532,7 +534,7 @@ class VirtualTrafficLights:
         return True
 
     def activateGreenLight(self):
-        if self.car_controller.blocked:
+        if self.car_controller.spaces_left < 1:#blocked:
             #print(self.name, "gave up leadership")
             self.retry()
             return
@@ -548,7 +550,7 @@ class VirtualTrafficLights:
         if self.num_followers <= 0:
             return
 
-        my_dist, my_entrance, blocked = self.knowledge[self.name]
+        my_dist, my_entrance, spaces = self.knowledge[self.name]
 
         if self.first_follower == None:
 
@@ -557,24 +559,24 @@ class VirtualTrafficLights:
                 if car_name == self.name:
                     continue
 
-                dist_left, entrance, blocked = self.knowledge[car_name]
+                dist_left, entrance, spaces = self.knowledge[car_name]
                 if entrance != my_entrance:
                     continue
 
                 if dist_left > my_dist:
-                    followers.append((dist_left, car_name, blocked))
+                    followers.append((dist_left, car_name, spaces))
 
             if not followers:
                 return
 
             followers.sort()
-            dist_left, car_name, blocked = followers[0]
+            dist_left, car_name, spaces = followers[0]
             self.first_follower = car_name
 
         else:
-            dist_left, entrance, blocked = self.knowledge[self.first_follower]
+            dist_left, entrance, spaces = self.knowledge[self.first_follower]
 
-        if blocked or dist_left - my_dist > VTL_FOLLOW_DIST:
+        if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST:
             return
 
         self.messages.append((self.first_follower, VTL_GREEN,
@@ -600,7 +602,7 @@ class VirtualTrafficLights:
 
             self.stage = VTL_CALCULATE_LEADERS
 
-        content = (dist_left, self.entrance, self.car_controller.blocked)
+        content = (dist_left, self.entrance, self.car_controller.spaces_left)
 
         self.knowledge[self.name] = content
 
@@ -751,7 +753,6 @@ for entrance in range(4):
         connection = (entrance, getExit(entrance, turn))
         combs_including_connection[connection] = combs
 
-ALL_ROUTES  = set()
 VALID_PAIRS = {}
 for connectionA in combs_including_connection:
     combsA = combs_including_connection[connectionA]
@@ -764,29 +765,7 @@ for connectionA in combs_including_connection:
         if combsA & combsB:
             valid_B.add(connectionB)
 
-    ALL_ROUTES.add(connectionA)
-
     VALID_PAIRS[connectionA] = valid_B
-
-
-def checkValidLights(lights, route):
-    return lights.keys() <= VALID_PAIRS[route]
-
-    #routes = ALL_ROUTES
-
-    #for light in lights:
-    #    routes = routes & VALID_PAIRS[light]
-
-    #return route in routes
-
-
-    #valid_pairs = VALID_PAIRS[route]
-
-    #for light in lights:
-    #    if not light in valid_pairs:
-    #        return False
-
-    #return True
 
 class MyTrafficController:
     def __init__(self, car_controller):
@@ -803,14 +782,344 @@ class MyTrafficController:
         self.route        = None
         self.start_time   = None
 
-        self.lights = {}
+        self.messages      = []
+        self.knowledge     = {}
+        self.existing_cars = {}
+
+        self.leader = None
+        self.stage  = MTC_NO_INTERSECTION
+
+        self.crossing_cars = {}
+
+    def getLight(self, entrance, exit):
+        if self.stage == MTC_CROSSING:
+            return GREEN_LIGHT
+        return RED_LIGHT
+
+    def chooseNextLeader(self):
+        options = []
+        for car_name in self.existing_cars:
+            #if car_name == self.name:
+            #    continue
+
+            wait_time = self.existing_cars[car_name]
+            options.append((-wait_time, car_name))
+
+        #if not options:
+        #    return None
+
+        options.sort()
+        # return options[0][-1]
+        return [option[-1] for option in options]
+
+    def announceCrossed(self):
+        if self.leader == self.name:
+
+            for car_name in self.chooseNextLeader():
+                if car_name != self.name:
+                    new_leader = car_name
+                    break
+            else:
+                new_leader = None
+
+            if self.route in self.crossing_cars:
+                if self.crossing_cars[self.route] == self.name:
+                    del self.crossing_cars[self.route]
+
+            self.messages.append(
+                (SEND_TO_ALL, MTC_NEW_LEADER, self.intersection,
+                 (new_leader, self.crossing_cars.copy()))
+            )
+
+            self.leader = None
+
+        else:
+            self.messages.append((SEND_TO_ALL, MTC_FINISHED_CROSSING,
+                                  self.intersection, self.route))
+
+
+    def update(self, time, instruction):
+        self.time = time
+
+        if isinstance(instruction, EnterIntersection):
+            intersection = instruction.intersection
+            if intersection == self.intersection:
+                return
+
+            if self.stage == MTC_CROSSING:
+                self.announceCrossed()
+
+            self.intersection = intersection
+            self.road         = instruction.road
+            self.route        = (instruction.entrance, instruction.exit)
+            self.start_time   = time
+
+            self.leader = None
+            self.stage  = MTC_OUT_OF_RANGE
+
+            self.crossing_cars.clear()
+
+        #elif instruction.danger:
+        #    self.stage = MTC_CROSSING
+
+        elif not instruction.danger:
+            if self.stage == MTC_CROSSING:
+                self.announceCrossed()
+
+            self.stage = MTC_NO_INTERSECTION
+
+    def getLeadCars(self):
+        car_queues = [[] for entrance_road in self.intersection.inputs]
+
+        for car_name in self.knowledge:
+            dist_left, wait_time, route, spaces = self.knowledge[car_name]
+            entrance, exit = route
+            car_queues[entrance].append((dist_left, car_name))
+
+        lead_cars = []
+        for car_queue in car_queues:
+            if car_queue:
+                car_queue.sort()
+
+                car_name = car_queue[0][-1]
+                dist_left, wait_time, route, spaces = self.knowledge[car_name]
+
+                lead_cars.append((-wait_time, car_name, route))
+
+        lead_cars.sort()
+        return [(name, route) for wait, name, route in lead_cars]
+
+    def carCanCross(self, car_name):
+        dist_left, wait_time, route, spaces = self.knowledge[car_name]
+        if spaces < 1 or dist_left > MTC_CROSS_DIST:
+            return False
+        return self.crossing_cars.keys() <= VALID_PAIRS[route]
+
+    def sendMessages(self):
+        self.knowledge.clear()
+        self.existing_cars.clear()
+
+        if self.stage == MTC_NO_INTERSECTION:
+            return self.messages
+
+        position = self.car.centre
+        road     = self.road
+
+        dist_along = road.getDistanceAlong(position)
+        dist_left  = road.length - dist_along
+
+        if self.stage == MTC_OUT_OF_RANGE:
+            if dist_left > MTC_THRESHOLD:
+                return self.messages
+            else:
+                self.stage = MTC_IN_QUEUE
+
+        wait_time = self.time - self.start_time
+
+        self.messages.append((SEND_TO_ALL, MTC_CAR_EXISTS,
+                              self.intersection, wait_time))
+
+        self.existing_cars[self.name] = wait_time
+
+        if self.stage == MTC_CROSSING:
+            return self.messages
+
+        content = (dist_left, wait_time, self.route,
+                   self.car_controller.spaces_left)
+
+        self.knowledge[self.name] = content
+
+        self.messages.append((SEND_TO_ALL,       MTC_CAR_STATUS,
+                              self.intersection, content))
+        return self.messages
+
+    def receiveMessages(self, messages):
+        self.messages.clear()
+
+        if self.stage in {MTC_NO_INTERSECTION, MTC_OUT_OF_RANGE}:
+            return
+
+        #lights_announce = []
+
+        green_lights = []
+        new_leaders  = []
+        crossed      = []
+
+        for message in messages:
+            source, destination, message_type, context, content = message
+
+            if source == self.name:
+                continue
+
+            if context != self.intersection:
+                continue
+
+            if message_type == MTC_CAR_STATUS:
+                self.knowledge[source] = content
+
+            elif message_type == MTC_CAR_EXISTS:
+                self.existing_cars[source] = content
+
+            #elif message_type == MTC_ANNOUNCE_LIGHTS:
+            #    lights_announce.append((source, content))
+
+            elif message_type == MTC_GREEN_LIGHT:
+                green_lights.append((source, destination))
+
+            elif message_type == MTC_NEW_LEADER:
+                new_leaders.append((source, content))
+
+            elif message_type == MTC_FINISHED_CROSSING:
+                crossed.append((source, content))
+
+        for source, content in new_leaders:
+            if source == self.leader or self.leader == None:
+                new_leader, crossing_cars = content
+
+                self.crossing_cars = crossing_cars.copy()
+
+                if new_leader in self.existing_cars:
+                    self.leader = new_leader
+                else:
+                    self.leader = None
+
+        for source, destination in green_lights:
+            if source == self.leader or self.leader == None:
+                if destination == self.name:
+                    self.stage = MTC_CROSSING
+                    return
+
+        if self.leader == None:
+            # decide who the leader is
+
+            # this is just a placeholder
+            #self.leader = self.chooseLeader()
+
+            if len(self.existing_cars) == 1:
+                self.leader = self.name
+
+            else:
+                self.leader = self.chooseNextLeader()[0]
+
+        # lead intersection
+        if self.leader == self.name:
+
+            # light time out
+            #timed_out = []
+            #for route in self.lights:
+            #    red_time = self.lights[route][1]
+            #    if red_time <= self.time:
+            #        timed_out.append(route)
+            #for route in timed_out:
+            #    del self.lights[route]
+
+            for source, route in crossed:
+                if route in self.crossing_cars:
+                    if self.crossing_cars[route] == source:
+                        del self.crossing_cars[route]
+
+            if self.stage != MTC_CROSSING:
+
+                if self.carCanCross(self.name):
+                    self.crossing_cars[self.route] = self.name
+
+                    self.stage = MTC_CROSSING
+
+                    print(self.name, self.crossing_cars)
+
+                    #new_leader = self.chooseLeader()
+
+                    #self.messages.append(
+                    #    (SEND_TO_ALL, MTC_NEW_LEADER, self.intersection,
+                    #     (new_leader, self.crossing_cars))
+                    #)
+                    #return
+
+            lead_cars = self.getLeadCars()
+            for car_name, route in lead_cars:
+
+                if self.carCanCross(car_name):
+
+                    self.crossing_cars[route] = car_name
+
+                    self.messages.append((car_name, MTC_GREEN_LIGHT,
+                                          self.intersection, None))
+
+                    print(self.name, self.crossing_cars)
+
+                    #amber_time = self.time  + MTC_GREEN_TIME
+                    #red_time   = amber_time + MTC_TURN_TIMES[getTurn(*route)]
+
+                    #self.lights[route] = (amber_time, red_time)
+
+            #self.messages.append(
+            #    (SEND_TO_ALL, MTC_ANNOUNCE_LIGHTS, self.intersection,
+            #     (self.lights.copy(), self.exit_counts.copy()))
+            #)
+
+    def drawBackground(self):
+        if self.leader != self.name:
+            return
+
+        world  = self.world
+        screen = world.screen
+
+        for route in self.crossing_cars:
+            colour = GREEN
+
+            for road in self.intersection.paths[route]:
+                start = world.getDrawable(road.start)
+                end   = world.getDrawable(road.end)
+                pygame.draw.line(screen, colour, start, end, 2)
+
+    def draw(self):
+
+        if self.stage == MTC_NO_INTERSECTION:
+            return
+
+        world  = self.world
+        screen = world.screen
+
+        if self.leader == self.name:
+            colour = YELLOW
+        elif self.stage == MTC_CROSSING:
+            colour = GREEN
+        elif self.stage == MTC_OUT_OF_RANGE:
+            colour = GREY
+        else:
+            colour = WHITE
+
+        radius = CAR_WIDTH/2 + 0.1
+
+        pos = world.getDrawable(self.car.centre)
+        rad = world.scaleDistance(CAR_WIDTH/2 + 0.1)
+
+        pygame.draw.circle(screen, colour, pos, rad)
+        pygame.draw.circle(screen, BLACK,  pos, rad, 1)
+
+class alt_MyTrafficController:
+    def __init__(self, car_controller):
+        self.car_controller = car_controller
+
+        self.world  = car_controller.world
+        self.name   = car_controller.name
+        self.colour = car_controller.colour
+        self.car    = car_controller.car
+        self.time   = car_controller.time
+
+        self.intersection = None
+        self.road         = None
+        self.route        = None
+        self.start_time   = None
+
+        self.lights      = {}
+        self.exit_counts = {}
 
         self.messages  = []
         self.knowledge = {}
 
         self.leader = None
-
-        self.crossing = False
+        self.stage  = MTC_NO_INTERSECTION
 
     def getLight(self, entrance, exit):
         route = (entrance, exit)
@@ -837,31 +1146,22 @@ class MyTrafficController:
             self.route        = (instruction.entrance, instruction.exit)
             self.start_time   = time
 
-            self.leader   = None
-            self.crossing = False
+            self.leader = None
+            self.stage  = MTC_OUT_OF_RANGE
 
-            self.lights = {}
+            self.lights      = {}
+            self.exit_counts = {}
 
         elif instruction.danger:
-            self.crossing = True
-            self.leader   = None
-
+            self.stage = MTC_CROSSING
         else:
-            self.intersection = None
-            self.road         = None
-            self.route        = None
-            self.start_time   = None
-
-            self.leader   = None
-            self.crossing = False
-
-            self.lights = {}
+            self.stage = MTC_NO_INTERSECTION
 
     def getLeadCars(self):
         car_queues = [[] for entrance_road in self.intersection.inputs]
 
         for car_name in self.knowledge:
-            dist_left, wait_time, route, blocked = self.knowledge[car_name]
+            dist_left, wait_time, route, spaces = self.knowledge[car_name]
             entrance, exit = route
             car_queues[entrance].append((dist_left, car_name))
 
@@ -871,9 +1171,23 @@ class MyTrafficController:
                 car_queue.sort()
 
                 car_name = car_queue[0][-1]
-                dist_left, wait_time, route, blocked = self.knowledge[car_name]
+                dist_left, wait_time, route, spaces = self.knowledge[car_name]
 
-                lead_cars.append((blocked, -wait_time, car_name))
+                entrance, exit = route
+
+                #if exit in self.exit_counts:
+                #    bias = self.exit_counts[exit]
+                #else:
+                #    bias = 0
+
+                #turn = getTurn(*route)
+                #if turn == RIGHT:
+                #    turn_advantage = 0
+                #else:
+                #    turn_advantage = 1
+
+                if spaces >= 1:
+                    lead_cars.append((-wait_time, car_name))
 
         lead_cars.sort()
         return [details[-1] for details in lead_cars]
@@ -881,16 +1195,15 @@ class MyTrafficController:
     def chooseLeader(self):
         options = []
         for car_name in self.knowledge:
-            dist_left, wait_time, route, blocked = self.knowledge[car_name]
+            dist_left, wait_time, route, spaces = self.knowledge[car_name]
             options.append((-wait_time, car_name))
         options.sort()
         return options[0][1]
 
     def sendMessages(self):
-
         self.knowledge.clear()
 
-        if self.intersection == None or self.crossing:
+        if self.stage in {MTC_NO_INTERSECTION, MTC_CROSSING}:
             return self.messages
 
         position = self.car.centre
@@ -899,10 +1212,16 @@ class MyTrafficController:
         dist_along = road.getDistanceAlong(position)
         dist_left  = road.length - dist_along
 
+        if self.stage == MTC_OUT_OF_RANGE:
+            if dist_left > MTC_THRESHOLD:
+                return self.messages
+            else:
+                self.stage = MTC_IN_QUEUE
+
         wait_time = self.time - self.start_time
 
         content = (dist_left, wait_time, self.route,
-                   self.car_controller.blocked)
+                   self.car_controller.spaces_left)
 
         self.knowledge[self.name] = content
 
@@ -912,6 +1231,9 @@ class MyTrafficController:
 
     def receiveMessages(self, messages):
         self.messages.clear()
+
+        if self.stage != MTC_IN_QUEUE:
+            return
 
         lights_announce = []
 
@@ -930,13 +1252,13 @@ class MyTrafficController:
             elif message_type == MTC_ANNOUNCE_LIGHTS:
                 lights_announce.append((source, content))
 
-        if self.intersection == None or self.crossing:
-            return
-
         # update lights
-        for car_name, lights in lights_announce:
+        for car_name, content in lights_announce:
             #if car_name == self.leader or self.leader == None:
-            self.lights = lights.copy()
+            lights, exit_counts = content
+
+            self.lights      = lights.copy()
+            self.exit_counts = exit_counts.copy()
 
         # choose leader
         self.leader = self.chooseLeader()
@@ -953,27 +1275,40 @@ class MyTrafficController:
             for route in timed_out:
                 del self.lights[route]
 
+            #dont_block_me = VALID_PAIRS[self.route]
+
             lead_cars = self.getLeadCars()
             for car_name in lead_cars:
 
-                dist_left, wait_time, route, blocked = self.knowledge[car_name]
+                dist_left, wait_time, route, spaces = self.knowledge[car_name]
 
                 if dist_left > MTC_CROSS_DIST:
                     continue
 
-                if checkValidLights(self.lights, route):
+                if self.lights.keys() <= VALID_PAIRS[route]:
 
                     amber_time = self.time  + MTC_GREEN_TIME
                     red_time   = amber_time + MTC_TURN_TIMES[getTurn(*route)]
 
+                    #if not route in dont_block_me:
+                    #    continue
+
                     self.lights[route] = (amber_time, red_time)
 
+                    #entrance, exit = route
+                    #if exit in self.exit_counts:
+                    #    self.exit_counts[exit] += 1
+                    #else:
+                    #    self.exit_counts[exit] = 1
+                #break
+
             self.messages.append(
-                (SEND_TO_ALL,       MTC_ANNOUNCE_LIGHTS,
-                 self.intersection, self.lights.copy()))
+                (SEND_TO_ALL, MTC_ANNOUNCE_LIGHTS, self.intersection,
+                 (self.lights.copy(), self.exit_counts.copy()))
+            )
 
     def drawBackground(self):
-        if self.leader != self.name:
+        if self.stage != MTC_IN_QUEUE or self.leader != self.name:
             return
 
         world  = self.world
@@ -992,14 +1327,17 @@ class MyTrafficController:
                 pygame.draw.line(screen, colour, start, end, 2)
 
     def draw(self):
-        if self.intersection == None:
+
+        if self.stage == MTC_NO_INTERSECTION:
             return
 
         world  = self.world
         screen = world.screen
 
-        if self.crossing:
+        if self.stage == MTC_CROSSING:
             colour = GREEN
+        elif self.stage == MTC_OUT_OF_RANGE:
+            colour = GREY
         elif self.leader == self.name:
             colour = YELLOW
         else:

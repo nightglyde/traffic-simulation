@@ -75,6 +75,8 @@ RIGHT  = 1
 CENTRE = 0
 
 # traffic control
+ROAD_CLEAR = 1000
+
 RED_LIGHT   = 0
 AMBER_LIGHT = 1
 GREEN_LIGHT = 2
@@ -105,8 +107,13 @@ VTL_GREEN         = 6
 
 # my traffic controller
 MTC_CAR_STATUS         = 7
-MTC_ANNOUNCE_LIGHTS    = 8
-MTC_LEAVE_INTERSECTION = 9
+MTC_ANNOUNCE_LIGHTS    = 8 #
+MTC_LEAVE_INTERSECTION = 9 #
+
+MTC_GREEN_LIGHT       = 10
+MTC_NEW_LEADER        = 11
+MTC_FINISHED_CROSSING = 12
+MTC_CAR_EXISTS        = 13
 
 #####################
 # MESSAGE ADDRESSES #
@@ -123,12 +130,12 @@ SIGHT_RADIUS = 50 # metres, maximum range for line-of-sight messages
 # must be at least
 # sqrt(2*((ROAD_WIDTH + CORNER_OFFSET*2 + CAR_LENGTH - HALF_LANE)**2))
 
-# traffic lights
+# TRAFFIC LIGHTS
 AMBER_PHASE    = 4000
 RED_PHASE      = AMBER_PHASE + 1000
 CYCLE_DURATION = RED_PHASE   + 1000
 
-# virtual traffic lights
+# VIRTUAL TRAFFIC LIGHTS
 VTL_NR_MAX     = 10
 VTL_NF_DEFAULT = 5
 
@@ -143,14 +150,15 @@ VTL_LEADER              = 1
 VTL_FOLLOWER            = 2
 VTL_CROSSING            = 3
 
+# stages
 VTL_NO_INTERSECTION   = 0
 VTL_JOIN_INTERSECTION = 1
 VTL_CALCULATE_LEADERS = 2
 VTL_GET_APPROVALS     = 3
 VTL_CHOOSE_NEW_LEADER = 4
 
-# my traffic controller
-MTC_GREEN_TIME = 500
+# MY TRAFFIC CONTROLLER
+MTC_GREEN_TIME = 1000#500
 
 MTC_TURN_TIMES = [
     1200, # centre
@@ -158,7 +166,14 @@ MTC_TURN_TIMES = [
     500, # left
 ]
 
-MTC_CROSS_DIST = 10
+MTC_THRESHOLD  = 20
+MTC_CROSS_DIST = 5
+
+# stages
+MTC_NO_INTERSECTION = 0
+MTC_OUT_OF_RANGE    = 1
+MTC_IN_QUEUE        = 2
+MTC_CROSSING        = 3
 
 ##########
 # VECTOR #

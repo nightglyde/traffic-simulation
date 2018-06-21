@@ -36,7 +36,8 @@ class CarController:
         self.knowledge = {}
 
         self.following_speed = MAX_SPEED
-        self.blocked         = False
+        #self.blocked         = False
+        self.spaces_left     = ROAD_CLEAR
 
     def setupRoute(self, route):
         if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
@@ -65,12 +66,14 @@ class CarController:
         distB = self.dist_along
 
         if not isinstance(self.road, IntersectionRoad):
-            self.blocked = False
+            #self.blocked = False
+            self.spaces_left = ROAD_CLEAR
             return
 
         dist_left = self.road.length - distB
         if dist_left > VTL_THRESHOLD:
-            self.blocked = False
+            #self.blocked = False
+            self.spaces_left = ROAD_CLEAR
             return
 
         cars_turning  = []
@@ -108,7 +111,8 @@ class CarController:
             distance += road.length
 
         if (not cars_turning) or (exit_distance == None):
-            self.blocked = False
+            #self.blocked = False
+            self.spaces_left = ROAD_CLEAR
             return
 
         if False:#if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
@@ -122,11 +126,17 @@ class CarController:
             safe_space = distance - exit_distance - CAR_LENGTH/2
 
         if safe_space <= 0:
-            self.blocked = False
+            print("APPLEDIRT")
+            #self.blocked = False
+            self.spaces_left = ROAD_CLEAR
             return
 
         cars_fit = safe_space / MIN_DIST_APART
-        self.blocked = cars_fit < len(cars_turning)
+        #self.blocked = cars_fit < len(cars_turning)
+
+        self.spaces_left = max(0, cars_fit - len(cars_turning) + 1)
+
+        #print(self.name, cars_fit < len(cars_turning), cars_fit, len(cars_turning), self.spaces_left)
 
     def checkCarsAhead(self):
         distB = self.dist_along
@@ -163,7 +173,7 @@ class CarController:
                                               self.car.speed, speedA)
 
     def getDesiredSpeed(self):
-        if not self.blocked and self.route[0].checkLights() == GREEN_LIGHT:
+        if self.spaces_left >= 1 and self.route[0].checkLights() == GREEN_LIGHT:
             desired_speed = MAX_SPEED
 
         else:
@@ -325,4 +335,12 @@ class CarController:
     def draw(self):
         if self.traffic_controller != None:
             self.traffic_controller.draw()
+
+        if self.spaces_left < ROAD_CLEAR:
+            pos = self.world.getDrawable(self.car.centre)
+
+            font = pygame.font.SysFont('Helvetica', 12, bold=True)
+            text = font.render(str(round(self.spaces_left, 2)), False, BLACK)
+            rect = text.get_rect(center=pos)
+            self.world.screen.blit(text, rect)
 
