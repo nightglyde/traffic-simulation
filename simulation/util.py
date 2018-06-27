@@ -90,31 +90,6 @@ MY_TRAFFIC_CONTROLLER_MODE  = 2
 #CONTROLLER_MODE = VIRTUAL_TRAFFIC_LIGHTS_MODE
 CONTROLLER_MODE = MY_TRAFFIC_CONTROLLER_MODE
 
-#################
-# MESSAGE TYPES #
-#################
-
-# traffic lights
-VISIBLE_DETAILS = 0
-
-# virtual traffic lights
-VTL_STATUS        = 1
-VTL_GREEN_REQUEST = 2
-VTL_ACKNOWLEDGE   = 3
-VTL_REFUSAL       = 4
-VTL_RETRY         = 5
-VTL_GREEN         = 6
-
-# my traffic controller
-MTC_CAR_STATUS         = 7
-MTC_ANNOUNCE_LIGHTS    = 8 #
-MTC_LEAVE_INTERSECTION = 9 #
-
-MTC_GREEN_LIGHT       = 10
-MTC_NEW_LEADER        = 11
-MTC_FINISHED_CROSSING = 12
-MTC_CAR_EXISTS        = 13
-
 #####################
 # MESSAGE ADDRESSES #
 #####################
@@ -122,6 +97,31 @@ SEND_TO_ALL    = 0
 LINE_OF_SIGHT  = 1
 CONTROL_CENTRE = 2
 # for direct messages, use the destination car's name
+
+# MESSAGE FORMAT: (destination, message_type, context [intersection], content)
+
+#################
+# MESSAGE TYPES #
+#################
+                       # SEND ADDRESS # CONTENT
+# ALL CONTROLLERS
+VISIBLE_DETAILS = 0    # SEND_TO_ALL  # (speed, road, dist_along, next_turn)
+
+# VIRTUAL TRAFFIC LIGHTS
+VTL_STATUS        = 1  # SEND_TO_ALL  # (dist_left, entry, spaces)
+VTL_GREEN_REQUEST = 2  # individual   # None
+VTL_ACKNOWLEDGE   = 3  # individual   # None
+VTL_REFUSAL       = 4  # individual   # None
+VTL_RETRY         = 5  # individual   # None
+VTL_GREEN         = 6  # individual   # num_followers
+
+# MY TRAFFIC CONTROLLER
+MTC_CAR_STATUS    =  7 # SEND_TO_ALL  # status [MTCStatus]
+MTC_VOTE_LEADER   =  8 # SEND_TO_ALL  # car_name
+MTC_ASSERT_LEADER =  9 # SEND_TO_ALL  # car_name, cross_count
+MTC_GREEN_LIGHT   = 10 # SEND_TO_ALL  # car_name
+
+# route: (entry_id, exit_id)
 
 ########
 # MISC #
@@ -158,16 +158,11 @@ VTL_GET_APPROVALS     = 3
 VTL_CHOOSE_NEW_LEADER = 4
 
 # MY TRAFFIC CONTROLLER
-MTC_GREEN_TIME = 1000#500
+MTC_THRESHOLD   = 20
+MTC_CROSS_DIST  = 10
+MTC_CROSS_COUNT = 6
 
-MTC_TURN_TIMES = [
-    1200, # centre
-    1200, # right
-    500, # left
-]
-
-MTC_THRESHOLD  = 20
-MTC_CROSS_DIST = 5
+MTC_TIMEOUT = 100
 
 # stages
 MTC_NO_INTERSECTION = 0

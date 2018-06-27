@@ -336,11 +336,11 @@ class CarController:
         if self.traffic_controller != None:
             self.traffic_controller.draw()
 
-        if self.spaces_left < ROAD_CLEAR:
-            pos = self.world.getDrawable(self.car.centre)
+        #if self.spaces_left < ROAD_CLEAR:
+        #    pos = self.world.getDrawable(self.car.centre)
 
-            font = pygame.font.SysFont('Helvetica', 12, bold=True)
-            text = font.render(str(round(self.spaces_left, 2)), False, BLACK)
-            rect = text.get_rect(center=pos)
-            self.world.screen.blit(text, rect)
+        #    font = pygame.font.SysFont('Helvetica', 12, bold=True)
+        #    text = font.render(str(round(self.spaces_left, 2)), False, BLACK)
+        #    rect = text.get_rect(center=pos)
+        #    self.world.screen.blit(text, rect)
 

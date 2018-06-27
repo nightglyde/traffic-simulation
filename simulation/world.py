@@ -112,7 +112,7 @@ class World:
 
         duration = car.time - car.start_time
         self.results.append((car.start_time, car.time, duration))
-        print(car.time, car.start_time, duration)
+        print(self.successful_cars, car.time, car.start_time, duration)
 
     def addCar(self, road, entry, speed):
         start_time, route_num, colour, name = self.entry_queues[entry].popleft()
@@ -238,14 +238,14 @@ class World:
 
                 if address == SEND_TO_ALL:
                     for recv in self.controllers:
-                        if sender == recv:
-                            continue
+                        #if sender == recv:
+                        #    continue
                         messages[recv.name].append(message)
 
                 elif address == LINE_OF_SIGHT:
                     for recv in self.controllers:
-                        if sender == recv:
-                            continue
+                        #if sender == recv:
+                        #    continue
 
                         #if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
                         #    dist = (recv.car.centre - sender.car.centre).mag()

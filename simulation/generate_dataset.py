@@ -2,7 +2,7 @@ from util import *
 
 random.seed()
 
-from scenario_0 import entry_roads, valid_routes
+from two_grid import entry_roads, valid_routes
 
 entry_options = len(entry_roads)
 num_routes    = [len(valid_routes[i]) for i in range(entry_options)]
@@ -12,9 +12,9 @@ MINUTE_DURATION = SECOND_DURATION * 60
 HOUR_DURATION   = MINUTE_DURATION * 60
 
 TIME_DURATION   = HOUR_DURATION
-CARS_PER_SECOND = 1
+CARS_PER_MINUTE = 120
 
-NUM_CARS = int(TIME_DURATION / SECOND_DURATION * CARS_PER_SECOND)
+NUM_CARS = int(TIME_DURATION / MINUTE_DURATION * CARS_PER_MINUTE)
 
 schedule = []
 for car_num in range(NUM_CARS):

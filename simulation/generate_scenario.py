@@ -9,8 +9,8 @@ BORDER_SIZE   = 50
 BLOCK_SIZE    = 50
 CORNER_OFFSET = 5.4
 
-NUM_COLS = 1
-NUM_ROWS = 1
+NUM_COLS = 3
+NUM_ROWS = 3
 
 NEXT_BLOCK   = BLOCK_SIZE + ROAD_WIDTH
 WORLD_WIDTH  = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_COLS
@@ -120,7 +120,7 @@ class IntersectionRoad(Road):
         return self.valid_paths[turn]
 
     def getPath(self, output_index):
-        path, turn = self.intersection.paths[(self.input_index, output_index)]
+        path, turn, dist = self.intersection.paths[(self.input_index, output_index)]
         return path
 
 class CrossingRoad(Road):
@@ -262,7 +262,7 @@ def connectRoads(in_road, out_road):
         if ab_cross_bx < 0.0001:
             road = CrossingRoad(b, x)
             road.setNext(out_road)
-            return [road], turn
+            return [road], turn, road.length
         else:
             raise Exception('Bad road connection: {} to {}'.format(in_road,
                                                                    out_road))
@@ -379,7 +379,9 @@ def connectRoads(in_road, out_road):
 
     curr_road.setNext(out_road)
 
-    return joining_roads, turn
+    distance = ang_diff.value * turn_radius
+
+    return joining_roads, turn, distance
 
 class Intersection:
     def __init__(self, i, j):
@@ -412,11 +414,11 @@ class Intersection:
             for j in range(old_out_count, new_out_count):
                 out_road = self.outputs[j]
 
-                path, turn = connectRoads(in_road, out_road)
+                path, turn, dist = connectRoads(in_road, out_road)
                 if path:
                     pair = (i, j)
                     self.pairs.append(pair)
-                    self.paths[pair] = (path, turn)
+                    self.paths[pair] = (path, turn, dist)
 
                     self.connections[i][turn] = j #.append(j)
 
@@ -428,11 +430,11 @@ class Intersection:
             for j in range(old_out_count):
                 out_road = self.outputs[j]
 
-                path, turn = connectRoads(in_road, out_road)
+                path, turn, dist = connectRoads(in_road, out_road)
                 if path:
                     pair = (i, j)
                     self.pairs.append(pair)
-                    self.paths[pair] = (path, turn)
+                    self.paths[pair] = (path, turn, dist)
 
                     self.connections[i][turn] = j
                     #self.connections[i][1] = j
@@ -660,7 +662,7 @@ if __name__ == "__main__":
                 if not pair in intersection.paths:
                     continue
 
-                path, turn = intersection.paths[pair]
+                path, turn, dist = intersection.paths[pair]
 
                 path = [road.name for road in path]
                 path = "[" + ",".join(path) + "]"
@@ -672,8 +674,8 @@ if __name__ == "__main__":
                 else:
                     turn = "CENTRE"
 
-                print("{}.addConnection({}, {}, {}, {})".format(
-                      intersection.name, new_i, new_j, path, turn))
+                print("{}.addConnection({}, {}, {}, {}, {})".format(
+                      intersection.name, new_i, new_j, path, turn, dist))
 
 
                 #pair = (i, j)
