@@ -321,7 +321,7 @@ class World:
         for car in self.cars:
             if car.checkInside(true_mouse_position):
                 self.selected_car = car
-                print("Selected car:", car.name)
+                #print("Selected car:", car.name)
                 self.panning = False
                 return
 

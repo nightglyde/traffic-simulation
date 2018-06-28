@@ -1,9 +1,9 @@
 from util import *
 
 from world import World
-from scenario_1_1 import roads, entry_roads, intersections, valid_routes,\
-                         grass, world_width, world_height
-from tested_dataset_0 import schedule
+from pregen.scenario_1x1 import roads, entry_roads, intersections,\
+                                valid_routes, grass, world_width, world_height
+from pregen.dataset_1x1_90_111 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -57,15 +57,16 @@ while not done:
         for frame in frames:
             total += frame
         if total == 0.0:
-            fps = "UNDEFINED"
+            fps = time_rate = "UNDEFINED"
         else:
             fps = round(10/total)
+            time_rate = "{:.2f}".format(10/(total*FRAMES_PER_SECOND))
 
         # generate screen caption
         string  = "Car Simulator | FPS: {}".format(fps)
         string += " | Score: {} | Crash: {} | Active cars: {}".format(
             world.successful_cars, world.crashed_cars, len(world.cars))
-        string += " | T: {}".format(world_time/1000)
+        string += " | Time Rate: {} | T: {}".format(time_rate, world_time/1000)
         if paused:
             string += " | PAUSED"
 
