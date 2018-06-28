@@ -176,35 +176,35 @@ class Car(Obstacle):
         chassis = [self.world.getDrawable(point) for point in self.hull]
 
         # arrow outline
-        stem_front = forward * ARROW_STEM_LENGTH
-        stem_left  = left    * ARROW_STEM_WIDTH / 2
-        head_front = forward * ARROW_LENGTH
-        head_left  = left    * ARROW_WIDTH / 2
+#        stem_front = forward * ARROW_STEM_LENGTH
+#        stem_left  = left    * ARROW_STEM_WIDTH / 2
+#        head_front = forward * ARROW_LENGTH
+#        head_left  = left    * ARROW_WIDTH / 2
 
-        arrow = [
-            self.world.getDrawable(pos              + stem_left),
-            self.world.getDrawable(pos + stem_front + stem_left),
-            self.world.getDrawable(pos + stem_front + head_left),
-            self.world.getDrawable(pos + head_front            ),
-            self.world.getDrawable(pos + stem_front - head_left),
-            self.world.getDrawable(pos + stem_front - stem_left),
-            self.world.getDrawable(pos              - stem_left),
-        ]
+#        arrow = [
+#            self.world.getDrawable(pos              + stem_left),
+#            self.world.getDrawable(pos + stem_front + stem_left),
+#            self.world.getDrawable(pos + stem_front + head_left),
+#            self.world.getDrawable(pos + head_front            ),
+#            self.world.getDrawable(pos + stem_front - head_left),
+#            self.world.getDrawable(pos + stem_front - stem_left),
+#            self.world.getDrawable(pos              - stem_left),
+#        ]
 
         if self.stopped:
             # draw crashed car
             pygame.draw.polygon(screen, LIGHT_GREY,  chassis)
             pygame.draw.polygon(screen, GREY, chassis, 1)
-            pygame.draw.polygon(screen, self.colour, arrow)
-            pygame.draw.polygon(screen, GREY, arrow, 1)
+#            pygame.draw.polygon(screen, self.colour, arrow)
+#            pygame.draw.polygon(screen, GREY, arrow, 1)
             return
 
         # draw active car
         pygame.draw.polygon(screen, self.colour, chassis)
         pygame.draw.polygon(screen, BLACK,       chassis, 1)
-        if selected:
-            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
-        pygame.draw.polygon(screen, BLACK, arrow, 1)
+#        if selected:
+#            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
+#        pygame.draw.polygon(screen, BLACK, arrow, 1)
 
         #font = pygame.font.SysFont('Helvetica', 12, bold=True)
         #text = font.render(self.name, False, BLACK)

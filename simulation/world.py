@@ -355,48 +355,46 @@ class World:
             grass.draw()
             #grass.drawOutline()
 
-        for road in self.all_roads:
-            start = self.getDrawable(road.start)
-            end   = self.getDrawable(road.end)
+#        for road in self.all_roads:
+#            start = self.getDrawable(road.start)
+#            end   = self.getDrawable(road.end)
 
-            pygame.draw.line(self.screen, BLACK, start, end, 1)
+#            pygame.draw.line(self.screen, BLACK, start, end, 1)
 
+#        font = pygame.font.SysFont('Helvetica', 12, bold=True)
+#        for entry_num, road in enumerate(self.entry_roads):
+#            if not self.entry_queues[entry_num]:
+#                continue
 
+#            num_cars = len(self.entry_queues[entry_num])
 
-        font = pygame.font.SysFont('Helvetica', 12, bold=True)
-        for entry_num, road in enumerate(self.entry_roads):
-            if not self.entry_queues[entry_num]:
-                continue
+#            position = road.end + (road.start - road.end).norm() \
+#                                  * (CAR_ADDING_DIST + 3.5)
+#            pos      = self.getDrawable(position)
 
-            num_cars = len(self.entry_queues[entry_num])
+#            text = font.render("+{}".format(num_cars), False, BLACK)
+#            rect = text.get_rect(center=pos)
 
-            position = road.end + (road.start - road.end).norm() \
-                                  * (CAR_ADDING_DIST + 3.5)
-            pos      = self.getDrawable(position)
+#            border = rect.inflate(4, 2)
+#            pygame.draw.rect(self.screen, WHITE, border)
+#            pygame.draw.rect(self.screen, BLACK, border, 1)
 
-            text = font.render("+{}".format(num_cars), False, BLACK)
-            rect = text.get_rect(center=pos)
+#            self.screen.blit(text, rect)
 
-            border = rect.inflate(4, 2)
-            pygame.draw.rect(self.screen, WHITE, border)
-            pygame.draw.rect(self.screen, BLACK, border, 1)
+#        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+#            for intersection in self.traffic_lights:
+#                self.traffic_lights[intersection].draw()
 
-            self.screen.blit(text, rect)
-
-        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
-            for intersection in self.traffic_lights:
-                self.traffic_lights[intersection].draw()
-
-        elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
-            for controller in self.controllers:
-                controller.traffic_controller.drawBackground()
+#        elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
+#            for controller in self.controllers:
+#                controller.traffic_controller.drawBackground()
 
         #box = [self.getDrawable(point) for point in self.hull]
         #pygame.draw.polygon(self.screen, BLACK, box, 1)
 
-        for ghost in self.ghosts:
+#        for ghost in self.ghosts:
             #ghost.drawPath()
-            ghost.draw(False, paused)
+#            ghost.draw(False, paused)
 
         #for controller in self.controllers:
         #    controller.drawRoute()
@@ -414,6 +412,6 @@ class World:
         #for car in self.cars:
         #    car.drawDesiredPosition()
 
-        for controller in self.controllers:
-            controller.draw()
+#        for controller in self.controllers:
+#            controller.draw()
 

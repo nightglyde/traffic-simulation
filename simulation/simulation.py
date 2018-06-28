@@ -5,7 +5,7 @@ from pregen.scenarios.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets.dataset_1x1_30_111 import schedule
+from pregen.datasets.dataset_1x1_90_111 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -39,7 +39,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    clock.tick(FRAMES_PER_SECOND)
+    #clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
