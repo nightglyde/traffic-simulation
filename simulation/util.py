@@ -7,7 +7,7 @@ from collections import deque
 
 random.seed(0)
 
-FRAMES_PER_SECOND = 30#120#30
+FRAMES_PER_SECOND = 30
 TIME_STEP         = 1000 // FRAMES_PER_SECOND
 STEP_TIME         = TIME_STEP / 1000
 

@@ -4,7 +4,8 @@ from road_network import EnterIntersection
 
 random.seed()
 
-from pregen.scenario_2x2 import NUM_ROWS, NUM_COLS, entry_roads, valid_routes
+from pregen.scenarios.scenario_2x2 import NUM_ROWS, NUM_COLS,\
+                                          entry_roads, valid_routes
 
 SECOND_DURATION = 1000
 MINUTE_DURATION = SECOND_DURATION * 60
@@ -12,14 +13,14 @@ HOUR_DURATION   = MINUTE_DURATION * 60
 
 # scenario density and duration
 TIME_DURATION   = HOUR_DURATION
-CARS_PER_MINUTE = 600
+CARS_PER_MINUTE = 150
 
 NUM_CARS = int(TIME_DURATION / MINUTE_DURATION * CARS_PER_MINUTE)
 
 # probability of car turning
 LEFT_PROB   = 1
 RIGHT_PROB  = 1
-CENTRE_PROB = 1
+CENTRE_PROB = 6
 
 DIVISOR = LEFT_PROB + RIGHT_PROB + CENTRE_PROB
 

@@ -789,14 +789,11 @@ class MyTrafficController:
         self.intersection = None
         self.road         = None
         self.route        = None
-        self.start_time   = None
 
         self.status = MTCStatus()
 
         self.messages  = []
         self.knowledge = {}
-        #self.freshness = {}
-        #self.votes     = {}
 
         self.leader      = None
         self.stage       = MTC_NO_INTERSECTION
@@ -808,7 +805,8 @@ class MyTrafficController:
     def getLight(self, entrance, exit):
         if self.stage == MTC_CROSSING:
             return GREEN_LIGHT
-        return RED_LIGHT
+        else:
+            return RED_LIGHT
 
     def update(self, time, instruction):
         self.time = time
@@ -821,15 +819,12 @@ class MyTrafficController:
             self.intersection = intersection
             self.road         = instruction.road
             self.route        = (instruction.entrance, instruction.exit)
-            self.start_time   = time
 
             self.leader = None
             self.stage  = MTC_OUT_OF_RANGE
 
             self.knowledge.clear()
-            #self.freshness.clear()
             self.greens.clear()
-            #self.votes.clear()
 
             self.vote = self.name
 
@@ -840,34 +835,19 @@ class MyTrafficController:
             self.stage = MTC_NO_INTERSECTION
 
     def countVotes(self):
-
-        #if not self.votes:
-        #    return None, False
-
-        #missing_votes = False
-
         votes = {}
         for car_name in self.knowledge:
-            #if not car_name in self.votes:
-            #    missing_votes = True
-            #    continue
-
-            vote = self.knowledge[car_name].vote#self.votes[car_name]
+            vote = self.knowledge[car_name].vote
             if vote in votes:
                 votes[vote] += 1
             else:
                 votes[vote] = 1
 
         votes_list = [(-votes[name], name) for name in votes]
-
-        #if not votes_list:
-        #    return None, False
-
         votes_list.sort()
 
         count, winner = votes_list[0]
-
-        return winner, len(votes_list) == 1#not missing_votes and len(votes_list) == 1
+        return winner, len(votes_list) == 1
 
     def getLeadCars(self):
         car_queues = [[] for entrance_road in self.intersection.inputs]
@@ -899,7 +879,8 @@ class MyTrafficController:
                     if status2.wait_time > queue_status.wait_time:
                         queue_status.wait_time = status2.wait_time
 
-                lead_cars.append((-queue_status.wait_time, car_name, queue_status))
+                lead_cars.append(
+                    (-queue_status.wait_time, car_name, queue_status))
 
         if not lead_cars:
             return lead_cars, None
@@ -915,8 +896,8 @@ class MyTrafficController:
         valid = VALID_PAIRS[status.route]
 
         if status.wait_time < priority_status.wait_time:
-            #if status.wait_time < priority_status.wait_time-MTC_WAIT_THRESHOLD:
-            if not priority_status.route in valid:
+            if status.wait_time < priority_status.wait_time-MTC_WAIT_THRESHOLD:
+                if not priority_status.route in valid:
                     return False
 
 
@@ -969,49 +950,9 @@ class MyTrafficController:
 
             if message_type == MTC_CAR_STATUS:
                 self.knowledge[source] = content
-                #self.freshness[source] = 0
-
-            #elif message_type == MTC_VOTE_LEADER:
-            #    self.votes[source] = content
-
-            #elif message_type == MTC_ASSERT_LEADER:
-            #    new_leaders.append((source, content))
 
             elif message_type == MTC_GREEN_LIGHT:
                 green_lights.append((source, content))
-
-        # clear old data
-        #unfresh = []
-        #for car_name in self.freshness:
-            #if not car_name in self.knowledge:
-            #    continue
-
-        #    freshness = self.freshness[car_name]
-        #    if freshness >= 5:
-        #        unfresh.append(car_name)
-                #del self.knowledge[car_name]
-                #self.votes.clear()
-        #    else:
-        #        self.freshness[car_name] += 1
-
-        #if unfresh:
-        #    self.votes.clear()
-        #    for car_name in unfresh:
-        #        del self.knowledge[car_name]
-        #        del self.freshness[car_name]
-
-        # clear old data
-        #if self.leader != None and not self.leader in self.knowledge:
-        #    self.leader = None
-        #    self.votes.clear()
-        #elif self.name in self.votes:
-        #    if self.votes[self.name] not in self.knowledge:
-        #        self.votes.clear()
-
-        # new leader
-        #for source, content in new_leaders:
-        #    if source == self.leader:
-        #        self.leader = content
 
         # new green light
         for source, green_car in green_lights:
@@ -1025,9 +966,7 @@ class MyTrafficController:
         self.greens = {car_name: self.greens[car_name] for car_name \
                        in self.greens if self.greens[car_name] > timeout}
 
-        #if True:#if self.leader == None:
-            # decide who the leader is
-
+        # work out who the leader is
         leader, unanimous = self.countVotes()
         if not leader in self.knowledge:
             leader = self.name
@@ -1035,15 +974,6 @@ class MyTrafficController:
             self.leader = leader
 
         self.vote = leader
-
-        #self.messages.append((SEND_TO_ALL, MTC_VOTE_LEADER,
-        #                      self.intersection, leader))
-
-        #print(self.name, leader)
-
-        #else:
-        #    self.messages.append((SEND_TO_ALL, MTC_VOTE_LEADER,
-        #                          self.intersection, self.leader))
 
         # lead intersection
         if self.leader == self.name:
@@ -1095,6 +1025,8 @@ class MyTrafficController:
             colour = GREEN
         elif self.stage == MTC_OUT_OF_RANGE:
             colour = GREY
+        elif self.leader == None:
+            colour = LIGHT_GREY
         else:
             colour = WHITE
 
@@ -1120,12 +1052,9 @@ class MyTrafficController:
             rect = text.get_rect(center=pos)
             world.screen.blit(text, rect)
 
-        #if self.name in self.votes:#self.leader != self.name and self.leader != None:
-        #    vote = self.votes[self.name]
-
-        if self.vote != None:
-            for car in world.cars:
-                if car.name == self.vote:#self.leader:
-                    pos2 = world.getDrawable(car.position)
-                    pygame.draw.line(screen, car.colour, pos, pos2, 3)
+        #if self.vote != None and self.vote != self.name:
+        #    for car in world.cars:
+        #        if car.name == self.vote:#self.leader:
+        #            pos2 = world.getDrawable(car.centre)
+        #            pygame.draw.line(screen, car.colour, pos, pos2, 3)
 
