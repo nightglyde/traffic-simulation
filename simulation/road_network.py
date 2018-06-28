@@ -165,7 +165,7 @@ class EnterIntersection:
         else:
             turn = "CENTRE"
 
-        return "EnterIntersection({})".format(self.road, turn)
+        return "EnterIntersection({}, {})".format(self.road, turn)
 
 #######################
 # Traffic Controllers #
@@ -943,8 +943,8 @@ class MyTrafficController:
         valid = VALID_PAIRS[status.route]
 
         # temp
-        if not priority_status.route in valid:
-            return False
+        #if not priority_status.route in valid:
+        #    return False
 
         return self.lights <= valid
 

@@ -1,9 +1,9 @@
 from util import *
 
 from world import World
-from scenario_1 import roads, entry_roads, intersections, valid_routes,\
-                      grass, world_width, world_height
-from heavy_0 import schedule
+from scenario_1_1 import roads, entry_roads, intersections, valid_routes,\
+                         grass, world_width, world_height
+from tested_dataset_0 import schedule
 
 INCLUDE_CAPTION = True
 

@@ -9,8 +9,8 @@ BORDER_SIZE   = 50
 BLOCK_SIZE    = 50
 CORNER_OFFSET = 5.4
 
-NUM_COLS = 3
-NUM_ROWS = 3
+NUM_COLS = 1
+NUM_ROWS = 1
 
 NEXT_BLOCK   = BLOCK_SIZE + ROAD_WIDTH
 WORLD_WIDTH  = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_COLS
@@ -155,7 +155,7 @@ class TerminalRoad(Road):
 # Route instructions #
 ######################
 
-def findRoutes(road, last_turn=None, turns=[], route=[]):
+def findRoutes(road, last_turn=None, route=[]):
     routes = []
 
     while road != None:
@@ -176,12 +176,11 @@ def findRoutes(road, last_turn=None, turns=[], route=[]):
                 else:
                     new_last_turn = last_turn
 
-                new_turns = turns + [turn]
-
                 new_route = route + [instruction]
 
                 routes += findRoutes(instruction.getNextRoad(),
-                                     new_last_turn, new_turns, new_route)
+                                     new_last_turn, new_route)
+
             return routes
 
         instruction = FollowRoad(road)
@@ -618,6 +617,9 @@ if __name__ == "__main__":
     print("from road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection")
 
     print()
+
+    print("NUM_ROWS = {}".format(NUM_ROWS))
+    print("NUM_COLS = {}".format(NUM_COLS))
 
     print("world_width  = {}".format(WORLD_WIDTH))
     print("world_height = {}".format(WORLD_HEIGHT))
