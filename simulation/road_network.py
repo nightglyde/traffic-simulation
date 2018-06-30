@@ -900,7 +900,6 @@ class MyTrafficController:
                 if not priority_status.route in valid:
                     return False
 
-
         return self.lights <= valid
 
     def sendMessages(self):
