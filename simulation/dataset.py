@@ -4,8 +4,7 @@ from road_network import EnterIntersection
 
 random.seed()
 
-from pregen.scenarios.scenario_1x1 import NUM_ROWS, NUM_COLS,\
-                                          entry_roads, valid_routes
+from pregen.scenario_2x2 import NUM_ROWS, NUM_COLS, entry_roads, valid_routes
 
 SECOND_DURATION = 1000
 MINUTE_DURATION = SECOND_DURATION * 60
@@ -13,7 +12,7 @@ HOUR_DURATION   = MINUTE_DURATION * 60
 
 # scenario density and duration
 TIME_DURATION   = HOUR_DURATION
-CARS_PER_MINUTE = 120
+CARS_PER_MINUTE = 30
 
 NUM_CARS = int(TIME_DURATION / MINUTE_DURATION * CARS_PER_MINUTE)
 
@@ -23,6 +22,8 @@ RIGHT_PROB  = 1
 CENTRE_PROB = 1
 
 DIVISOR = LEFT_PROB + RIGHT_PROB + CENTRE_PROB
+
+STRATEGY_A = True
 
 LEFT_CENTRE_PROB  = DIVISOR - LEFT_PROB
 RIGHT_CENTRE_PROB = DIVISOR - RIGHT_PROB
@@ -49,12 +50,17 @@ def generateScore(route):
                 score *= LEFT_PROB
             elif turn == RIGHT:
                 score *= RIGHT_PROB
-            elif prev_turn == LEFT:
-                score *= LEFT_CENTRE_PROB
-            elif prev_turn == RIGHT:
-                score *= RIGHT_CENTRE_PROB
+
             else:
-                score *= CENTRE_PROB
+                if STRATEGY_A:
+                    score *= CENTRE_PROB
+
+                elif prev_turn == LEFT:
+                    score *= LEFT_CENTRE_PROB
+                elif prev_turn == RIGHT:
+                    score *= RIGHT_CENTRE_PROB
+                else:
+                    score *= CENTRE_PROB
 
             prev_turn = instruction.turn
 

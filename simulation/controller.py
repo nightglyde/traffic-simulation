@@ -40,7 +40,7 @@ class CarController:
         self.spaces_left     = ROAD_CLEAR
 
     def setupRoute(self, route):
-        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+        if self.world.strategy == TRAFFIC_LIGHTS_MODE:
             for instruction in route:
                 self.route.append(instruction)
                 self.roads.add(instruction.road)
@@ -48,9 +48,9 @@ class CarController:
             self.traffic_controller = None
 
         else:
-            if CONTROLLER_MODE == VIRTUAL_TRAFFIC_LIGHTS_MODE:
+            if self.world.strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
                 controller = VirtualTrafficLights(self)
-            elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
+            elif self.world.strategy == MY_TRAFFIC_CONTROLLER_MODE:
                 controller = MyTrafficController(self)
 
             for instruction in route:
@@ -115,7 +115,7 @@ class CarController:
             self.spaces_left = ROAD_CLEAR
             return
 
-        if False:#if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+        if False:#if self.world.strategy == TRAFFIC_LIGHTS_MODE:
             cars_turning.sort()
             distA, speedA, car_name = cars_turning[-1]
             stop_distA = distA + getStopDistance(speedA)

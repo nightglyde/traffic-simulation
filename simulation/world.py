@@ -32,10 +32,14 @@ class World:
 
         self.time = -1
 
-        self.entry_roads  = []
-        self.entry_queues = []
-        self.recent_cars  = []
-        self.schedule     = deque()
+        self.strategy      = None
+        self.schedule_size = -1
+        self.cars_added    = 0
+
+        self.entry_roads   = []
+        self.entry_queues  = []
+        self.recent_cars   = []
+        self.schedule      = deque()
 
         self.cars          = []
         self.controllers   = []
@@ -68,8 +72,11 @@ class World:
         self.panning      = False
         self.selected_car = None
 
-    def setup(self, roads, intersections, grass,
-              entry_roads, valid_routes, schedule):
+    def setup(self, roads, intersections, grass, entry_roads,
+              valid_routes, schedule, strategy):
+
+        self.strategy      = strategy
+        self.schedule_size = len(schedule)
 
         self.all_roads     = roads
         self.intersections = intersections
@@ -93,7 +100,7 @@ class World:
 
         #self.schedule     = schedule
 
-        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+        if self.strategy == TRAFFIC_LIGHTS_MODE:
 
             for intersection in intersections:
                 self.traffic_lights[intersection] = TrafficLights(self,
@@ -112,7 +119,26 @@ class World:
 
         duration = car.time - car.start_time
         self.results.append((car.start_time, car.time, duration))
-        print(self.successful_cars, car.time, car.start_time, duration)
+        #print(self.successful_cars, car.time, car.start_time, duration)
+
+    def checkFinished(self):
+        return self.successful_cars == self.schedule_size
+
+    def checkAbort(self):
+        if self.crashed_cars:
+            print("Abort! Crashed car.")
+            return True
+
+        if self.results:
+            start_time, end_time, duration = self.results[-1]
+
+        else:
+            end_time = 0
+
+        if self.time - end_time > SCENARIO_TIMEOUT:
+            print("Abort! Timed out.")
+            return True
+        return False
 
     def addCar(self, road, entry, speed):
         start_time, route_num, colour, name = self.entry_queues[entry].popleft()
@@ -211,11 +237,10 @@ class World:
             start_time, entry_num, route_num, colour, name = self.schedule[0]
 
             if start_time <= time:
-
                 self.entry_queues[entry_num].append((start_time, route_num,
                                                      colour,     name))
-                #self.addCar(time, entry_num, route_num)
                 self.schedule.popleft()
+                self.cars_added += 1
             else:
                 break
 
@@ -247,7 +272,7 @@ class World:
                         #if sender == recv:
                         #    continue
 
-                        #if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+                        #if self.strategy == TRAFFIC_LIGHTS_MODE:
                         #    dist = (recv.car.centre - sender.car.centre).mag()
                         #    if dist <= SIGHT_RADIUS:
                         #        messages[recv.name].append(message)
@@ -381,11 +406,11 @@ class World:
 
 #            self.screen.blit(text, rect)
 
-#        if CONTROLLER_MODE == TRAFFIC_LIGHTS_MODE:
+#        if self.strategy == TRAFFIC_LIGHTS_MODE:
 #            for intersection in self.traffic_lights:
 #                self.traffic_lights[intersection].draw()
 
-#        elif CONTROLLER_MODE == MY_TRAFFIC_CONTROLLER_MODE:
+#        elif self.strategy == MY_TRAFFIC_CONTROLLER_MODE:
 #            for controller in self.controllers:
 #                controller.traffic_controller.drawBackground()
 

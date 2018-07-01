@@ -1,11 +1,11 @@
 from util import *
 
 from world import World
-from pregen.scenarios.scenario_1x1 import\
+from pregen.scenario_2x2 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets.dataset_1x1_30_116 import schedule
+from pregen.datasets_2x2.dataset_2x2_30_111 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -19,8 +19,10 @@ clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
 
+strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
+
 # build world
-world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule)
+world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
