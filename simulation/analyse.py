@@ -4,23 +4,28 @@ WIDE_COLUMN   = 10
 BATCH_WIDTH   = 32
 BATCH_GAP     = 3
 
-strategy_codes    = ["tl", "vtl", "mtc"]
+strategy_codes    = ["TrafficLights", "VirtualTrafficLights", "MyTrafficController"]
+short_codes       = ["TL", "VTL", "MTC"]
+
 scenario_codes    = ["1x1", "2x2"]
 density_codes     = [30, 60, 90, 120, 150]
-turn_distro_codes = ["111", "112", "113", "114", "115", "116"]
+turn_distro_codes = ["111", "111A", "112", "112A", "113", "113A",
+                     "114", "114A", "115", "115A", "116", "116A"]
 
 def getAverageDuration(f):
-
     count = 0
     total = 0
 
     for line in f:
-        car_num, end_time, start_time, duration = [int(x) for x in line.split()]
+        start_time, end_time, duration = [int(x) for x in line.split()]
 
         count += 1
         total += duration
 
-    return total / count
+    if count > 1:
+        return total / count
+
+    return None
 
 def centreText(text, width):
 
@@ -37,7 +42,7 @@ def centreText(text, width):
     return text
 
 strategy_line = ""
-for strategy in strategy_codes:
+for strategy in short_codes:
     strategy_line += centreText(strategy, WIDE_COLUMN+1)
 
 for turn_distro in turn_distro_codes:
@@ -61,17 +66,19 @@ for turn_distro in turn_distro_codes:
 
             for strategy in strategy_codes:
 
-                filename = "results/{}_{}_{}_{}.txt".format(
+                filename = "results/{}_dataset_{}_{}_{}.txt".format(
                     strategy, scenario, density, turn_distro)
 
                 try:
                     f = open(filename)
-
                     average_duration = getAverageDuration(f)
-
-                    items.append("{:10.2f}".format(average_duration))
-
                     f.close()
+
+                    if average_duration is None:
+                        items.append(centreText("", WIDE_COLUMN))
+                    else:
+                        items.append("{:10.2f}".format(average_duration))
+
                 except FileNotFoundError:
                     items.append(centreText("", WIDE_COLUMN))
 
