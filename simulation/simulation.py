@@ -1,11 +1,11 @@
 from util import *
 
 from world import World
-from pregen.scenario_2x2 import\
+from pregen.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets_2x2.dataset_2x2_30_111 import schedule
+from pregen.datasets_1x1.dataset_1x1_150_114A import schedule
 
 INCLUDE_CAPTION = True
 

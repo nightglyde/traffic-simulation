@@ -50,6 +50,11 @@ def worldGenerator():
 
         for strategy, strategy_name in ALL_STRATEGIES:
 
+            # NEED TO FIX VirtualTrafficLights
+
+            if strategy != VIRTUAL_TRAFFIC_LIGHTS_MODE:
+                continue
+
             filename = "results/{}_{}.txt".format(strategy_name, short_name)
 
             try:
