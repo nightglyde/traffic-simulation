@@ -437,6 +437,6 @@ class World:
         #for car in self.cars:
         #    car.drawDesiredPosition()
 
-        for controller in self.controllers:
-            controller.draw()
+#        for controller in self.controllers:
+#            controller.draw()
 

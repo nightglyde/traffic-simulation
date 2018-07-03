@@ -707,7 +707,7 @@ class VirtualTrafficLights:
         pygame.draw.circle(screen, colour, point, radius)
         pygame.draw.circle(screen, BLACK,  point, radius, 1)
 
-        if True:
+        if False:
 
             if self.role == VTL_INTERSECTION_LEADER:
                 pygame.draw.circle(screen, BLACK, point, 10)

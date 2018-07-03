@@ -19,7 +19,7 @@ clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
 
-strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
+strategy = MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
 
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
