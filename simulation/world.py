@@ -98,8 +98,6 @@ class World:
             self.schedule.append((start_time, entry_num, route_num,
                                   colour, name))
 
-        #self.schedule     = schedule
-
         if self.strategy == TRAFFIC_LIGHTS_MODE:
 
             for intersection in intersections:
@@ -406,9 +404,9 @@ class World:
 
 #            self.screen.blit(text, rect)
 
-#        if self.strategy == TRAFFIC_LIGHTS_MODE:
-#            for intersection in self.traffic_lights:
-#                self.traffic_lights[intersection].draw()
+        if self.strategy == TRAFFIC_LIGHTS_MODE:
+            for intersection in self.traffic_lights:
+                self.traffic_lights[intersection].draw()
 
 #        elif self.strategy == MY_TRAFFIC_CONTROLLER_MODE:
 #            for controller in self.controllers:

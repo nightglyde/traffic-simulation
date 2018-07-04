@@ -1,6 +1,6 @@
 import pkgutil
 import time as time_module
-#import re
+import re
 
 from util import *
 
@@ -13,7 +13,7 @@ import pregen.datasets_1x1 as datasets
 package = datasets
 prefix  = package.__name__ + "."
 
-#pattern = re.compile("dataset_1x1_30")
+#pattern = re.compile("dataset_1x1_150_116")
 
 module_names = []
 
@@ -21,11 +21,12 @@ module_names = []
 for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
                                                          prefix):
 
+    #if not pattern.search(module_name):
+    #    continue
+
     print("Found module:", module_name)
 
     module_names.append(module_name)
-
-    #if pattern.search(modname):
 
 TIME_FORMAT = "%H:%M:%S"
 
@@ -147,6 +148,8 @@ done = False
 while not done:
 
     done = world_handler.check()
+    if done:
+        break
     world = world_handler.world
 
     # limit the frames per second

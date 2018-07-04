@@ -19,7 +19,7 @@ clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
 
-strategy = MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
+strategy = TRAFFIC_LIGHTS_MODE#MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
 
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
@@ -41,7 +41,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    #clock.tick(FRAMES_PER_SECOND)
+    clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time

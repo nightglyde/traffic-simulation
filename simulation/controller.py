@@ -23,6 +23,7 @@ class CarController:
         self.time   = car.time
 
         self.route = deque()
+        self.stops = deque()
         self.roads = set()
         self.traffic_controller = None
         self.setupRoute(route)
@@ -33,15 +34,23 @@ class CarController:
         #self.path = car.path
         #self.path.append(self.car.position)
 
-        self.knowledge = {}
+        self.knowledge     = {}
+        self.road_register = {}
+        self.stop_register = {}
 
         self.following_speed = MAX_SPEED
         #self.blocked         = False
         self.spaces_left     = ROAD_CLEAR
 
+        self.next_turn = None # Needed???
+
     def setupRoute(self, route):
         if self.world.strategy == TRAFFIC_LIGHTS_MODE:
             for instruction in route:
+
+                if isinstance(instruction, EnterIntersection):
+                    self.stops.append(instruction.road)
+
                 self.route.append(instruction)
                 self.roads.add(instruction.road)
 
@@ -57,12 +66,49 @@ class CarController:
                 if isinstance(instruction, EnterIntersection):
                     instruction = instruction.copy()
                     instruction.setController(controller)
+
+                    self.stops.append(instruction.road)
+
                 self.route.append(instruction)
                 self.roads.add(instruction.road)
 
             self.traffic_controller = controller
 
     def checkBlocked(self):
+        self.spaces_left = ROAD_CLEAR
+
+        if not isinstance(self.road, IntersectionRoad):
+            return
+
+        if len(self.stops) < 2:
+            return
+
+        curr_stop = self.stops[0]
+        next_stop = self.stops[1]
+
+        queue_capacity = next_stop.length / MIN_DIST_APART
+
+        if next_stop in self.stop_register:
+            queue_length = len(self.stop_register[next_stop])
+        else:
+            queue_length = 0
+
+        if curr_stop in self.stop_register:
+
+            distB = self.dist_along
+
+            for car_name in self.stop_register[curr_stop]:
+                speedA, roadA, distA, turnA, stopA = self.knowledge[car_name]
+
+                if distA > distB and turnA == self.next_turn:
+                    queue_length += 1
+
+        if queue_length == 0:
+            return
+
+        self.spaces_left = max(0, queue_capacity - queue_length)
+
+    def alt_checkBlocked(self):
         distB = self.dist_along
 
         if not isinstance(self.road, IntersectionRoad):
@@ -98,8 +144,11 @@ class CarController:
                 if instruction.danger:
                     break
 
-            if road in self.knowledge:
-                for car_name, speedA, distA, turnA in self.knowledge[road]:
+            if road in self.road_register:
+                for car_name in self.road_register[road]:
+                    speedA, roadA, distA, turnA, stopA = self.knowledge[car_name]
+
+                #for car_name, speedA, distA, turnA in self.knowledge[road]:
                     distA += distance
 
                     if turn_status == DURING_INTERSECTION:
@@ -149,8 +198,13 @@ class CarController:
         for instruction in self.route:
             road = instruction.road
 
-            if road in self.knowledge:
-                for car_name, speedA, distA, turnA in self.knowledge[road]:
+            if road in self.road_register:
+                for car_name in self.road_register[road]:
+                    speedA, roadA, distA, turnA, stopA = self.knowledge[car_name]
+
+            #if road in self.knowledge:
+            #    for car_name, speedA, distA, turnA in self.knowledge[road]:
+
                     distA += distance
 
                     if distA > distB:
@@ -251,6 +305,10 @@ class CarController:
             if dist_along >= road.length:
                 self.route.popleft()
                 self.roads.remove(road)
+
+                if self.stops and road == self.stops[0]:
+                    self.stops.popleft()
+
                 continue
             break
 
@@ -258,6 +316,9 @@ class CarController:
         if not self.route:
             self.car.stop()
             return
+
+        # was moved from below
+        self.next_turn = self.getTurningSignal()
 
         # save the current road
         self.road       = road
@@ -273,7 +334,6 @@ class CarController:
         # generate control signal
         desired_speed                   = self.getDesiredSpeed()
         desired_position, desired_angle = self.getDesiredPosition()
-        self.next_turn                  = self.getTurningSignal()
 
         self.car.control(desired_speed, desired_position,
                          desired_angle, self.next_turn,
@@ -284,7 +344,12 @@ class CarController:
         if self.car.stopped:
             return messages
 
-        content = (self.car.speed, self.road, self.dist_along, self.next_turn)
+        if self.stops:
+            next_stop = self.stops[0]
+        else:
+            next_stop = None
+
+        content = (self.car.speed, self.road, self.dist_along, self.next_turn, next_stop)
         messages.append((LINE_OF_SIGHT, VISIBLE_DETAILS, None, content))
 
         if self.traffic_controller != None:
@@ -297,6 +362,8 @@ class CarController:
             return
 
         self.knowledge.clear()
+        self.road_register.clear()
+        self.stop_register.clear()
 
         for message in messages:
             source, destination, message_type, context, content = message
@@ -307,17 +374,31 @@ class CarController:
             if message_type == VISIBLE_DETAILS:
                 #self.knowledge[source] = content
 
-                speed, road, dist_along, next_turn = content
+                speed, road, dist_along, next_turn, next_stop = content
 
-                if not road in self.roads:
-                    continue
+                #if not road in self.roads:
+                #    continue
 
-                new_content = (source, speed, dist_along, next_turn)
+                self.knowledge[source] = content
 
-                if road in self.knowledge:
-                    self.knowledge[road].append(new_content)
+                if next_stop in self.stop_register:
+                    self.stop_register[next_stop].append(source)
                 else:
-                    self.knowledge[road] = [new_content]
+                    self.stop_register[next_stop] = [source]
+
+                if road in self.roads:
+                    if road in self.road_register:
+                        self.road_register[road].append(source)
+                    else:
+                        self.road_register[road] = [source]
+
+                #new_content = (source, speed, dist_along, next_turn)
+
+                #if road in self.knowledge:
+                #    self.knowledge[road].append(new_content)
+                #else:
+                #    self.knowledge[road] = [new_content]
+
 
         if self.traffic_controller != None:
             self.traffic_controller.receiveMessages(messages)
