@@ -75,7 +75,7 @@ for turn_distro in turn_distro_codes:
                     f.close()
 
                     if average_duration is None:
-                        items.append(centreText("", WIDE_COLUMN))
+                        items.append(centreText("-", WIDE_COLUMN))
                     else:
                         items.append("{:10.2f}".format(average_duration))
 
