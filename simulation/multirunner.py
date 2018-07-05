@@ -9,25 +9,36 @@ from world import World
 from pregen.scenario_1x1 import roads, entry_roads, intersections,\
                                 valid_routes, grass, world_width, world_height
 
-import pregen.datasets_1x1 as datasets
-package = datasets
-prefix  = package.__name__ + "."
-
-#pattern = re.compile("dataset_1x1_150_116")
+import pregen.datasets_1x1 as datasets1
+import pregen.datasets_1x1.mass_generation as datasets2
 
 module_names = []
 
-#schedules = []
+
+#pattern = re.compile("dataset_1x1_150_116")
+pattern = re.compile("150_111_00")
+
+package = datasets2
+prefix  = package.__name__ + "."
 for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
                                                          prefix):
-
-    #if not pattern.search(module_name):
-    #    continue
-
+    if not pattern.search(module_name):
+        continue
     print("Found module:", module_name)
-
     module_names.append(module_name)
 
+pattern = re.compile("111A")
+
+package = datasets1
+prefix  = package.__name__ + "."
+for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
+                                                         prefix):
+    if not pattern.search(module_name):
+        continue
+    print("Found module:", module_name)
+    module_names.append(module_name)
+
+# time formatting
 TIME_FORMAT = "%H:%M:%S"
 
 # initialise game engine
@@ -71,7 +82,9 @@ class WorldHandler:
         self.filename   = None
         self.generator  = worldGenerator()
 
-    def generateNext(self):
+        self.start_time = None
+
+    def generateNext(self, time):
         try:
             schedule, strategy, filename = next(self.generator)
         except StopIteration:
@@ -83,13 +96,24 @@ class WorldHandler:
 
         self.world_time = 0
 
-        print("Running scenario. Results will be found at:", filename)
+        self.start_time = time
+        start_time = time_module.strftime(TIME_FORMAT,
+                                          time_module.gmtime(time/1000))
+
+        print("Starting scenario at time:", start_time)
+        print("Results will be found at:", filename)
         self.filename = filename
 
         return False
 
-    def recordResults(self):
+    def printDuration(self, time):
+        duration = (time - self.start_time) / 1000
+        duration = time_module.strftime(TIME_FORMAT,
+                                        time_module.gmtime(duration))
+        print("Test duration: {}".format(duration))
 
+    def recordResults(self, time):
+        self.printDuration(time)
         print("Writing results to file...")
         f = open(self.filename, 'w')
 
@@ -106,22 +130,23 @@ class WorldHandler:
         average = total / count
         print("Average duration:", average)
 
-    def blankResults(self):
-        print("Creating empty file...")
-        f = open(self.filename, 'w')
-        f.close()
+    #def blankResults(self, time):
+    #    self.printDuration(time)
+    #    print("Creating empty file...")
+    #    f = open(self.filename, 'w')
+    #    f.close()
 
-    def check(self):
+    def update(self, time):
         if self.world == None:
-            return self.generateNext()
+            return self.generateNext(time)
 
-        if self.world.checkFinished():
-            self.recordResults()
-            return self.generateNext()
+        if self.world.checkFinished() or self.world.checkAbort():
+            self.recordResults(time)
+            return self.generateNext(time)
 
-        if self.world.checkAbort():
-            self.blankResults()
-            return self.generateNext()
+        #if self.world.checkAbort():
+        #    self.blankResults(time)
+        #    return self.generateNext(time)
 
     def updateTime(self):
         self.world_time += TIME_STEP
@@ -138,19 +163,12 @@ paused          = False
 # set up for FPS
 if include_caption:
     fps = 0
-    pygame.display.set_caption("Car Simulator | FPS: {}".format(fps))
-
     frames = [0 for f in range(10)]
     f = 0
 
 # loop until the user clicks the close button
 done = False
 while not done:
-
-    done = world_handler.check()
-    if done:
-        break
-    world = world_handler.world
 
     # limit the frames per second
     if limit_fps:
@@ -159,6 +177,11 @@ while not done:
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
     prev_time = time
+
+    done = world_handler.update(time)
+    if done:
+        break
+    world = world_handler.world
 
     # generate caption
     if include_caption:

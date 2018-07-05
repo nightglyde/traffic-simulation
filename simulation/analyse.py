@@ -1,17 +1,18 @@
 
-strategy_codes    = ["TrafficLights_dataset",
-                     "VirtualTrafficLights_dataset",
-                     "MyTrafficController_dataset"]
-short_codes       = ["TL", "VTL", "MTC"]
+strategy_codes    = ["TrafficLights",
+                     "VirtualTrafficLights",
+                     "MyTrafficController",
+                     "GreedyController"]
+short_codes       = ["TL", "VTL", "MTC", "GC"]
 scenario_codes    = ["1x1", "2x2"]
 density_codes     = ["010", "020", "030", "040", "050",
                      "060", "070", "080", "090", "100",
                      "110", "120", "130", "140", "150"]
 turn_distro_codes = ["111", "112", "113", "114", "115", "116"]
 
-num_test_cases = 5
+num_test_cases = 10
 
-def getAverageDuration(filename):
+def getAverageDuration(filename, expected_count):
 
     f = open(filename)
 
@@ -26,7 +27,7 @@ def getAverageDuration(filename):
 
     f.close()
 
-    if count > 1:
+    if count == expected_count:
         return total / count
 
     return None
@@ -100,6 +101,8 @@ for turn_distro in turn_distro_codes:
 
     for density in density_codes:
 
+        expected_count = int(density) * 60
+
         items = [centreText(density, NARROW_COLUMN)]
 
         for scenario in scenario_codes:
@@ -112,11 +115,12 @@ for turn_distro in turn_distro_codes:
 
                 for i in range(num_test_cases):
 
-                    filename = "results/{}_{}_{}_{}_{:02}.txt".format(
+                    filename = "results/{}_dataset_{}_{}_{}_{:02}.txt".format(
                         strategy, scenario, density, turn_distro, i)
 
                     try:
-                        average_duration = getAverageDuration(filename)
+                        average_duration = getAverageDuration(filename,
+                                                              expected_count)
 
                         if average_duration is None:
                             num_fails += 1

@@ -408,7 +408,7 @@ class World:
             for intersection in self.traffic_lights:
                 self.traffic_lights[intersection].draw()
 
-#        elif self.strategy == MY_TRAFFIC_CONTROLLER_MODE:
+#        elif self.strategy in {MY_TRAFFIC_CONTROLLER_MODE, GREEDY_CONTROLLER_MODE}:
 #            for controller in self.controllers:
 #                controller.traffic_controller.drawBackground()
 

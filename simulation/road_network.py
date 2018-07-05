@@ -895,10 +895,12 @@ class MyTrafficController:
 
         valid = VALID_PAIRS[status.route]
 
-        if status.wait_time < priority_status.wait_time:
-            if status.wait_time < priority_status.wait_time-MTC_WAIT_THRESHOLD:
-                if not priority_status.route in valid:
-                    return False
+        if self.world.strategy == MY_TRAFFIC_CONTROLLER_MODE:
+
+            if status.wait_time < priority_status.wait_time:
+                if status.wait_time < priority_status.wait_time-MTC_WAIT_THRESHOLD:
+                    if not priority_status.route in valid:
+                        return False
 
         return self.lights <= valid
 

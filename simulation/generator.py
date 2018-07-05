@@ -4,9 +4,9 @@ from road_network import EnterIntersection
 
 random.seed()
 
-from pregen.scenario_2x2 import NUM_ROWS, NUM_COLS, entry_roads, valid_routes
+from pregen.scenario_1x1 import NUM_ROWS, NUM_COLS, entry_roads, valid_routes
 
-PATH_PREFIX = "pregen/datasets_2x2/mass_generation/dataset_2x2"
+PATH_PREFIX = "pregen/datasets_1x1/mass_generation/dataset_1x1"
 
 SECOND_DURATION = 1000
 MINUTE_DURATION = SECOND_DURATION * 60
@@ -20,7 +20,7 @@ NUM_TRIALS = 5
 # probability of car turning
 LEFT_PROB   = 1
 RIGHT_PROB  = 1
-CENTRE_PROB = 1
+CENTRE_PROB = 3
 
 TURN_CODE = "{}{}{}".format(LEFT_PROB, RIGHT_PROB, CENTRE_PROB)
 
@@ -118,7 +118,7 @@ def generateDataset(cars_per_minute):
     filename_start = "{}_{:03}_{}".format(PATH_PREFIX, car_density, TURN_CODE)
 
     for i in range(100):
-        filename = "{}_{:02}.txt".format(filename_start, i)
+        filename = "{}_{:02}.py".format(filename_start, i)
 
         try:
             f = open(filename)

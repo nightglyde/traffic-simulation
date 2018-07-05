@@ -1,14 +1,15 @@
 
 strategy_codes    = ["TrafficLights_dataset",
                      "VirtualTrafficLights_dataset",
-                     "MyTrafficController_dataset"]
-short_codes       = ["TL", "VTL", "MTC"]
+                     "MyTrafficController_dataset",
+                     "GreedyController_dataset"]
+short_codes       = ["TL", "VTL", "MTC", "GC"]
 #scenario_codes    = ["1x1", "2x2"]
-scenario_codes    = ["old", "new"]
+scenario_codes    = ["old", "new", "new2"]
 density_codes     = ["030", "060", "090", "120", "150"]
 turn_distro_codes = ["111A", "112A", "113A", "114A", "115A", "116A"]
 
-def getAverageDuration(filename, format_3):
+def getAverageDuration(filename, expected_count):
 
     f = open(filename)
 
@@ -16,17 +17,14 @@ def getAverageDuration(filename, format_3):
     total = 0
 
     for line in f:
-        if format_3:
-            start_time, end_time, duration = [int(x) for x in line.split()]
-        else:
-            car_num, end_time, start_time, duration = [int(x) for x in line.split()]
+        start_time, end_time, duration = [int(x) for x in line.split()]
 
         count += 1
         total += duration
 
     f.close()
 
-    if count > 1:
+    if count == expected_count:
         return total / count
 
     return None
@@ -100,6 +98,8 @@ for turn_distro in turn_distro_codes:
 
     for density in density_codes:
 
+        expected_count = int(density) * 60
+
         items = [centreText(density, NARROW_COLUMN)]
 
         for scenario in scenario_codes:
@@ -109,12 +109,15 @@ for turn_distro in turn_distro_codes:
                 if scenario == "old":
                     filename = "results/zzz_before_fix/{}_1x1_{}_{}.txt".format(
                         strategy, density, turn_distro)
-                else:
+                elif scenario == "new":
                     filename = "results/{}_1x1_{}_{}.txt".format(
+                        strategy, density, turn_distro)
+                else:
+                    filename = "results/zzz_new2/{}_1x1_{}_{}.txt".format(
                         strategy, density, turn_distro)
 
                 try:
-                    average_duration = getAverageDuration(filename, "dataset" in filename)
+                    average_duration = getAverageDuration(filename, expected_count)
 
                     if average_duration is None:
                         items.append(centreText("-", WIDE_COLUMN))
