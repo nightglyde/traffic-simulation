@@ -16,27 +16,38 @@ module_names = []
 
 
 #pattern = re.compile("dataset_1x1_150_116")
-pattern = re.compile("150_111_00")
+#pattern = re.compile("_116_00")
+#pattern = re.compile("_111_")
 
 package = datasets2
 prefix  = package.__name__ + "."
 for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
                                                          prefix):
-    if not pattern.search(module_name):
-        continue
+    #if not pattern.search(module_name):
+    #    continue
     print("Found module:", module_name)
-    module_names.append(module_name)
 
-pattern = re.compile("111A")
+    #turn_number = int(module_name[-6:-3])
+    case_number = int(module_name[-2:])
 
-package = datasets1
-prefix  = package.__name__ + "."
-for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
-                                                         prefix):
-    if not pattern.search(module_name):
-        continue
-    print("Found module:", module_name)
-    module_names.append(module_name)
+    module_names.append((case_number, module_name))
+
+module_names.sort()
+module_names = [module_name for case_number, module_name in module_names]
+
+#pattern = re.compile("111A")
+
+#package = datasets1
+#prefix  = package.__name__ + "."
+#for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
+#                                                         prefix):
+#    if not pattern.search(module_name):
+#        continue
+#    print("Found module:", module_name)
+#    module_names.append(module_name)
+
+#for module_name in module_names:
+#    print(module_name)
 
 # time formatting
 TIME_FORMAT = "%H:%M:%S"

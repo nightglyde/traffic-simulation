@@ -6,6 +6,7 @@ strategy_codes = [
     "GreedyController",
 ]
 
+#dataset_name = "dataset_1x1_150_111_00"#"dataset_1x1_120_111A"
 dataset_name = "dataset_1x1_090_115A"
 
 NUM_STRATEGIES = len(strategy_codes)
@@ -18,7 +19,7 @@ BUCKET_SIZE = SECOND_DURATION
 
 BUCKET_MINUTES = BUCKET_SIZE / MINUTE_DURATION
 
-NUM_BUCKETS = 60 * 5
+NUM_BUCKETS = 60 * 70
 
 TIME_LIMIT = BUCKET_SIZE*NUM_BUCKETS
 
@@ -49,7 +50,7 @@ def progressOverTime(filename):
 
     while curr_time <= TIME_LIMIT:
         progress.append(successful_cars)
-        curr_time += MINUTE_DURATION
+        curr_time += BUCKET_SIZE
 
     return progress
 

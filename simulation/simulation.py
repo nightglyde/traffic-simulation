@@ -1,5 +1,7 @@
 from util import *
 
+from time import gmtime, strftime
+
 from world import World
 from pregen.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
@@ -24,6 +26,12 @@ strategy = TRAFFIC_LIGHTS_MODE#MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
 
+def generateFilename():
+    timestamp = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
+    strategy_name = ALL_STRATEGIES[world.strategy][1]
+
+    return "screenshots/img_{}_{}.png".format(timestamp, strategy_name)
+
 world_time = 0
 prev_time  = pygame.time.get_ticks()
 
@@ -41,7 +49,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    clock.tick(FRAMES_PER_SECOND)
+    #clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
@@ -102,6 +110,9 @@ while not done:
             if event.key == pygame.K_ESCAPE:
                 world.resetZoom()
 
+            if event.key == pygame.K_RETURN:
+                pygame.image.save(screen, generateFilename())
+
         #elif event.type == pygame.USEREVENT:
         #    paused = True
 
@@ -113,7 +124,7 @@ while not done:
 
     # draw to screen
     screen.fill(WHITE)
-    world.draw(paused)
+    world.drawAll(paused)
     pygame.display.flip()
 
 pygame.quit()

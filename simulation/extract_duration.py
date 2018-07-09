@@ -51,6 +51,12 @@ def getDurations(filename, expected_count):
 
     return []
 
+#cumulative_fails = []
+#for strategy in strategy_codes:
+#    cumulative_fails.append(0)
+
+#stop_calculating = False
+
 minimums = []
 maximums = []
 averages = []
@@ -65,10 +71,12 @@ for density in density_codes:
     averages_line = [density]
     std_devs_line = [density]
     fails_line    = [density]
-    for strategy in strategy_codes:
+    for s, strategy in enumerate(strategy_codes):
 
         durations = []
+        num_success = 0
         num_fails = 0
+        #num_fails = cumulative_fails[s]
 
         for i in range(num_test_cases):
 
@@ -79,31 +87,51 @@ for density in density_codes:
                 new_durations = getDurations(filename, expected_count)
 
                 if new_durations:
+
+                    #if stop_calculating:
+                    #    continue
+
                     durations += new_durations
+
+                    num_success += 1
                 else:
                     num_fails += 1
 
             except FileNotFoundError:
                 continue
 
+            if num_success >= 1:
+                break
+
+        fails_line.append(str(num_fails))
+
+        #if stop_calculating:
+        #    continue
+
         if durations:
-            minimums_line.append(str(min(durations)))
-            maximums_line.append(str(max(durations)))
-            averages_line.append(str(statistics.mean(durations)))
-            std_devs_line.append(str(statistics.stdev(durations)))
+            minimums_line.append(str(min(durations)/1000))
+            maximums_line.append(str(max(durations)/1000))
+            averages_line.append(str(statistics.mean(durations)/1000))
+            std_devs_line.append(str(statistics.stdev(durations)/1000))
         else:
             minimums_line.append(str("NaN"))
             maximums_line.append(str("NaN"))
             averages_line.append(str("NaN"))
             std_devs_line.append(str("NaN"))
 
-        fails_line.append(str(num_fails))
+            #stop_calculating = True
+
+        #cumulative_fails[s] = num_fails
+
+    fails.append(fails_line)
+
+    #if stop_calculating:
+    #    continue
 
     minimums.append(minimums_line)
     maximums.append(maximums_line)
     averages.append(averages_line)
     std_devs.append(std_devs_line)
-    fails.append(fails_line)
 
 # MINIMUM
 filename = "results/compiled_results/duration_min_{}_{}.txt".format(

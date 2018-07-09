@@ -51,8 +51,8 @@ class World:
         self.ghosts          = deque()
 
         # pan and zoom
-        self.scale = min(SCREEN_WIDTH  / self.width  * 0.9,
-                         SCREEN_HEIGHT / self.height * 0.9)
+        self.scale = min(SCREEN_WIDTH  / self.width  * 0.95,#0.9,
+                         SCREEN_HEIGHT / self.height * 0.95)#0.9)
 
         self.scale_min = min(SCREEN_WIDTH  / self.width * 0.5,
                              SCREEN_HEIGHT / self.width * 0.5)
@@ -376,48 +376,64 @@ class World:
 
         for grass in self.grass:
             grass.draw()
+
+        for car in self.cars:
+            car.draw()
+
+    def drawAll(self, paused):
+        if self.panning:
+            self.updatePan(Vector(*pygame.mouse.get_pos()))
+
+        if self.selected_car:
+            if self.selected_car.stopped:
+                self.selected_car = None
+            else:
+                self.followCar(self.selected_car)
+
+        for grass in self.grass:
+            grass.draw()
             #grass.drawOutline()
 
-#        for road in self.all_roads:
-#            start = self.getDrawable(road.start)
-#            end   = self.getDrawable(road.end)
+        #for road in self.all_roads:
+        #    start = self.getDrawable(road.start)
+        #    end   = self.getDrawable(road.end)
 
-#            pygame.draw.line(self.screen, BLACK, start, end, 1)
+        #    pygame.draw.line(self.screen, BLACK, start, end, 1)
 
-#        font = pygame.font.SysFont('Helvetica', 12, bold=True)
-#        for entry_num, road in enumerate(self.entry_roads):
-#            if not self.entry_queues[entry_num]:
-#                continue
+        font = pygame.font.SysFont('Helvetica', 12, bold=True)
+        for entry_num, road in enumerate(self.entry_roads):
+            if not self.entry_queues[entry_num]:
+                continue
 
-#            num_cars = len(self.entry_queues[entry_num])
+            num_cars = len(self.entry_queues[entry_num])
 
-#            position = road.end + (road.start - road.end).norm() \
-#                                  * (CAR_ADDING_DIST + 3.5)
-#            pos      = self.getDrawable(position)
+            position = road.end + (road.start - road.end).norm() \
+                                  * (CAR_ADDING_DIST + 3.5)
+            pos      = self.getDrawable(position)
 
-#            text = font.render("+{}".format(num_cars), False, BLACK)
-#            rect = text.get_rect(center=pos)
+            text = font.render("+{}".format(num_cars), False, BLACK)
+            rect = text.get_rect(center=pos)
 
-#            border = rect.inflate(4, 2)
-#            pygame.draw.rect(self.screen, WHITE, border)
-#            pygame.draw.rect(self.screen, BLACK, border, 1)
+            border = rect.inflate(4, 2)
+            pygame.draw.rect(self.screen, WHITE, border)
+            pygame.draw.rect(self.screen, BLACK, border, 1)
 
-#            self.screen.blit(text, rect)
+            self.screen.blit(text, rect)
 
         if self.strategy == TRAFFIC_LIGHTS_MODE:
             for intersection in self.traffic_lights:
                 self.traffic_lights[intersection].draw()
 
-#        elif self.strategy in {MY_TRAFFIC_CONTROLLER_MODE, GREEDY_CONTROLLER_MODE}:
-#            for controller in self.controllers:
-#                controller.traffic_controller.drawBackground()
+        elif self.strategy in {MY_TRAFFIC_CONTROLLER_MODE, GREEDY_CONTROLLER_MODE}:
+            for controller in self.controllers:
+                controller.traffic_controller.drawBackground()
 
         #box = [self.getDrawable(point) for point in self.hull]
         #pygame.draw.polygon(self.screen, BLACK, box, 1)
 
-#        for ghost in self.ghosts:
+        for ghost in self.ghosts:
             #ghost.drawPath()
-#            ghost.draw(False, paused)
+            ghost.draw(False, paused)
 
         #for controller in self.controllers:
         #    controller.drawRoute()
@@ -429,12 +445,13 @@ class World:
         #    car.drawPath()
 
         for car in self.cars:
-            car.draw(car is self.selected_car, paused)
+            #car.draw()
+            car.drawAll(car is self.selected_car, paused)
             #car.drawExtra()
 
         #for car in self.cars:
         #    car.drawDesiredPosition()
 
-#        for controller in self.controllers:
-#            controller.draw()
+        for controller in self.controllers:
+            controller.draw()
 

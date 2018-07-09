@@ -20,7 +20,7 @@ NUM_TRIALS = 5
 # probability of car turning
 LEFT_PROB   = 1
 RIGHT_PROB  = 1
-CENTRE_PROB = 3
+CENTRE_PROB = 6
 
 TURN_CODE = "{}{}{}".format(LEFT_PROB, RIGHT_PROB, CENTRE_PROB)
 

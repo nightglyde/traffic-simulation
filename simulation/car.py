@@ -4,10 +4,35 @@ from obstacle import Obstacle
 
 #from controller import FollowRoad, EnterIntersection
 
-SHOW_WHEELS   = False
-SHOW_LIGHTS   = True
+SHOW_WHEELS = True
+SHOW_LIGHTS = True
 
 STEERING_RATE = 2*math.pi * 0.3#0.3#0.5#0.1
+
+def alt_getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
+    ang_diff = (desired_car_angle - car_angle).value
+    if ang_diff == 0.0 or speed == 0.0:
+        return wheel_angle
+
+    ang_vel = ang_diff / dt
+    radius  = speed / ang_vel
+
+    ratio = PIVOT_TO_AXLE / radius
+    ratio = min(abs(ratio), 0.5) * sign(ratio)
+
+    desired_wheel_angle = Angle(math.asin(ratio))
+
+    #return max(-MAX_WHEEL_ANGLE, min(wheel_angle, MAX_WHEEL_ANGLE))
+
+    angle_change = Angle(STEERING_RATE * dt)
+    if desired_wheel_angle < wheel_angle:
+        return max(wheel_angle - angle_change,
+                   desired_wheel_angle, -MAX_WHEEL_ANGLE)
+    elif desired_wheel_angle > wheel_angle:
+        return min(wheel_angle + angle_change,
+                   desired_wheel_angle, MAX_WHEEL_ANGLE)
+    return wheel_angle
+
 
 def getNextWheelAngle(desired_car_angle, car_angle, wheel_angle, speed, dt):
     ang_diff = (desired_car_angle - car_angle).value
@@ -162,7 +187,17 @@ class Car(Obstacle):
         self.desired_angle    = angle
         self.next_turn        = turn
 
-    def draw(self, selected, paused):
+    def draw(self):
+        screen = self.world.screen
+
+        # car outline
+        chassis = [self.world.getDrawable(point) for point in self.hull]
+
+        # draw active car
+        pygame.draw.polygon(screen, self.colour, chassis)
+        pygame.draw.polygon(screen, BLACK,       chassis, 1)
+
+    def drawAll(self, selected, paused):
         screen = self.world.screen
         pos    = self.position
 
@@ -176,35 +211,35 @@ class Car(Obstacle):
         chassis = [self.world.getDrawable(point) for point in self.hull]
 
         # arrow outline
-#        stem_front = forward * ARROW_STEM_LENGTH
-#        stem_left  = left    * ARROW_STEM_WIDTH / 2
-#        head_front = forward * ARROW_LENGTH
-#        head_left  = left    * ARROW_WIDTH / 2
+        stem_front = forward * ARROW_STEM_LENGTH
+        stem_left  = left    * ARROW_STEM_WIDTH / 2
+        head_front = forward * ARROW_LENGTH
+        head_left  = left    * ARROW_WIDTH / 2
 
-#        arrow = [
-#            self.world.getDrawable(pos              + stem_left),
-#            self.world.getDrawable(pos + stem_front + stem_left),
-#            self.world.getDrawable(pos + stem_front + head_left),
-#            self.world.getDrawable(pos + head_front            ),
-#            self.world.getDrawable(pos + stem_front - head_left),
-#            self.world.getDrawable(pos + stem_front - stem_left),
-#            self.world.getDrawable(pos              - stem_left),
-#        ]
+        arrow = [
+            self.world.getDrawable(pos              + stem_left),
+            self.world.getDrawable(pos + stem_front + stem_left),
+            self.world.getDrawable(pos + stem_front + head_left),
+            self.world.getDrawable(pos + head_front            ),
+            self.world.getDrawable(pos + stem_front - head_left),
+            self.world.getDrawable(pos + stem_front - stem_left),
+            self.world.getDrawable(pos              - stem_left),
+        ]
 
         if self.stopped:
             # draw crashed car
             pygame.draw.polygon(screen, LIGHT_GREY,  chassis)
             pygame.draw.polygon(screen, GREY, chassis, 1)
-#            pygame.draw.polygon(screen, self.colour, arrow)
-#            pygame.draw.polygon(screen, GREY, arrow, 1)
+            pygame.draw.polygon(screen, self.colour, arrow)
+            pygame.draw.polygon(screen, GREY, arrow, 1)
             return
 
         # draw active car
         pygame.draw.polygon(screen, self.colour, chassis)
         pygame.draw.polygon(screen, BLACK,       chassis, 1)
-#        if selected:
-#            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
-#        pygame.draw.polygon(screen, BLACK, arrow, 1)
+        if selected:
+            pygame.draw.polygon(screen, LIGHTER[self.colour], arrow)
+        pygame.draw.polygon(screen, BLACK, arrow, 1)
 
         #font = pygame.font.SysFont('Helvetica', 12, bold=True)
         #text = font.render(self.name, False, BLACK)
@@ -371,6 +406,41 @@ class Car(Obstacle):
         #text = font.render(str(round(self.speed)), False, BLACK)
         #rect = text.get_rect(center=self.world.getDrawable(self.centre))
         #screen.blit(text, rect)
+
+    def drawExtra(self):
+        if self.stopped:
+            return
+
+        screen = self.world.screen
+        forward = getVector(self.angle)
+
+        if abs(self.wheel_angle.value) > TINY_ANGLE:
+            radius = PIVOT_TO_AXLE / abs(math.sin(self.wheel_angle.value))
+
+            if self.wheel_angle < ANGLE_0:
+                circle_centre = getTurningCircle(LEFT, self, radius)
+                outer_radius  = (self.hull[1] - circle_centre).mag()
+            else:
+                circle_centre = getTurningCircle(RIGHT, self, radius)
+                outer_radius  = (self.hull[0] - circle_centre).mag()
+
+            centre       = self.world.getDrawable(circle_centre)
+            outer_radius = self.world.scaleDistance(outer_radius)
+            inner_radius = self.world.scaleDistance(radius - CAR_WIDTH/2)
+
+            pygame.draw.circle(screen, GREY, centre, outer_radius, 1)
+            pygame.draw.circle(screen, GREY, centre, inner_radius, 1)
+
+        else:
+            front = forward * COLLISION_DISTANCE
+
+            left        = self.world.getDrawable(self.hull[1])
+            front_left  = self.world.getDrawable(self.hull[1] + front)
+            right       = self.world.getDrawable(self.hull[0])
+            front_right = self.world.getDrawable(self.hull[0] + front)
+
+            pygame.draw.line(screen, GREY, left,  front_left,  1)
+            pygame.draw.line(screen, GREY, right, front_right, 1)
 
     def drawExtra(self):
         if self.stopped:
