@@ -7,7 +7,7 @@ from pregen.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets_1x1.dataset_1x1_150_114A import schedule
+from pregen.datasets_1x1.mass_generation.dataset_1x1_150_116_00 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -21,7 +21,7 @@ clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
 
-strategy = TRAFFIC_LIGHTS_MODE#MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
+strategy = GREEDY_CONTROLLER_MODE#TRAFFIC_LIGHTS_MODE#MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
 
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)

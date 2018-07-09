@@ -1,39 +1,59 @@
 
+import statistics
+
 strategy_codes    = ["TrafficLights",
                      "VirtualTrafficLights",
                      "MyTrafficController",
                      "GreedyController"]
 short_codes       = ["TL", "VTL", "MTC", "GC"]
-scenario_codes    = ["1x1", "2x2"]
+scenario_codes    = ["1x1"]#, "2x2"]
 density_codes     = ["010", "020", "030", "040", "050",
                      "060", "070", "080", "090", "100",
                      "110", "120", "130", "140", "150"]
-turn_distro_codes = ["111", "112", "113", "114", "115", "116"]
+turn_distro_codes = [
+    "111",# "112", "113",
+    #"114", "115", "116"
+]
 
 num_test_cases = 10
 
-def getAverageDuration(filename, expected_count):
+def getDurations(filename, expected_count):
 
     f = open(filename)
 
-    count = 0
-    total = 0
+    #count = 0
+    #total = 0
+
+    durations = []
 
     for line in f:
         start_time, end_time, duration = [int(x) for x in line.split()]
 
-        count += 1
-        total += duration
+        #count += 1
+        #total += duration
+
+        durations.append(duration)
 
     f.close()
 
-    if count == expected_count:
-        return total / count
+    if len(durations) < 1:
+        return None, None, False
 
-    return None
+    mean_duration = statistics.mean(durations)
+    max_duration  = max(durations)
+
+    if len(durations) == expected_count:
+        return mean_duration, max_duration, True
+    else:
+        return mean_duration, max_duration, False
+
+    #if count == expected_count:
+    #    return total / count
+
+    #return None
 
 NARROW_COLUMN = 5
-WIDE_COLUMN   = 18
+WIDE_COLUMN   = 18 + 11 + 8
 
 NORMAL_DIV  = "|"
 DIVIDER_DIV = "+"
@@ -109,7 +129,11 @@ for turn_distro in turn_distro_codes:
 
             for strategy in strategy_codes:
 
-                total       = 0.0
+                #all_durations = []
+                #total       = 0.0
+                mean_durations = []
+                max_durations  = []
+
                 num_fails   = 0
                 num_missing = 0
 
@@ -119,13 +143,25 @@ for turn_distro in turn_distro_codes:
                         strategy, scenario, density, turn_distro, i)
 
                     try:
-                        average_duration = getAverageDuration(filename,
-                                                              expected_count)
+                        #average_duration = getAverageDuration(filename,
+                        #                                      expected_count)
 
-                        if average_duration is None:
+                        #if average_duration is None:
+                        #    num_fails += 1
+                        #else:
+                        #    total += average_duration
+
+                        mean_duration, max_duration, passed = getDurations(filename, expected_count)
+
+                        if mean_duration:
+                            mean_durations.append(mean_duration)
+
+                        if max_duration:
+                            max_durations.append(max_duration)
+
+                        if not passed:
                             num_fails += 1
-                        else:
-                            total += average_duration
+                            continue
 
                     except FileNotFoundError:
                         num_missing += 1
@@ -134,18 +170,34 @@ for turn_distro in turn_distro_codes:
                 num_success = num_results - num_fails
 
                 if num_success > 0:
-                    average_over_trials = total / num_success
+                    average_mean_duration = statistics.mean(mean_durations) / 1000
+                    average_max_duration  = max(max_durations)  / 1000
 
-                    text = "{:10.2f} {:02}/{:02}".format(
-                        average_over_trials, num_success, num_results)
+                    text = "mean:{:7.2f} max:{:7.2f} fail:{:2}/{:2}".format(
+                        average_mean_duration, average_max_duration,
+                        num_fails, num_results)
                     items.append(centreText(text, WIDE_COLUMN))
 
                 elif num_results > 0:
-                    text = "{:02}/{:02} fails".format(num_fails, num_results)
+                    text = "{:2}/{:2} fails".format(num_fails, num_results)
                     items.append(centreText(text, WIDE_COLUMN))
 
                 else:
                     items.append(centreText("-", WIDE_COLUMN))
+
+                #if num_success > 0:
+                #    average_over_trials = total / num_success
+
+                #    text = "{:10.2f} {:02}/{:02}".format(
+                #        average_over_trials, num_success, num_results)
+                #    items.append(centreText(text, WIDE_COLUMN))
+
+                #elif num_results > 0:
+                #    text = "{:02}/{:02} fails".format(num_fails, num_results)
+                #    items.append(centreText(text, WIDE_COLUMN))
+
+                #else:
+                #    items.append(centreText("-", WIDE_COLUMN))
 
         print(NORMAL_DIV + NORMAL_DIV.join(items) + NORMAL_DIV)
 

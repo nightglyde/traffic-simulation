@@ -4,8 +4,8 @@ import statistics
 strategy_codes = [
     "TrafficLights",
     "VirtualTrafficLights",
-    "MyTrafficController",
     "GreedyController",
+    "MyTrafficController",
 ]
 
 density_codes = [

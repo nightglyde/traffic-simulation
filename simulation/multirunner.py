@@ -14,18 +14,19 @@ import pregen.datasets_1x1.mass_generation as datasets2
 
 module_names = []
 
-
 #pattern = re.compile("dataset_1x1_150_116")
 #pattern = re.compile("_116_00")
-#pattern = re.compile("_111_")
+pattern = re.compile("_111_")
 
 package = datasets2
 prefix  = package.__name__ + "."
 for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
                                                          prefix):
-    #if not pattern.search(module_name):
-    #    continue
+    if not pattern.search(module_name):
+        continue
     print("Found module:", module_name)
+
+    #module_names.append(module_name)
 
     #turn_number = int(module_name[-6:-3])
     case_number = int(module_name[-2:])
