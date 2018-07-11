@@ -14,6 +14,14 @@ import pregen.datasets_1x1.mass_generation as datasets2
 
 module_names = []
 
+#blacklist = {
+#    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_00",
+#    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_01",
+#    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_02",
+#    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_03",
+#    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_04",
+#}
+
 #pattern = re.compile("dataset_1x1_150_116")
 #pattern = re.compile("_116_00")
 pattern = re.compile("_111_")
@@ -24,17 +32,27 @@ for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
                                                          prefix):
     if not pattern.search(module_name):
         continue
-    print("Found module:", module_name)
 
-    #module_names.append(module_name)
+    #if module_name in blacklist:
+    #    continue
 
+    #density = int(module_name[-10:-7])
     #turn_number = int(module_name[-6:-3])
-    case_number = int(module_name[-2:])
+    #case_number = int(module_name[-2:])
 
-    module_names.append((case_number, module_name))
+    #if density < 120:
+    #    continue
 
-module_names.sort()
-module_names = [module_name for case_number, module_name in module_names]
+    #if density > 120:
+    #    continue
+
+    print("Found module:", module_name)
+    module_names.append(module_name)
+
+    #module_names.append((case_number, module_name))
+
+#module_names.sort()
+#module_names = [module_name for case_number, module_name in module_names]
 
 #pattern = re.compile("111A")
 
@@ -77,6 +95,12 @@ def worldGenerator():
             # NEED TO FIX VirtualTrafficLights
             #if strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
             #    continue
+
+            if strategy == VIRTUAL_TRAFFIC_LIGHTS_2_MODE:
+                continue
+
+            if strategy == MY_TRAFFIC_CONTROLLER_MODE:
+                continue
 
             filename = "results/{}_{}.txt".format(strategy_name, short_name)
 

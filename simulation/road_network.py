@@ -576,8 +576,12 @@ class VirtualTrafficLights:
         else:
             dist_left, entrance, spaces = self.knowledge[self.first_follower]
 
-        if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST:
-            return
+        if self.world.strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
+            if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST:
+                return
+        else:
+            if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST_2:
+                return
 
         self.messages.append((self.first_follower, VTL_GREEN,
                               self.intersection,  self.num_followers-1))
@@ -1036,26 +1040,28 @@ class MyTrafficController:
         pos = world.getDrawable(self.car.centre)
         rad = world.scaleDistance(CAR_WIDTH/2 + 0.1)
 
-        rad = max(8, rad)
+        #rad = max(8, rad)
 
         pygame.draw.circle(screen, colour, pos, rad)
         pygame.draw.circle(screen, BLACK,  pos, rad, 1)
 
-        wait_time = self.status.wait_time
-        if wait_time != None:
+        if rad >= 8:
 
-            time = wait_time // 1000
+            wait_time = self.status.wait_time
+            if wait_time != None:
 
-            font_size = rad#max(6, rad)
+                time = wait_time // 1000
 
-            font = pygame.font.SysFont('Helvetica', font_size, bold=True)
-            text = font.render(str(time), False, BLACK)
-            rect = text.get_rect(center=pos)
-            world.screen.blit(text, rect)
+                font_size = rad#max(6, rad)
 
-        #if self.vote != None and self.vote != self.name:
-        #    for car in world.cars:
-        #        if car.name == self.vote:#self.leader:
-        #            pos2 = world.getDrawable(car.centre)
-        #            pygame.draw.line(screen, car.colour, pos, pos2, 3)
+                font = pygame.font.SysFont('Helvetica', font_size, bold=True)
+                text = font.render(str(time), False, BLACK)
+                rect = text.get_rect(center=pos)
+                world.screen.blit(text, rect)
+
+            #if self.vote != None and self.vote != self.name:
+            #    for car in world.cars:
+            #        if car.name == self.vote:#self.leader:
+            #            pos2 = world.getDrawable(car.centre)
+            #            pygame.draw.line(screen, car.colour, pos, pos2, 3)
 

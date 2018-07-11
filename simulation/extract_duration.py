@@ -8,6 +8,13 @@ strategy_codes = [
     "MyTrafficController",
 ]
 
+short_names = [
+    "tl",
+    "vtl",
+    "gc",
+    "mtc",
+]
+
 density_codes = [
     "010",
     "020",
@@ -21,12 +28,12 @@ density_codes = [
     "100",
     "110",
     "120",
-    "130",
-    "140",
-    "150",
+#    "130",
+#    "140",
+#    "150",
 ]
 
-num_test_cases = 10
+num_test_cases = 20
 
 dataset_prefix = "dataset_1x1"
 dataset_suffix = "111"
@@ -171,5 +178,46 @@ filename = "results/compiled_results/fails_{}_{}.txt".format(
 f = open(filename, 'w')
 for line in fails:
     f.write(" ".join(line) + "\n")
+f.close()
+
+# DISTRIBUTION OF SINGLE STRATEGY
+def writeFileForStrategy(strategy_num, strategy_name):
+    filename = "results/compiled_results/duration_{}_{}_{}.txt".format(
+        strategy_name, dataset_prefix, dataset_suffix)
+
+    f = open(filename, 'w')
+
+    for i, density in enumerate(density_codes):
+        line = [
+            density,
+            averages[i][strategy_num+1],
+            minimums[i][strategy_num+1],
+            maximums[i][strategy_num+1],
+            std_devs[i][strategy_num+1],
+        ]
+        f.write(" ".join(line) + "\n")
+    f.close()
+
+for i, short_name in enumerate(short_names):
+    writeFileForStrategy(i, short_name)
+
+# COMBINED
+
+filename = "results/compiled_results/duration_combined_{}_{}.txt".format(
+    dataset_prefix, dataset_suffix)
+f = open(filename, 'w')
+for i, density in enumerate(density_codes):
+    line = [density]
+
+    for j in range(len(strategy_codes)):
+        line += [
+            averages[i][j+1],
+            minimums[i][j+1],
+            maximums[i][j+1],
+            std_devs[i][j+1],
+        ]
+
+    f.write(" ".join(line) + "\n")
+
 f.close()
 

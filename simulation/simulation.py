@@ -7,7 +7,7 @@ from pregen.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets_1x1.mass_generation.dataset_1x1_150_116_00 import schedule
+from pregen.datasets_1x1.mass_generation.dataset_1x1_150_111_00 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -21,16 +21,25 @@ clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
 
-strategy = GREEDY_CONTROLLER_MODE#TRAFFIC_LIGHTS_MODE#MY_TRAFFIC_CONTROLLER_MODE#VIRTUAL_TRAFFIC_LIGHTS_MODE
+#strategy = TRAFFIC_LIGHTS_MODE
+#strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
+#strategy = VIRTUAL_TRAFFIC_LIGHTS_2_MODE
+strategy = GREEDY_CONTROLLER_MODE
+#strategy = MY_TRAFFIC_CONTROLLER_MODE
 
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
 
 def generateFilename():
-    timestamp = strftime("%Y-%m-%d_%H-%M-%S", gmtime())
+    timestamp = strftime("%Y-%m-%d_%H-%M", gmtime())
     strategy_name = ALL_STRATEGIES[world.strategy][1]
 
-    return "screenshots/img_{}_{}.png".format(timestamp, strategy_name)
+    batch_name = "{}_{}".format(timestamp, strategy_name)
+
+    for i in range(1000):
+        yield "screenshots/img_{}_{:03}.png".format(batch_name, i)
+
+filenames = generateFilename()
 
 world_time = 0
 prev_time  = pygame.time.get_ticks()
@@ -49,7 +58,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    #clock.tick(FRAMES_PER_SECOND)
+    clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
@@ -111,7 +120,7 @@ while not done:
                 world.resetZoom()
 
             if event.key == pygame.K_RETURN:
-                pygame.image.save(screen, generateFilename())
+                pygame.image.save(screen, next(filenames))
 
         #elif event.type == pygame.USEREVENT:
         #    paused = True

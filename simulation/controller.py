@@ -57,9 +57,9 @@ class CarController:
             self.traffic_controller = None
 
         else:
-            if self.world.strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
+            if self.world.strategy in VTL_MODES:
                 controller = VirtualTrafficLights(self)
-            elif self.world.strategy in {MY_TRAFFIC_CONTROLLER_MODE, GREEDY_CONTROLLER_MODE}:
+            elif self.world.strategy in MTC_MODES:
                 controller = MyTrafficController(self)
 
             for instruction in route:

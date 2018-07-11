@@ -424,7 +424,7 @@ class World:
             for intersection in self.traffic_lights:
                 self.traffic_lights[intersection].draw()
 
-        elif self.strategy in {MY_TRAFFIC_CONTROLLER_MODE, GREEDY_CONTROLLER_MODE}:
+        elif self.strategy in MTC_MODES:
             for controller in self.controllers:
                 controller.traffic_controller.drawBackground()
 
@@ -445,8 +445,8 @@ class World:
         #    car.drawPath()
 
         for car in self.cars:
-            #car.draw()
-            car.drawAll(car is self.selected_car, paused)
+            car.draw()
+            #car.drawAll(car is self.selected_car, paused)
             #car.drawExtra()
 
         #for car in self.cars:

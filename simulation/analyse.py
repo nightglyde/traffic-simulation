@@ -1,21 +1,45 @@
 
 import statistics
 
-strategy_codes    = ["TrafficLights",
-                     "VirtualTrafficLights",
-                     "MyTrafficController",
-                     "GreedyController"]
-short_codes       = ["TL", "VTL", "MTC", "GC"]
-scenario_codes    = ["1x1"]#, "2x2"]
-density_codes     = ["010", "020", "030", "040", "050",
-                     "060", "070", "080", "090", "100",
-                     "110", "120", "130", "140", "150"]
-turn_distro_codes = [
-    "111",# "112", "113",
-    #"114", "115", "116"
+strategy_codes = [
+    "TrafficLights",
+    "VirtualTrafficLights",
+    "VirtualTrafficLights2",
+    "GreedyController",
+    "MyTrafficController",
 ]
 
-num_test_cases = 10
+short_codes = [
+    "TL",
+    "VTL",
+    "VTL2",
+    "GC",
+    "MTC",
+]
+
+scenario_codes = [
+    "1x1",
+    #"2x2",
+]
+
+density_codes = [
+    "010", "020", "030",
+    "040", "050", "060",
+    "070", "080", "090",
+    "100", "110", "120",
+    #"130", "140", "150",
+]
+
+turn_distro_codes = [
+    "111",
+    #"112",
+    #"113",
+    #"114",
+    #"115",
+    #"116",
+]
+
+num_test_cases = 20
 
 def getDurations(filename, expected_count):
 
@@ -37,15 +61,17 @@ def getDurations(filename, expected_count):
     f.close()
 
     if len(durations) < 1:
-        return None, None, False
+        #return None, None, False
+        return None
 
     mean_duration = statistics.mean(durations)
     max_duration  = max(durations)
 
     if len(durations) == expected_count:
-        return mean_duration, max_duration, True
+        return mean_duration, max_duration#, True
     else:
-        return mean_duration, max_duration, False
+        #return mean_duration, max_duration, False
+        return None
 
     #if count == expected_count:
     #    return total / count
@@ -53,7 +79,7 @@ def getDurations(filename, expected_count):
     #return None
 
 NARROW_COLUMN = 5
-WIDE_COLUMN   = 18 + 11 + 8
+WIDE_COLUMN   = 18 + 11 + 8 - 6
 
 NORMAL_DIV  = "|"
 DIVIDER_DIV = "+"
@@ -119,6 +145,8 @@ for turn_distro in turn_distro_codes:
     print(strategy_line)
     print(hori_div_2)
 
+    bad_datasets = []
+
     for density in density_codes:
 
         expected_count = int(density) * 60
@@ -127,6 +155,29 @@ for turn_distro in turn_distro_codes:
 
         for scenario in scenario_codes:
 
+            good_datasets = []
+            for i in range(num_test_cases):
+
+                dataset = "dataset_{}_{}_{}_{:02}.txt".format(
+                    scenario, density, turn_distro, i)
+
+                for strategy in strategy_codes:
+
+                    filename = "results/{}_{}".format(strategy, dataset)
+
+                    try:
+                        if not getDurations(filename, expected_count):
+                            bad_datasets.append((dataset, expected_count, density))
+                            break
+                    except FileNotFoundError:
+                        #bad_datasets.append((dataset, expected_count, density))
+                        #break
+                        pass
+
+                else:
+                    good_datasets.append(dataset)
+
+
             for strategy in strategy_codes:
 
                 #all_durations = []
@@ -134,15 +185,18 @@ for turn_distro in turn_distro_codes:
                 mean_durations = []
                 max_durations  = []
 
-                num_fails   = 0
-                num_missing = 0
+                num_results = 0
 
-                for i in range(num_test_cases):
+                #for i in range(num_test_cases):
 
-                    filename = "results/{}_dataset_{}_{}_{}_{:02}.txt".format(
-                        strategy, scenario, density, turn_distro, i)
+                #    filename = "results/{}_dataset_{}_{}_{}_{:02}.txt".format(
+                #        strategy, scenario, density, turn_distro, i)
 
-                    try:
+                for dataset in good_datasets:
+
+                    filename = "results/{}_{}".format(strategy, dataset)
+
+                    #try:
                         #average_duration = getAverageDuration(filename,
                         #                                      expected_count)
 
@@ -151,39 +205,62 @@ for turn_distro in turn_distro_codes:
                         #else:
                         #    total += average_duration
 
-                        mean_duration, max_duration, passed = getDurations(filename, expected_count)
+                    #    mean_duration, max_duration, passed = getDurations(filename, expected_count)
 
-                        if mean_duration:
-                            mean_durations.append(mean_duration)
+                    #    if mean_duration:
+                    #        mean_durations.append(mean_duration)
 
-                        if max_duration:
-                            max_durations.append(max_duration)
+                    #    if max_duration:
+                    #        max_durations.append(max_duration)
 
-                        if not passed:
-                            num_fails += 1
-                            continue
+                    #    if not passed:
+                    #        num_fails += 1
+                    #        continue
+
+                    #except FileNotFoundError:
+                    #    num_missing += 1
+
+                    try:
+                        mean_duration, max_duration = getDurations(filename, expected_count)
+
+                        mean_durations.append(mean_duration)
+                        max_durations.append(max_duration)
+
+                        num_results += 1
 
                     except FileNotFoundError:
-                        num_missing += 1
+                        pass
 
-                num_results = num_test_cases - num_missing
-                num_success = num_results - num_fails
+                #num_results = num_test_cases - num_missing
+                #num_success = num_results - num_fails
 
-                if num_success > 0:
+                if num_results > 1:
                     average_mean_duration = statistics.mean(mean_durations) / 1000
                     average_max_duration  = max(max_durations)  / 1000
 
-                    text = "mean:{:7.2f} max:{:7.2f} fail:{:2}/{:2}".format(
+                    text = "mean:{:7.2f} max:{:7.2f} ({:02})".format(
                         average_mean_duration, average_max_duration,
-                        num_fails, num_results)
-                    items.append(centreText(text, WIDE_COLUMN))
-
-                elif num_results > 0:
-                    text = "{:2}/{:2} fails".format(num_fails, num_results)
+                        num_results)
                     items.append(centreText(text, WIDE_COLUMN))
 
                 else:
                     items.append(centreText("-", WIDE_COLUMN))
+
+                #if num_success > 0:
+                #    average_mean_duration = statistics.mean(mean_durations) / 1000
+                #    average_max_duration  = max(max_durations)  / 1000
+
+                #    text = "mean:{:7.2f} max:{:7.2f} fail:{:2}/{:2}".format(
+                #        average_mean_duration, average_max_duration,
+                #        num_fails, num_results)
+                #    items.append(centreText(text, WIDE_COLUMN))
+
+                #elif num_results > 0:
+                #    text = "{:2}/{:2} fails".format(num_fails, num_results)
+                #    items.append(centreText(text, WIDE_COLUMN))
+
+                #else:
+                #    items.append(centreText("-", WIDE_COLUMN))
 
                 #if num_success > 0:
                 #    average_over_trials = total / num_success
@@ -200,6 +277,37 @@ for turn_distro in turn_distro_codes:
                 #    items.append(centreText("-", WIDE_COLUMN))
 
         print(NORMAL_DIV + NORMAL_DIV.join(items) + NORMAL_DIV)
+
+    print(hori_div_2)
+
+    for dataset, expected_count, density in bad_datasets:
+
+        line = [density, dataset[-6:-4]]
+
+        for strategy in strategy_codes:
+
+            filename = "results/{}_{}".format(strategy, dataset)
+
+            try:
+
+                result = getDurations(filename, expected_count)
+
+                if result:
+                    mean_duration, max_duration = result
+                    #text = "mean: {:.2f}, max: {:.2f}".format(mean_duration/1000,
+                    #                                          max_duration/1000)
+
+                    text = "{:.2f}".format(mean_duration/1000)
+
+                else:
+                    text = "Traffic Jam"
+
+            except:
+                text = "-"
+
+            line.append(text)
+
+        print(" & ".join(line) + " \\\\")
 
     print(hori_div_2)
     print()
