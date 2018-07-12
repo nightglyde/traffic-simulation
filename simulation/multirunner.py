@@ -38,7 +38,10 @@ for importer, module_name, ispkg in pkgutil.iter_modules(package.__path__,
 
     #density = int(module_name[-10:-7])
     #turn_number = int(module_name[-6:-3])
-    #case_number = int(module_name[-2:])
+    case_number = int(module_name[-2:])
+
+    if case_number >= 5:
+        continue
 
     #if density < 120:
     #    continue
@@ -96,11 +99,11 @@ def worldGenerator():
             #if strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
             #    continue
 
-            if strategy == VIRTUAL_TRAFFIC_LIGHTS_2_MODE:
-                continue
+            #if strategy == VIRTUAL_TRAFFIC_LIGHTS_2_MODE:
+            #    continue
 
-            if strategy == MY_TRAFFIC_CONTROLLER_MODE:
-                continue
+            #if strategy == MY_TRAFFIC_CONTROLLER_MODE:
+            #    continue
 
             filename = "results/{}_{}.txt".format(strategy_name, short_name)
 

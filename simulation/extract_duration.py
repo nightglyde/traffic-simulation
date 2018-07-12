@@ -4,6 +4,7 @@ import statistics
 strategy_codes = [
     "TrafficLights",
     "VirtualTrafficLights",
+    "VirtualTrafficLights2",
     "GreedyController",
     "MyTrafficController",
 ]
@@ -11,6 +12,7 @@ strategy_codes = [
 short_names = [
     "tl",
     "vtl",
+    "vtl2",
     "gc",
     "mtc",
 ]
@@ -28,9 +30,9 @@ density_codes = [
     "100",
     "110",
     "120",
-#    "130",
-#    "140",
-#    "150",
+    "130",
+    "140",
+    "150",
 ]
 
 num_test_cases = 20
@@ -58,12 +60,6 @@ def getDurations(filename, expected_count):
 
     return []
 
-#cumulative_fails = []
-#for strategy in strategy_codes:
-#    cumulative_fails.append(0)
-
-#stop_calculating = False
-
 minimums = []
 maximums = []
 averages = []
@@ -73,67 +69,69 @@ for density in density_codes:
 
     expected_count = int(density) * 60
 
+    good_datasets = []
+    bad_datasets  = []
+    for i in range(num_test_cases):
+        dataset = "{}_{}_{}_{:02}".format(
+            dataset_prefix, density, dataset_suffix, i)
+
+        for strategy in strategy_codes:
+
+            filename = "results/{}_{}.txt".format(strategy, dataset)
+
+            try:
+                if not getDurations(filename, expected_count):
+                    bad_datasets.append(dataset)
+                    break
+
+            except FileNotFoundError:
+                bad_datasets.append(dataset)
+                break
+
+        else:
+            good_datasets.append(dataset)
+
+
     minimums_line = [density]
     maximums_line = [density]
     averages_line = [density]
     std_devs_line = [density]
     fails_line    = [density]
-    for s, strategy in enumerate(strategy_codes):
+    for strategy in strategy_codes:
 
-        durations = []
-        num_success = 0
+        all_durations = []
         num_fails = 0
-        #num_fails = cumulative_fails[s]
 
-        for i in range(num_test_cases):
+        for dataset in good_datasets:
+            filename = "results/{}_{}.txt".format(strategy, dataset)
 
-            filename = "results/{}_{}_{}_{}_{:02}.txt".format(
-                strategy, dataset_prefix, density, dataset_suffix, i)
+            all_durations += getDurations(filename, expected_count)
+
+        for dataset in bad_datasets:
+            filename = "results/{}_{}.txt".format(strategy, dataset)
 
             try:
-                new_durations = getDurations(filename, expected_count)
-
-                if new_durations:
-
-                    #if stop_calculating:
-                    #    continue
-
-                    durations += new_durations
-
-                    num_success += 1
-                else:
+                durations = getDurations(filename, expected_count)
+                if not durations:
                     num_fails += 1
 
             except FileNotFoundError:
-                continue
-
-            if num_success >= 1:
-                break
+                pass
 
         fails_line.append(str(num_fails))
 
-        #if stop_calculating:
-        #    continue
-
-        if durations:
-            minimums_line.append(str(min(durations)/1000))
-            maximums_line.append(str(max(durations)/1000))
-            averages_line.append(str(statistics.mean(durations)/1000))
-            std_devs_line.append(str(statistics.stdev(durations)/1000))
+        if all_durations:
+            minimums_line.append(str(min(all_durations)/1000))
+            maximums_line.append(str(max(all_durations)/1000))
+            averages_line.append(str(statistics.mean(all_durations)/1000))
+            std_devs_line.append(str(statistics.stdev(all_durations)/1000))
         else:
             minimums_line.append(str("NaN"))
             maximums_line.append(str("NaN"))
             averages_line.append(str("NaN"))
             std_devs_line.append(str("NaN"))
 
-            #stop_calculating = True
-
-        #cumulative_fails[s] = num_fails
-
     fails.append(fails_line)
-
-    #if stop_calculating:
-    #    continue
 
     minimums.append(minimums_line)
     maximums.append(maximums_line)

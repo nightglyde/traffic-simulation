@@ -197,6 +197,42 @@ class Car(Obstacle):
         pygame.draw.polygon(screen, self.colour, chassis)
         pygame.draw.polygon(screen, BLACK,       chassis, 1)
 
+        if SHOW_LIGHTS:
+            pos = self.position
+
+            forward = getVector(self.angle)
+            left    = forward.right90()#left90()
+            # TODO: FIX THIS
+            # FOR SOME INSANE REASON, LEFT AND RIGHT ARE SWITCHED!!!
+            # IT'S LIKE THIS FOR THE WHEELS TOO
+
+            if self.next_turn != CENTRE:
+
+                light_front = forward * (PIVOT_TO_CENTRE + 0.5)
+                light_mid   = forward * (PIVOT_TO_CENTRE)
+                light_back  = forward * (PIVOT_TO_CENTRE - 0.5)
+
+                light_outer = left * (CAR_WIDTH/2 + 1)
+                light_inner = left * (CAR_WIDTH/2 + 0.5)
+
+                if self.next_turn == LEFT:
+                    left_arrow = [
+                        self.world.getDrawable(pos + light_front + light_inner),
+                        self.world.getDrawable(pos + light_mid   + light_outer),
+                        self.world.getDrawable(pos + light_back  + light_inner),
+                    ]
+                    pygame.draw.polygon(screen, AMBER, left_arrow)
+                    pygame.draw.polygon(screen, BLACK, left_arrow, 1)
+
+                if self.next_turn == RIGHT:
+                    right_arrow = [
+                        self.world.getDrawable(pos + light_front - light_inner),
+                        self.world.getDrawable(pos + light_mid   - light_outer),
+                        self.world.getDrawable(pos + light_back  - light_inner),
+                    ]
+                    pygame.draw.polygon(screen, AMBER, right_arrow)
+                    pygame.draw.polygon(screen, BLACK, right_arrow, 1)
+
     def drawAll(self, selected, paused):
         screen = self.world.screen
         pos    = self.position
@@ -307,7 +343,7 @@ class Car(Obstacle):
         # draw lights
         if SHOW_LIGHTS:
 
-            turning_signal_on = paused or (self.time % 1000) < 500
+            #turning_signal_on = paused or (self.time % 1000) < 500
 
             if self.next_turn != CENTRE:
 

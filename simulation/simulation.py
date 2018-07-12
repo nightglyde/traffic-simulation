@@ -58,7 +58,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    clock.tick(FRAMES_PER_SECOND)
+    #clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
