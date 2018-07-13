@@ -3,18 +3,18 @@ import statistics
 
 strategy_codes = [
     "TrafficLights",
-    "VirtualTrafficLights",
+#    "VirtualTrafficLights",
     "VirtualTrafficLights2",
     "GreedyController",
-    "MyTrafficController",
+#    "MyTrafficController",
 ]
 
 short_codes = [
     "TL",
-    "VTL",
+#    "VTL",
     "VTL2",
     "GC",
-    "MTC",
+#    "MTC",
 ]
 
 scenario_codes = [
@@ -39,7 +39,8 @@ turn_distro_codes = [
     #"116",
 ]
 
-num_test_cases = 20
+num_test_cases    = 20
+chosen_test_cases = 5
 
 def getDurations(filename, expected_count):
 
@@ -166,6 +167,9 @@ for turn_distro in turn_distro_codes:
                 else:
                     good_datasets.append(dataset)
 
+                if len(good_datasets) >= chosen_test_cases:
+                    break
+
 
             for strategy in strategy_codes:
 
@@ -189,7 +193,8 @@ for turn_distro in turn_distro_codes:
                     except FileNotFoundError:
                         pass
 
-                if num_results > 1:
+                if mean_durations:
+                #if num_results > 1:
                     average_mean_duration = statistics.mean(mean_durations) / 1000
                     average_max_duration  = max(max_durations)  / 1000
 

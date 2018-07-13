@@ -3,7 +3,7 @@ import statistics
 
 strategy_codes = [
     "TrafficLights",
-    "VirtualTrafficLights",
+    #"VirtualTrafficLights",
     "VirtualTrafficLights2",
     "GreedyController",
     "MyTrafficController",
@@ -12,7 +12,7 @@ strategy_codes = [
 short_names = [
     "tl",
     "vtl",
-    "vtl2",
+    #"vtl2",
     "gc",
     "mtc",
 ]
@@ -35,7 +35,7 @@ density_codes = [
     "150",
 ]
 
-num_test_cases = 20
+num_test_cases = 5#20
 
 dataset_prefix = "dataset_1x1"
 dataset_suffix = "111"

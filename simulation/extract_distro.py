@@ -3,14 +3,14 @@ import statistics
 
 strategy_codes = [
     "TrafficLights",
-    "VirtualTrafficLights",
+    "VirtualTrafficLights2",
     "GreedyController",
     "MyTrafficController",
 ]
 
 NUM_STRATEGIES = len(strategy_codes)
 
-num_test_cases = 10
+num_test_cases = 5#10
 
 density = "100"
 dataset_prefix = "dataset_1x1_{}_111".format(density)

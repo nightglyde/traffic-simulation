@@ -13,8 +13,8 @@ STEP_TIME         = TIME_STEP / 1000
 
 SCENARIO_TIMEOUT = 1000 * 60 * 5 # 5 minutes
 
-SCREEN_WIDTH  = 400#1200 # pixels
-SCREEN_HEIGHT = 400#800
+SCREEN_WIDTH  = 1200 # pixels
+SCREEN_HEIGHT = 800
 
 # physics constants
 DRAG_CONSTANT    = 0.761
