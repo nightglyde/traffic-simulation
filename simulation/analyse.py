@@ -6,7 +6,7 @@ strategy_codes = [
 #    "VirtualTrafficLights",
     "VirtualTrafficLights2",
     "GreedyController",
-#    "MyTrafficController",
+    "MyTrafficController",
 ]
 
 short_codes = [
@@ -14,7 +14,7 @@ short_codes = [
 #    "VTL",
     "VTL2",
     "GC",
-#    "MTC",
+    "MTC",
 ]
 
 scenario_codes = [
@@ -151,13 +151,20 @@ for turn_distro in turn_distro_codes:
                 dataset = "dataset_{}_{}_{}_{:02}.txt".format(
                     scenario, density, turn_distro, i)
 
+                if int(density) > 110:
+                    if i >= chosen_test_cases:
+                        break
+                    bad_datasets.append((dataset, expected_count, density))
+                    continue
+
                 for strategy in strategy_codes:
 
                     filename = "results/{}_{}".format(strategy, dataset)
 
                     try:
                         if not getDurations(filename, expected_count):
-                            bad_datasets.append((dataset, expected_count, density))
+                            if int(density) <= 110 or i < chosen_test_cases:
+                                bad_datasets.append((dataset, expected_count, density))
                             break
                     except FileNotFoundError:
                         #bad_datasets.append((dataset, expected_count, density))
@@ -167,8 +174,8 @@ for turn_distro in turn_distro_codes:
                 else:
                     good_datasets.append(dataset)
 
-                if len(good_datasets) >= chosen_test_cases:
-                    break
+                #if len(good_datasets) >= chosen_test_cases:
+                #    break
 
 
             for strategy in strategy_codes:
@@ -212,7 +219,7 @@ for turn_distro in turn_distro_codes:
 
     for dataset, expected_count, density in bad_datasets:
 
-        line = [density, dataset[-6:-4]]
+        line = [centreText(int(density), 3), centreText(int(dataset[-6:-4]), 2)]
 
         for strategy in strategy_codes:
 
