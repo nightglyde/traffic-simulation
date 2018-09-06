@@ -349,7 +349,7 @@ class VirtualTrafficLights:
 
         priorities = [None for i in range(N)]
         for car_name in self.knowledge:
-            dist_left, entrance, spaces = self.knowledge[car_name]
+            dist_left, entrance, blocked = self.knowledge[car_name]
 
             if not priorities[entrance]:
                 priorities[entrance] = (dist_left, car_name)
@@ -372,36 +372,6 @@ class VirtualTrafficLights:
                 #      "new leader chosen:", car_name, "D")
                 break
 
-    def update(self, time, instruction):
-        self.time = time
-
-        if isinstance(instruction, EnterIntersection):
-            intersection = instruction.intersection
-            if intersection == self.intersection:
-                return
-
-            if self.stage == VTL_CHOOSE_NEW_LEADER:
-                self.chooseNewLeader()
-
-            self.intersection = intersection
-            self.road         = instruction.road
-            self.entrance     = instruction.entrance
-
-            self.light       = AMBER_LIGHT
-            self.num_retries = 1
-            self.stage       = VTL_JOIN_INTERSECTION
-
-        elif not instruction.danger:
-
-            if self.stage == VTL_CHOOSE_NEW_LEADER:
-                self.chooseNewLeader()
-
-            self.stage = VTL_NO_INTERSECTION
-
-            self.intersection = None
-            self.road         = None
-            self.entrance     = None
-
     def retry(self, broadcast=True):
         self.light = RED_LIGHT
         self.stage = VTL_CALCULATE_LEADERS
@@ -416,9 +386,7 @@ class VirtualTrafficLights:
         roads = self.intersection.inputs
         priorities = [None for road in roads]
         for car_name in self.knowledge:
-            dist_left, entrance, spaces = self.knowledge[car_name]
-
-            blocked = spaces < 1
+            dist_left, entrance, blocked = self.knowledge[car_name]
 
             if not priorities[entrance]:
                 priorities[entrance] = (blocked, dist_left, car_name)
@@ -485,7 +453,7 @@ class VirtualTrafficLights:
 
         if self.role != VTL_FOLLOWER:
             for car_name in new_vehicles:
-                dist_left, entrance, spaces = self.knowledge[car_name]
+                dist_left, entrance, blocked = self.knowledge[car_name]
 
                 if dist_left < VTL_LEADER_DIST:
                     self.retry()
@@ -550,7 +518,7 @@ class VirtualTrafficLights:
         if self.num_followers <= 0:
             return
 
-        my_dist, my_entrance, spaces = self.knowledge[self.name]
+        my_dist, my_entrance, blocked = self.knowledge[self.name]
 
         if self.first_follower == None:
 
@@ -559,28 +527,28 @@ class VirtualTrafficLights:
                 if car_name == self.name:
                     continue
 
-                dist_left, entrance, spaces = self.knowledge[car_name]
+                dist_left, entrance, blocked = self.knowledge[car_name]
                 if entrance != my_entrance:
                     continue
 
                 if dist_left > my_dist:
-                    followers.append((dist_left, car_name, spaces))
+                    followers.append((dist_left, car_name, blocked))
 
             if not followers:
                 return
 
             followers.sort()
-            dist_left, car_name, spaces = followers[0]
+            dist_left, car_name, blocked = followers[0]
             self.first_follower = car_name
 
         else:
-            dist_left, entrance, spaces = self.knowledge[self.first_follower]
+            dist_left, entrance, blocked = self.knowledge[self.first_follower]
 
         if self.world.strategy == VIRTUAL_TRAFFIC_LIGHTS_MODE:
-            if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST:
+            if blocked or dist_left - my_dist > VTL_FOLLOW_DIST:
                 return
         else:
-            if spaces < 1 or dist_left - my_dist > VTL_FOLLOW_DIST_2:
+            if blocked or dist_left - my_dist > VTL_FOLLOW_DIST_2:
                 return
 
         self.messages.append((self.first_follower, VTL_GREEN,
@@ -588,6 +556,36 @@ class VirtualTrafficLights:
         #print(self.intersection, self.name, "new leader chosen:",
         #      self.first_follower, "C")
         self.stage = VTL_NO_INTERSECTION
+
+    def update(self, time, instruction):
+        self.time = time
+
+        if isinstance(instruction, EnterIntersection):
+            intersection = instruction.intersection
+            if intersection == self.intersection:
+                return
+
+            if self.stage == VTL_CHOOSE_NEW_LEADER:
+                self.chooseNewLeader()
+
+            self.intersection = intersection
+            self.road         = instruction.road
+            self.entrance     = instruction.entrance
+
+            self.light       = AMBER_LIGHT
+            self.num_retries = 1
+            self.stage       = VTL_JOIN_INTERSECTION
+
+        elif not instruction.danger:
+
+            if self.stage == VTL_CHOOSE_NEW_LEADER:
+                self.chooseNewLeader()
+
+            self.stage = VTL_NO_INTERSECTION
+
+            self.intersection = None
+            self.road         = None
+            self.entrance     = None
 
     def sendMessages(self):
 
@@ -606,7 +604,10 @@ class VirtualTrafficLights:
 
             self.stage = VTL_CALCULATE_LEADERS
 
-        content = (dist_left, self.entrance, self.car_controller.spaces_left)
+
+        blocked = self.car_controller.spaces_left < 1
+
+        content = (dist_left, self.entrance, blocked)
 
         #self.knowledge[self.name] = content
 
@@ -711,7 +712,7 @@ class VirtualTrafficLights:
         pygame.draw.circle(screen, colour, point, radius)
         pygame.draw.circle(screen, BLACK,  point, radius, 1)
 
-        if False:
+        if False: # code below will not be run, as False is False
 
             if self.role == VTL_INTERSECTION_LEADER:
                 pygame.draw.circle(screen, BLACK, point, 10)

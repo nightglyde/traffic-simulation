@@ -7,7 +7,20 @@ from pregen.scenario_1x1 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
 
-from pregen.datasets_1x1.mass_generation.dataset_1x1_150_111_00 import schedule
+from pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_00 import schedule
+
+strategy = int(input("Enter strategy {0, 2, 4}: "))
+
+while not strategy in {TRAFFIC_LIGHTS_MODE,
+                       VIRTUAL_TRAFFIC_LIGHTS_2_MODE,
+                       GREEDY_CONTROLLER_MODE}:
+    strategy = int(input("Enter strategy {0, 2, 4}: "))
+
+#strategy = TRAFFIC_LIGHTS_MODE
+#strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
+#strategy = VIRTUAL_TRAFFIC_LIGHTS_2_MODE
+#strategy = GREEDY_CONTROLLER_MODE
+#strategy = MY_TRAFFIC_CONTROLLER_MODE
 
 INCLUDE_CAPTION = True
 
@@ -20,12 +33,6 @@ screen = pygame.display.set_mode(size)
 clock  = pygame.time.Clock()
 
 world = World(screen, world_width, world_height)
-
-#strategy = TRAFFIC_LIGHTS_MODE
-#strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
-#strategy = VIRTUAL_TRAFFIC_LIGHTS_2_MODE
-strategy = GREEDY_CONTROLLER_MODE
-#strategy = MY_TRAFFIC_CONTROLLER_MODE
 
 # build world
 world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
@@ -58,7 +65,7 @@ done   = False
 while not done:
 
     # limit the frames per second
-    clock.tick(FRAMES_PER_SECOND)
+    #clock.tick(FRAMES_PER_SECOND)
 
     time      = pygame.time.get_ticks()
     time_step = time - prev_time
