@@ -21,8 +21,8 @@ short_codes = [
 ]
 
 scenario_codes = [
-    "1x1",
-    #"2x2",
+    "1x1_50",
+    #"2x2_50",
 ]
 
 density_codes = [

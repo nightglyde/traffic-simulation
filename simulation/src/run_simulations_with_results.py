@@ -12,10 +12,10 @@ import re
 from src.util import *
 from src.simulation.world import World
 
-from datasets.scenarios.scenario_1x1 import roads, entry_roads, intersections,\
+from datasets.scenarios.scenario_2x2_50 import roads, entry_roads, intersections,\
                                 valid_routes, grass, world_width, world_height
 
-import datasets.datasets_1x1 as datasets
+import datasets.datasets_2x2_50 as datasets
 
 # time formatting
 TIME_FORMAT = "%H:%M:%S"
@@ -24,14 +24,14 @@ def worldGenerator():
     module_names = []
 
     #blacklist = {
-    #    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_00",
-    #    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_01",
-    #    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_02",
-    #    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_03",
-    #    "pregen.datasets_1x1.mass_generation.dataset_1x1_120_111_04",
+    #    "datasets.datasets_1x1_50.dataset_1x1_50_120_111_00",
+    #    "datasets.datasets_1x1_50.dataset_1x1_50_120_111_01",
+    #    "datasets.datasets_1x1_50.dataset_1x1_50_120_111_02",
+    #    "datasets.datasets_1x1_50.dataset_1x1_50_120_111_03",
+    #    "datasets.datasets_1x1_50.dataset_1x1_50_120_111_04",
     #}
 
-    #pattern = re.compile("dataset_1x1_150_116")
+    #pattern = re.compile("dataset_1x1_50_150_116")
     #pattern = re.compile("_116_00")
     pattern = re.compile("_111_")
 

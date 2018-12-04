@@ -12,11 +12,11 @@ strategy_codes = [
     "MyTrafficController",
 ]
 
-#dataset_name = "dataset_1x1_150_111_00"
-#dataset_name = "dataset_1x1_120_111A"
-#dataset_name = "dataset_1x1_090_115A"
+#dataset_name = "dataset_1x1_50_150_111_00"
+#dataset_name = "dataset_1x1_50_120_111A"
+#dataset_name = "dataset_1x1_50_090_115A"
 
-dataset_name = "dataset_1x1_090_111_00"
+dataset_name = "dataset_1x1_50_090_111_00"
 
 NUM_STRATEGIES = len(strategy_codes)
 

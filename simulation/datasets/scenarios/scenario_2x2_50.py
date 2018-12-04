@@ -1,5 +1,5 @@
-from util import *
-from road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection
+from src.util import *
+from src.simulation.road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection
 
 NUM_ROWS = 2
 NUM_COLS = 2

@@ -1,22 +1,19 @@
-from util import *
+import sys, os
 
-# world size
-LANE_WIDTH = 3.5
-ROAD_WIDTH = LANE_WIDTH*2
-HALF_LANE  = LANE_WIDTH/2
+ABS_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(ABS_PATH)
 
-BORDER_SIZE   = 50
-BLOCK_SIZE    = 50
+from src.util import *
+
+PATH_PREFIX = ABS_PATH + "/datasets/scenarios/scenario"
+
 CORNER_OFFSET = 5.4
 
-NUM_COLS = 2
-NUM_ROWS = 2
-
-NEXT_BLOCK   = BLOCK_SIZE + ROAD_WIDTH
-WORLD_WIDTH  = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_COLS
-WORLD_HEIGHT = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_ROWS
-
 TURNS = [LEFT, RIGHT, CENTRE]
+
+###################
+# DATA STRUCTURES #
+###################
 
 all_intersections = []
 
@@ -26,10 +23,6 @@ normal_roads       = []
 intersection_roads = []
 crossing_roads     = []
 terminal_roads     = []
-
-##############
-# ROAD TYPES #
-##############
 
 def nameGenerator():
     chars = string.ascii_lowercase
@@ -55,6 +48,10 @@ def nameGenerator():
             name = a*(num_zeds+1)
 
 road_name_generator = nameGenerator()
+
+##############
+# ROAD TYPES #
+##############
 
 class Road:
     def __init__(self, start, end):
@@ -476,176 +473,206 @@ class Intersection:
 # GENERATE STUFF #
 ##################
 
-# generate intersections
-intersections = [[Intersection(i, j) for j in range(NUM_ROWS+1)] for i in range(NUM_COLS+1)]
+def run(num_cols=1, num_rows=1, block_size=50):
 
-# generate horizontal internal roads
-x_start = BORDER_SIZE + ROAD_WIDTH
-y_start = BORDER_SIZE + HALF_LANE
-for i in range(NUM_COLS):
-    x = x_start + NEXT_BLOCK * i
+    filename = "{}_{}x{}_{}.py".format(
+        PATH_PREFIX, num_cols, num_rows, block_size)
+
+    try:
+        f = open(filename)
+        f.close()
+        print("\nStopping program: scenario already exists.\n{}".format(
+            filename))
+        return
+
+    except FileNotFoundError:
+        pass
+
+    LANE_WIDTH = 3.5
+    ROAD_WIDTH = LANE_WIDTH*2
+    HALF_LANE  = LANE_WIDTH/2
+
+    BORDER_SIZE   = 50
+    BLOCK_SIZE    = block_size
+
+    NUM_COLS = num_cols
+    NUM_ROWS = num_cols
+
+    NEXT_BLOCK   = BLOCK_SIZE + ROAD_WIDTH
+    WORLD_WIDTH  = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_COLS
+    WORLD_HEIGHT = BORDER_SIZE*2 + ROAD_WIDTH + NEXT_BLOCK*NUM_ROWS
+
+    # generate intersections
+    intersections = [[Intersection(i, j) for j in range(NUM_ROWS+1)] for i in range(NUM_COLS+1)]
+
+    # generate horizontal internal roads
+    x_start = BORDER_SIZE + ROAD_WIDTH
+    y_start = BORDER_SIZE + HALF_LANE
+    for i in range(NUM_COLS):
+        x = x_start + NEXT_BLOCK * i
+        for j in range(NUM_ROWS+1):
+            y = y_start + NEXT_BLOCK * j
+
+            left_road = IntersectionRoad(
+                Vector(x + BLOCK_SIZE - CORNER_OFFSET, y + LANE_WIDTH),
+                Vector(x + CORNER_OFFSET, y + LANE_WIDTH)
+            )
+            right_road = IntersectionRoad(
+                Vector(x + CORNER_OFFSET, y),
+                Vector(x + BLOCK_SIZE - CORNER_OFFSET, y)
+            )
+
+            intersections[i][j].addRoad(  [left_road],  [right_road])
+            intersections[i+1][j].addRoad([right_road], [left_road])
+
+    # generate vertical internal roads
+    x_start = BORDER_SIZE + HALF_LANE
+    y_start = BORDER_SIZE + ROAD_WIDTH
+    for j in range(NUM_ROWS):
+        y = y_start + NEXT_BLOCK * j
+        for i in range(NUM_COLS+1):
+            x = x_start + NEXT_BLOCK * i
+
+            up_road = IntersectionRoad(
+                Vector(x, y + BLOCK_SIZE - CORNER_OFFSET),
+                Vector(x, y + CORNER_OFFSET)
+            )
+            down_road = IntersectionRoad(
+                Vector(x + LANE_WIDTH, y + CORNER_OFFSET),
+                Vector(x + LANE_WIDTH, y + BLOCK_SIZE - CORNER_OFFSET)
+            )
+
+            intersections[i][j].addRoad(  [up_road],   [down_road])
+            intersections[i][j+1].addRoad([down_road], [up_road])
+
+    # generate horizontal external roads
+    x_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
+    x_end   = BORDER_SIZE - CORNER_OFFSET
+    y_start = BORDER_SIZE + HALF_LANE
     for j in range(NUM_ROWS+1):
         y = y_start + NEXT_BLOCK * j
 
-        left_road = IntersectionRoad(
-            Vector(x + BLOCK_SIZE - CORNER_OFFSET, y + LANE_WIDTH),
-            Vector(x + CORNER_OFFSET, y + LANE_WIDTH)
+        # left entry
+        entry_road = IntersectionRoad(
+            Vector(x_start, y),
+            Vector(x_end,   y)
         )
-        right_road = IntersectionRoad(
-            Vector(x + CORNER_OFFSET, y),
-            Vector(x + BLOCK_SIZE - CORNER_OFFSET, y)
+        exit_road = TerminalRoad(
+            Vector(x_end,   y+LANE_WIDTH),
+            Vector(x_start, y+LANE_WIDTH)
         )
+        entry_roads.append(entry_road)
+        intersections[0][j].addRoad([entry_road], [exit_road])
 
-        intersections[i][j].addRoad(  [left_road],  [right_road])
-        intersections[i+1][j].addRoad([right_road], [left_road])
+        # right entry
+        entry_road = IntersectionRoad(
+            Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y),
+            Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y)
+        )
+        exit_road = TerminalRoad(
+            Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y-LANE_WIDTH),
+            Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y-LANE_WIDTH)
+        )
+        entry_roads.append(entry_road)
+        intersections[NUM_COLS][NUM_ROWS-j].addRoad([entry_road], [exit_road])
 
-# generate vertical internal roads
-x_start = BORDER_SIZE + HALF_LANE
-y_start = BORDER_SIZE + ROAD_WIDTH
-for j in range(NUM_ROWS):
-    y = y_start + NEXT_BLOCK * j
+    # generate vertical external roads
+    x_start = BORDER_SIZE + HALF_LANE
+    y_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
+    y_end   = BORDER_SIZE - CORNER_OFFSET
     for i in range(NUM_COLS+1):
         x = x_start + NEXT_BLOCK * i
 
-        up_road = IntersectionRoad(
-            Vector(x, y + BLOCK_SIZE - CORNER_OFFSET),
-            Vector(x, y + CORNER_OFFSET)
+        # top entry
+        entry_road = IntersectionRoad(
+            Vector(x+LANE_WIDTH, y_start),
+            Vector(x+LANE_WIDTH, y_end)
         )
-        down_road = IntersectionRoad(
-            Vector(x + LANE_WIDTH, y + CORNER_OFFSET),
-            Vector(x + LANE_WIDTH, y + BLOCK_SIZE - CORNER_OFFSET)
+        exit_road = TerminalRoad(
+            Vector(x, y_end),
+            Vector(x, y_start)
         )
+        entry_roads.append(entry_road)
+        intersections[i][0].addRoad([entry_road], [exit_road])
 
-        intersections[i][j].addRoad(  [up_road],   [down_road])
-        intersections[i][j+1].addRoad([down_road], [up_road])
+        # bottom entry
+        entry_road = IntersectionRoad(
+            Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_start),
+            Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_end)
+        )
+        exit_road = TerminalRoad(
+            Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_end),
+            Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_start)
+        )
+        entry_roads.append(entry_road)
+        intersections[NUM_COLS-i][NUM_ROWS].addRoad([entry_road], [exit_road])
 
-# generate horizontal external roads
-x_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
-x_end   = BORDER_SIZE - CORNER_OFFSET
-y_start = BORDER_SIZE + HALF_LANE
-for j in range(NUM_ROWS+1):
-    y = y_start + NEXT_BLOCK * j
+    # generate valid routes
+    valid_routes = []
+    for i, entry_road in enumerate(entry_roads):
+        routes = findRoutes(entry_road)
+        valid_routes.append(routes)
 
-    # left entry
-    entry_road = IntersectionRoad(
-        Vector(x_start, y),
-        Vector(x_end,   y)
-    )
-    exit_road = TerminalRoad(
-        Vector(x_end,   y+LANE_WIDTH),
-        Vector(x_start, y+LANE_WIDTH)
-    )
-    entry_roads.append(entry_road)
-    intersections[0][j].addRoad([entry_road], [exit_road])
+    # generate grass
+    grass = []
 
-    # right entry
-    entry_road = IntersectionRoad(
-        Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y),
-        Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y)
-    )
-    exit_road = TerminalRoad(
-        Vector(WORLD_WIDTH-x_end,   WORLD_HEIGHT-y-LANE_WIDTH),
-        Vector(WORLD_WIDTH-x_start, WORLD_HEIGHT-y-LANE_WIDTH)
-    )
-    entry_roads.append(entry_road)
-    intersections[NUM_COLS][NUM_ROWS-j].addRoad([entry_road], [exit_road])
+    x_start = BORDER_SIZE + ROAD_WIDTH
+    y_start = BORDER_SIZE + ROAD_WIDTH
+    for i in range(-1, NUM_COLS+1):
+        x = x_start + NEXT_BLOCK * i
+        for j in range(-1, NUM_ROWS+1):
+            y = y_start + NEXT_BLOCK * j
 
-# generate vertical external roads
-x_start = BORDER_SIZE + HALF_LANE
-y_start = BORDER_SIZE - BLOCK_SIZE + CORNER_OFFSET
-y_end   = BORDER_SIZE - CORNER_OFFSET
-for i in range(NUM_COLS+1):
-    x = x_start + NEXT_BLOCK * i
+            grass.append([
+                Vector(x+CORNER_OFFSET, y),
+                Vector(x+BLOCK_SIZE-CORNER_OFFSET, y),
+                Vector(x+BLOCK_SIZE, y+CORNER_OFFSET),
+                Vector(x+BLOCK_SIZE, y+BLOCK_SIZE-CORNER_OFFSET),
+                Vector(x+BLOCK_SIZE-CORNER_OFFSET, y+BLOCK_SIZE),
+                Vector(x+CORNER_OFFSET, y+BLOCK_SIZE),
+                Vector(x, y+BLOCK_SIZE-CORNER_OFFSET),
+                Vector(x, y+CORNER_OFFSET),
+            ])
 
-    # top entry
-    entry_road = IntersectionRoad(
-        Vector(x+LANE_WIDTH, y_start),
-        Vector(x+LANE_WIDTH, y_end)
-    )
-    exit_road = TerminalRoad(
-        Vector(x, y_end),
-        Vector(x, y_start)
-    )
-    entry_roads.append(entry_road)
-    intersections[i][0].addRoad([entry_road], [exit_road])
+    ########################
+    # CREATE SCENARIO FILE #
+    ########################
 
-    # bottom entry
-    entry_road = IntersectionRoad(
-        Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_start),
-        Vector(WORLD_WIDTH-x-LANE_WIDTH, WORLD_HEIGHT-y_end)
-    )
-    exit_road = TerminalRoad(
-        Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_end),
-        Vector(WORLD_WIDTH-x, WORLD_HEIGHT-y_start)
-    )
-    entry_roads.append(entry_road)
-    intersections[NUM_COLS-i][NUM_ROWS].addRoad([entry_road], [exit_road])
+    f = open(filename, 'w')
 
-# generate valid routes
-valid_routes = []
-for i, entry_road in enumerate(entry_roads):
-    routes = findRoutes(entry_road)
-    valid_routes.append(routes)
+    f.write("from src.util import *\n")
+    f.write("from src.simulation.road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection\n")
 
-# generate grass
-grass = []
+    f.write("\n")
 
-x_start = BORDER_SIZE + ROAD_WIDTH
-y_start = BORDER_SIZE + ROAD_WIDTH
-for i in range(-1, NUM_COLS+1):
-    x = x_start + NEXT_BLOCK * i
-    for j in range(-1, NUM_ROWS+1):
-        y = y_start + NEXT_BLOCK * j
+    f.write("NUM_ROWS = {}\n".format(NUM_ROWS))
+    f.write("NUM_COLS = {}\n".format(NUM_COLS))
 
-        grass.append([
-            Vector(x+CORNER_OFFSET, y),
-            Vector(x+BLOCK_SIZE-CORNER_OFFSET, y),
-            Vector(x+BLOCK_SIZE, y+CORNER_OFFSET),
-            Vector(x+BLOCK_SIZE, y+BLOCK_SIZE-CORNER_OFFSET),
-            Vector(x+BLOCK_SIZE-CORNER_OFFSET, y+BLOCK_SIZE),
-            Vector(x+CORNER_OFFSET, y+BLOCK_SIZE),
-            Vector(x, y+BLOCK_SIZE-CORNER_OFFSET),
-            Vector(x, y+CORNER_OFFSET),
-        ])
+    f.write("world_width  = {}\n".format(WORLD_WIDTH))
+    f.write("world_height = {}\n".format(WORLD_HEIGHT))
 
-#####################
-# CREATE WORLD FILE #
-#####################
-
-if __name__ == "__main__":
-    print("from util import *")
-    print("from road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection")
-
-    print()
-
-    print("NUM_ROWS = {}".format(NUM_ROWS))
-    print("NUM_COLS = {}".format(NUM_COLS))
-
-    print("world_width  = {}".format(WORLD_WIDTH))
-    print("world_height = {}".format(WORLD_HEIGHT))
-
-    print()
+    f.write("\n")
 
     for road in intersection_roads:
         road.generateName()
-        print("{} = {}".format(road.name, road))
+        f.write("{} = {}\n".format(road.name, road))
 
     for road in normal_roads:
         road.generateName()
-        print("{} = {}".format(road.name, road))
+        f.write("{} = {}\n".format(road.name, road))
 
     for road in terminal_roads:
         road.generateName()
-        print("{} = {}".format(road.name, road))
+        f.write("{} = {}\n".format(road.name, road))
 
     for road in crossing_roads:
         road.generateName()
-        print("{} = {}".format(road.name, road))
+        f.write("{} = {}\n".format(road.name, road))
 
-    print()
+    f.write("\n")
 
     for intersection in all_intersections:
-        print("{} = {}".format(intersection.name, intersection))
+        f.write("{} = {}\n".format(intersection.name, intersection))
 
         index_mapping = intersection.generateIndexMapping()
 
@@ -653,7 +680,7 @@ if __name__ == "__main__":
             new_i = index_mapping[i]
 
             road = intersection.inputs[i]
-            print("{}.setIntersection({}, {})".format(
+            f.write("{}.setIntersection({}, {})\n".format(
                 road.name, intersection.name, new_i))
 
             for j in range(len(intersection.outputs)):
@@ -676,68 +703,93 @@ if __name__ == "__main__":
                 else:
                     turn = "CENTRE"
 
-                print("{}.addConnection({}, {}, {}, {}, {})".format(
+                f.write("{}.addConnection({}, {}, {}, {}, {})\n".format(
                       intersection.name, new_i, new_j, path, turn, dist))
 
-
-                #pair = (i, j)
-
-                #if pair in intersection.pairs:
-                #    path, turn = intersection.paths[pair]
-
-                #    path = [road.name for road in path]
-                #    path = "[" + ",".join(path) + "]"
-
-                #    if turn == LEFT:
-                #        turn = "LEFT"
-                #    elif turn == RIGHT:
-                #        turn = "RIGHT"
-                #    else:
-                #        turn = "CENTRE"
-
-                #    print("{}.addConnection({}, {}, {}, {})".format(
-                #        intersection.name, i, j, path, turn))
-
-    print()
+    f.write("\n")
 
     for road in normal_roads:
-        print("{}.setNext({})".format(road.name, road.next_road.name))
+        f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
 
     for road in crossing_roads:
-        print("{}.setNext({})".format(road.name, road.next_road.name))
+        f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
 
-    print()
+    f.write("\n")
 
     names = [road.name for road in all_roads]
-    print("roads = [" + ",".join(names) + "]")
+    f.write("roads = [" + ",".join(names) + "]\n")
 
-    print()
+    f.write("\n")
 
     names = [road.name for road in entry_roads]
-    print("entry_roads = [" + ",".join(names) + "]")
+    f.write("entry_roads = [" + ",".join(names) + "]\n")
 
-    print()
+    f.write("\n")
 
-    print("valid_routes = [")
+    f.write("valid_routes = [\n")
     for i in range(len(entry_roads)):
         routes = valid_routes[i]
-        print("  [")
+        f.write("  [\n")
         for route in routes:
-            print("    {},".format(route))
-        print("  ],")
-    print("]")
+            f.write("    {},\n".format(route))
+        f.write("  ],\n")
+    f.write("]\n")
 
-    print()
+    f.write("\n")
 
     names = [intersection.name for intersection in all_intersections]
-    print("intersections = [" + ",".join(names) + "]")
+    f.write("intersections = [" + ",".join(names) + "]\n")
 
-    print()
+    f.write("\n")
 
-    print("grass = [")
+    f.write("grass = [\n")
     for grass_area in grass:
-        print("{},".format(grass_area))
-    print("]")
+        f.write("{},\n".format(grass_area))
+    f.write("]\n")
 
-    print()
+    f.write("\n")
+
+    f.close()
+
+    print("\nScenario was successfully generated.\n{}".format(filename))
+
+if __name__ == "__main__":
+
+    print("Please enter dimensions of road network.")
+
+    while True:
+        try:
+            cols = int(input("\nNumber of blocks wide: "))
+            if cols >= 0:
+                break
+        except ValueError:
+            pass
+        print("Number of blocks must be a positive integer or 0.")
+
+    while True:
+        try:
+            rows = int(input("\nNumber of blocks high: "))
+            if rows >= 0:
+                break
+        except ValueError:
+            pass
+        print("Number of blocks must be a positive integer or 0.")
+
+    min_block_size = math.ceil(CORNER_OFFSET + 0.5)
+    while True:
+        try:
+            block_size = int(input("\nBlock size in metres: "))
+            if block_size >= min_block_size:
+                break
+        except ValueError:
+            pass
+        print("Block size must be an integer greater than or equal to {}".format(
+            min_block_size))
+
+    print("\nScenario will have square blocks with side length {} metres,".format(
+        block_size))
+    print("in a {} by {} grid.".format(cols, rows))
+
+    if input("Press enter to continue.") == "":
+        run(cols, rows, block_size)
 

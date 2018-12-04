@@ -8,10 +8,10 @@ from time import gmtime, strftime
 from src.util import *
 from src.simulation.world import World
 
-from datasets.scenarios.scenario_1x1 import\
+from datasets.scenarios.scenario_1x1_50 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
-from datasets.datasets_1x1.dataset_1x1_120_111_00 import schedule
+from datasets.datasets_1x1_50.dataset_1x1_50_120_111_00 import schedule
 
 def generateFilename(world):
     timestamp = strftime("%Y-%m-%d_%H-%M", gmtime())
@@ -23,7 +23,6 @@ def generateFilename(world):
         yield "{}/results/screenshots/img_{}_{:03}.png".format(ABS_PATH, batch_name, i)
 
 def main():
-
     strategy = int(input("Enter strategy {0, 2, 4}: "))
 
     while not strategy in {TRAFFIC_LIGHTS_MODE,

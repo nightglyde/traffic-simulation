@@ -18,7 +18,7 @@ NUM_STRATEGIES = len(strategy_codes)
 num_test_cases = 5#10
 
 density = "100"
-dataset_prefix = "dataset_1x1_{}_111".format(density)
+dataset_prefix = "dataset_1x1_50_{}_111".format(density)
 
 expected_count = int(density) * 60
 

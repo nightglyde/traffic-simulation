@@ -42,7 +42,7 @@ density_codes = [
 
 num_test_cases = 5#20
 
-dataset_prefix = "dataset_1x1"
+dataset_prefix = "dataset_1x1_50"
 dataset_suffix = "111"
 
 NUM_STRATEGIES = len(strategy_codes)
