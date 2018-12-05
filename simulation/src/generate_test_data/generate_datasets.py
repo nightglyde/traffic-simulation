@@ -28,8 +28,6 @@ class DatasetGenerator:
         if not os.path.exists(path_dir):
             os.mkdir(path_dir)
 
-        self.file_upto = 0
-
         module = __import__(module_name, fromlist="dummy")
 
         self.entry_options = len(module.entry_roads)
@@ -126,7 +124,7 @@ class DatasetGenerator:
         filename_start = "{}_{:03}_{}".format(
             self.path_prefix, cars_per_minute, self.turn_code)
 
-        for i in range(self.file_upto, 100):
+        for i in range(100):
             filename = "{}_{:02}.py".format(filename_start, i)
 
             try:
@@ -144,8 +142,6 @@ class DatasetGenerator:
                 f.write("])\n")
 
                 f.close()
-
-                self.file_upto = i+1
 
                 break
 

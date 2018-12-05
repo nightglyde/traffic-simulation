@@ -8,10 +8,12 @@ from time import gmtime, strftime
 from src.util import *
 from src.simulation.world import World
 
-from datasets.scenarios.scenario_1x1_50 import\
+from datasets.scenarios.scenario_2x2_50 import\
     roads, entry_roads, intersections, valid_routes,\
     grass, world_width, world_height
-from datasets.datasets_1x1_50.dataset_1x1_50_120_111_00 import schedule
+from datasets.datasets_2x2_50.dataset_2x2_50_030_111_02 import schedule
+
+INCLUDE_CAPTION = True
 
 def generateFilename(world):
     timestamp = strftime("%Y-%m-%d_%H-%M", gmtime())
@@ -22,22 +24,7 @@ def generateFilename(world):
     for i in range(1000):
         yield "{}/results/screenshots/img_{}_{:03}.png".format(ABS_PATH, batch_name, i)
 
-def main():
-    strategy = int(input("Enter strategy {0, 2, 4}: "))
-
-    while not strategy in {TRAFFIC_LIGHTS_MODE,
-                           VIRTUAL_TRAFFIC_LIGHTS_2_MODE,
-                           GREEDY_CONTROLLER_MODE}:
-        strategy = int(input("Enter strategy {0, 2, 4}: "))
-
-    #strategy = TRAFFIC_LIGHTS_MODE
-    #strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
-    #strategy = VIRTUAL_TRAFFIC_LIGHTS_2_MODE
-    #strategy = GREEDY_CONTROLLER_MODE
-    #strategy = MY_TRAFFIC_CONTROLLER_MODE
-
-    INCLUDE_CAPTION = True
-
+def run(strategy):
     # initialise game engine
     pygame.init()
 
@@ -151,5 +138,18 @@ def main():
     pygame.quit()
 
 if __name__ == "__main__":
-    main()
+    strategy = int(input("Enter strategy {0, 2, 4}: "))
+
+    while not strategy in {TRAFFIC_LIGHTS_MODE,
+                           VIRTUAL_TRAFFIC_LIGHTS_2_MODE,
+                           GREEDY_CONTROLLER_MODE}:
+        strategy = int(input("Enter strategy {0, 2, 4}: "))
+
+    #strategy = TRAFFIC_LIGHTS_MODE
+    #strategy = VIRTUAL_TRAFFIC_LIGHTS_MODE
+    #strategy = VIRTUAL_TRAFFIC_LIGHTS_2_MODE
+    #strategy = GREEDY_CONTROLLER_MODE
+    #strategy = MY_TRAFFIC_CONTROLLER_MODE
+
+    run(strategy)
 
