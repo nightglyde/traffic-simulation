@@ -13,7 +13,7 @@ from src.util import *
 from src.simulation.world import World
 
 from datasets.scenarios.scenario_2x2_50 import roads, entry_roads, intersections,\
-                                valid_routes, grass, world_width, world_height
+                                 valid_routes, grass, world_width, world_height
 
 import datasets.datasets_2x2_50 as datasets
 

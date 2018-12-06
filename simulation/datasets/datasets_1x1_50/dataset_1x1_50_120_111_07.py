@@ -1,4 +1,4 @@
-from util import *
+from src.util import *
 schedule = deque([
   (951, 7, 0),
   (976, 2, 0),

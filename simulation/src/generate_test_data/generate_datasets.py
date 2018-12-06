@@ -26,6 +26,7 @@ class DatasetGenerator:
         self.path_prefix = path_dir + "/dataset_{}".format(scenario_code)
 
         if not os.path.exists(path_dir):
+            print("\nCreating dataset directory:\n{}".format(path_dir))
             os.mkdir(path_dir)
 
         module = __import__(module_name, fromlist="dummy")

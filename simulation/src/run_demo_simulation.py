@@ -8,10 +8,10 @@ from time import gmtime, strftime
 from src.util import *
 from src.simulation.world import World
 
-from datasets.scenarios.scenario_2x2_50 import\
-    roads, entry_roads, intersections, valid_routes,\
-    grass, world_width, world_height
-from datasets.datasets_2x2_50.dataset_2x2_50_030_111_02 import schedule
+#from datasets.scenarios.scenario_2x2_50 import\
+#    roads, entry_roads, intersections, valid_routes,\
+#    grass, world_width, world_height
+#from datasets.datasets_2x2_50.dataset_2x2_50_030_111_02 import schedule
 
 INCLUDE_CAPTION = True
 
@@ -24,7 +24,10 @@ def generateFilename(world):
     for i in range(1000):
         yield "{}/results/screenshots/img_{}_{:03}.png".format(ABS_PATH, batch_name, i)
 
-def run(strategy):
+def run(scenario_name, dataset_name, strategy):
+    scenario = __import__(scenario_name, fromlist="dummy")
+    dataset  = __import__(dataset_name,  fromlist="dummy")
+
     # initialise game engine
     pygame.init()
 
@@ -33,10 +36,12 @@ def run(strategy):
     screen = pygame.display.set_mode(size)
     clock  = pygame.time.Clock()
 
-    world = World(screen, world_width, world_height)
+    world = World(screen, scenario.world_width, scenario.world_height)
 
     # build world
-    world.setup(roads, intersections, grass, entry_roads, valid_routes, schedule, strategy)
+    world.setup(scenario.roads, scenario.intersections, scenario.grass,
+                scenario.entry_roads, scenario.valid_routes, dataset.schedule,
+                strategy)
 
     filenames = generateFilename(world)
 
@@ -140,6 +145,9 @@ def run(strategy):
 if __name__ == "__main__":
     strategy = int(input("Enter strategy {0, 2, 4}: "))
 
+    scenario = "datasets.scenarios.scenario_1x1_50"
+    dataset  = "datasets.datasets_1x1_50.dataset_1x1_50_120_111_00"
+
     while not strategy in {TRAFFIC_LIGHTS_MODE,
                            VIRTUAL_TRAFFIC_LIGHTS_2_MODE,
                            GREEDY_CONTROLLER_MODE}:
@@ -151,5 +159,5 @@ if __name__ == "__main__":
     #strategy = GREEDY_CONTROLLER_MODE
     #strategy = MY_TRAFFIC_CONTROLLER_MODE
 
-    run(strategy)
+    run(scenario, dataset, strategy)
 

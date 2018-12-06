@@ -5,8 +5,6 @@ sys.path.append(ABS_PATH)
 
 from src.util import *
 
-PATH_PREFIX = ABS_PATH + "/datasets/scenarios/scenario"
-
 CORNER_OFFSET = 5.4
 
 TURNS = [LEFT, RIGHT, CENTRE]
@@ -475,8 +473,16 @@ class Intersection:
 
 def run(num_cols=1, num_rows=1, block_size=50):
 
-    filename = "{}_{}x{}_{}.py".format(
-        PATH_PREFIX, num_cols, num_rows, block_size)
+    scenario_code = "{}x{}_{}".format(num_cols, num_rows, block_size)
+
+    filename = "{}/datasets/scenarios/scenario_{}.py".format(ABS_PATH,
+                                                             scenario_code)
+
+    dataset_dir = "{}/datasets/datasets_{}".format(ABS_PATH, scenario_code)
+
+    if not os.path.exists(dataset_dir):
+        print("\nCreating dataset directory:\n{}".format(dataset_dir))
+        os.mkdir(dataset_dir)
 
     try:
         f = open(filename)
