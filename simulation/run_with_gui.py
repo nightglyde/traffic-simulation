@@ -68,8 +68,9 @@ class MyFrame(Frame):
 mainFrame = MyFrame(window, "Main Menu")
 
 # run simulation
-demoFrame  = MyFrame(window, "Run Demo Simulation")
-simFrame   = MyFrame(window, "Run Simulation with Results")
+simFrame     = MyFrame(window, "Run Simulation")
+demoFrame    = MyFrame(window, "Run Demo Simulation")
+fullSimFrame = MyFrame(window, "Run Simulation with Results")
 
 # data generation
 sceneFrame = MyFrame(window, "Generate Test Scenario")
@@ -82,11 +83,29 @@ analyseFrame = MyFrame(window, "Analyse Simulation Results")
 # main menu #
 #############
 
-mainFrame.createButton(demoFrame)
-mainFrame.createButton(simFrame)
-mainFrame.createButton(sceneFrame)
 mainFrame.createButton(dataFrame)
+mainFrame.createButton(simFrame)
 mainFrame.createButton(analyseFrame)
+
+######################
+# generate test data #
+######################
+
+dataFrame.createButton(sceneFrame)
+dataFrame.createReturnButton(mainFrame)
+
+##########################
+# generate test scenario #
+##########################
+
+sceneFrame.createReturnButton(dataFrame)
+
+##################
+# run simulation #
+##################
+
+simFrame.createButton(demoFrame)
+simFrame.createButton(fullSimFrame)
 
 #######################
 # run demo simulation #
@@ -109,10 +128,10 @@ def changeScenario(event):
     for module in datasets_map[scenario]:
         demoDataBox.insert(END, module)
 
-    if demoDataBox.size():
-        demoDataBox.config(width=0)
-    else:
-        demoDataBox.config(width=20)
+    #if demoDataBox.size():
+    #    demoDataBox.config(width=0)
+    #else:
+    #    demoDataBox.config(width=20)
 
 def changeDensity(density):
     densityVar.set(density)
@@ -133,10 +152,10 @@ def changeDensity(density):
             if pattern.search(module):
                 demoDataBox.insert(END, module)
 
-    if demoDataBox.size():
-        demoDataBox.config(width=0)
-    else:
-        demoDataBox.config(width=20)
+    #if demoDataBox.size():
+    #    demoDataBox.config(width=0)
+    #else:
+    #    demoDataBox.config(width=20)
 
 def startDemo():
     items = demoStratBox.curselection()
@@ -162,7 +181,8 @@ demoGridFrame = Frame(demoFrame)
 
 # box for selecting scenario
 demoSceneFrame = Frame(demoGridFrame)
-Label(demoSceneFrame, text="Choose Scenario").pack()
+Label(demoSceneFrame,
+      text="Choose Scenario\nFormat: columns, rows, block size").pack()
 
 demoSceneScrollbar = Scrollbar(demoSceneFrame)
 demoSceneScrollbar.pack(side=RIGHT, fill=Y)
@@ -195,7 +215,7 @@ demoDenseFrame.grid(column=1, row=0)
 
 # listbox for selecting dataset
 demoDataFrame = Frame(demoGridFrame)
-Label(demoDataFrame, text="Choose Dataset").pack()
+Label(demoDataFrame, text="Choose Dataset\nFormat: scenario code, traffic density, turn bias, trial id").pack()
 
 demoDataScrollbar = Scrollbar(demoDataFrame)
 demoDataScrollbar.pack(side=RIGHT, fill=Y)
@@ -203,6 +223,7 @@ demoDataScrollbar.pack(side=RIGHT, fill=Y)
 demoDataBox = Listbox(demoDataFrame, selectmode=SINGLE, exportselection=0,
                        yscrollcommand=demoDataScrollbar.set)
 demoDataBox.pack()
+demoDataBox.config(width=50)
 
 demoDataScrollbar.config(command=demoDataBox.yview)
 demoDataFrame.grid(column=0, row=1, columnspan=2)
@@ -219,6 +240,7 @@ demoStratScrollbar.pack(side=RIGHT, fill=Y)
 demoStratBox = Listbox(demoStratFrame, selectmode=SINGLE, exportselection=0,
                        yscrollcommand=demoStratScrollbar.set)
 demoStratBox.pack()
+demoStratBox.config(width=0)
 
 demoStratScrollbar.config(command=demoStratBox.yview)
 demoStratFrame.grid(column=0, row=2)
@@ -238,19 +260,7 @@ demoFrame.createReturnButton(mainFrame)
 # run simulation with results #
 ###############################
 
-simFrame.createReturnButton(mainFrame)
-
-##########################
-# generate test scenario #
-##########################
-
-sceneFrame.createReturnButton(mainFrame)
-
-######################
-# generate test data #
-######################
-
-dataFrame.createReturnButton(mainFrame)
+fullSimFrame.createReturnButton(mainFrame)
 
 ##############################
 # analyse simulation results #
