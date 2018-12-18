@@ -144,6 +144,8 @@ class DatasetGenerator:
 
                 f.close()
 
+                print("Generated dataset: {}".format(filename))
+
                 break
 
 def run(module_name, scenario_code, num_trials, min_density, max_density):

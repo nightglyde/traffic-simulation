@@ -433,7 +433,8 @@ class World:
 
         for ghost in self.ghosts:
             #ghost.drawPath()
-            ghost.draw(False, paused)
+            #ghost.draw(False, paused)
+            ghost.draw()
 
         #for controller in self.controllers:
         #    controller.drawRoute()

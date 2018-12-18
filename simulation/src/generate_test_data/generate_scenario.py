@@ -5,7 +5,8 @@ sys.path.append(ABS_PATH)
 
 from src.util import *
 
-CORNER_OFFSET = 5.4
+CORNER_OFFSET  = 5.4
+MIN_BLOCK_SIZE = 26
 
 TURNS = [LEFT, RIGHT, CENTRE]
 
@@ -781,16 +782,15 @@ if __name__ == "__main__":
             pass
         print("Number of blocks must be a positive integer or 0.")
 
-    min_block_size = math.ceil(CORNER_OFFSET + 0.5)
     while True:
         try:
             block_size = int(input("\nBlock size in metres: "))
-            if block_size >= min_block_size:
+            if block_size >= MIN_BLOCK_SIZE:
                 break
         except ValueError:
             pass
         print("Block size must be an integer greater than or equal to {}".format(
-            min_block_size))
+            MIN_BLOCK_SIZE))
 
     print("\nScenario will have square blocks with side length {} metres,".format(
         block_size))

@@ -7,13 +7,22 @@ import re
 from src.util import ALL_STRATEGIES
 
 import src.generate_test_data.generate_datasets as gen_data
+import src.generate_test_data.generate_scenario as gen_scene
 import src.run_demo_simulation as run_demo
 import src.run_simulations_with_results as run_sim
 
 import datasets.scenarios as scenarios
 
+CHOOSE_SCENARIO_TEXT = '''Choose Scenario
+...scenario_COLSxROWS_BlockSize'''
+
+CHOOSE_DATASET_TEXT = '''Choose Dataset
+...COLSxROWS_BlockSize_TrafficDensity_TurnBias_TrialNum'''
+
 DEFAULT_DATA_TEXT = '''How proposed changes will affect dataset numbers:
-\t\tExisting + New = Total'''
+\t\t[Existing + New = Total]'''
+
+DEFAULT_SCENE_TEXT = "Generate a scenario with these dimensions:"
 
 ANY_DENSITY = "any"
 
@@ -96,19 +105,16 @@ analyseFrame.createButton(mainFrame).pack()
 # generate test data #
 ######################
 
-def dataMessageSetDefault():
-    dataMessage.config(text=DEFAULT_DATA_TEXT)
-
-def validateDataFields(*args):
+def getDataParameters():
     items = dataSceneBox.curselection()
     if not items:
-        return dataMessageSetDefault()
+        return False
     scenario = dataSceneBox.get(items[0])
 
     try:
         numTrials = int(numTrialsEntry.get())
         if numTrials < 1:
-            return dataMessageSetDefault()
+            return False
 
         minDensity = int(minDensityEntry.get())
         if minDensity < 10:
@@ -120,10 +126,26 @@ def validateDataFields(*args):
         maxDensity = int(math.floor(maxDensity / 10.0)) * 10
 
         if maxDensity < minDensity:
-            return dataMessageSetDefault()
+            return False
 
     except ValueError:
-        return dataMessageSetDefault()
+        return False
+
+    m = re.match(".*([0-9]+x[0-9]+_[0-9]+).*", scenario)
+    if m:
+        scenario_code = m.group(1)
+    else:
+        return False
+
+    return scenario, scenario_code, numTrials, minDensity, maxDensity
+
+def validateDataFields(*args):
+    parameters = getDataParameters()
+    if not parameters:
+        dataMessage.config(text=DEFAULT_DATA_TEXT)
+        return
+
+    scenario, scenario_code, numTrials, minDensity, maxDensity = parameters
 
     countMap = {}
     for density in densities_map[scenario]:
@@ -152,53 +174,25 @@ def validateDataFields(*args):
         else:
             testCaseCount = 0
 
-        message.append("density={}:    {} + {} = {}".format(
+        message.append("    density={}:\t    {} + {} = {}".format(
             density, testCaseCount, numTrials, testCaseCount + numTrials))
 
     dataMessage.config(text="\n".join(message))
 
 def startGeneratingData():
-    items = dataSceneBox.curselection()
-    if not items:
-        return
-    scenario = dataSceneBox.get(items[0])
-
-    try:
-        numTrials = int(numTrialsEntry.get())
-        if numTrials < 1:
-            return
-
-        minDensity = int(minDensityEntry.get())
-        if minDensity < 10:
-            minDensity = 10
-        else:
-            minDensity = int(math.ceil(minDensity / 10.0)) * 10
-
-        maxDensity = int(maxDensityEntry.get())
-        maxDensity = int(math.floor(maxDensity / 10.0)) * 10
-
-        if maxDensity < minDensity:
-            return
-
-    except ValueError:
-        return
-
-    m = re.match(".*([0-9]+x[0-9]+_[0-9]+).*", scenario)
-    if m:
-        scenario_code = m.group(1)
-    else:
+    parameters = getDataParameters()
+    if not parameters:
         return
 
     window.destroy()
-    gen_data.run(scenario, scenario_code, numTrials, minDensity, maxDensity)
+    gen_data.run(*parameters)
 
 # container frame for grid alignment
 dataGridFrame = Frame(dataFrame)
 
 # box for selecting scenario
 dataSceneFrame = Frame(dataGridFrame)
-Label(dataSceneFrame,
-      text="Choose Scenario\nFormat: columns, rows, block size").pack()
+Label(dataSceneFrame, text=CHOOSE_SCENARIO_TEXT).pack()
 
 dataSceneScrollbar = Scrollbar(dataSceneFrame)
 dataSceneScrollbar.pack(side=RIGHT, fill=Y)
@@ -218,7 +212,14 @@ if dataSceneBox.size():
     dataSceneBox.config(width=0)
 
 # button to go to generate test scenario screen
-sceneFrame.createButton(dataGridFrame).grid(column=1, row=0)
+dataGenSceneFrame = Frame(dataGridFrame)
+
+Label(dataGenSceneFrame, text='''If the list doesn't have the scenario
+you want, click this button:''').pack()
+
+sceneFrame.createButton(dataGenSceneFrame).pack()
+
+dataGenSceneFrame.grid(column=1, row=0)
 
 # box for choosing test case parameters
 dataFieldsFrame = Frame(dataGridFrame)
@@ -260,11 +261,12 @@ dataDenseFrame.grid(column=1, row=0)
 dataFieldsFrame.grid(column=0, row=1, columnspan=2)
 
 # text box to display info about data that will be generated
-dataMessage = Label(dataGridFrame, text=DEFAULT_DATA_TEXT, bd=5)
+dataMessage = Label(dataGridFrame, bd=5, justify=LEFT)
 dataMessage.grid(column=0, row=2)
+validateDataFields()
 
 # button to start generating data
-Button(dataGridFrame, text="Generate Test Data",
+Button(dataGridFrame, text="Start Generating Data",
        command=startGeneratingData).grid(column=1, row=2)
 
 dataGridFrame.pack()
@@ -274,6 +276,105 @@ mainFrame.createReturnButton(dataFrame).pack(padx=5, pady=5)
 ##########################
 # generate test scenario #
 ##########################
+
+def getSceneParameters():
+    try:
+        num_cols = int(columnsEntry.get())
+        if num_cols < 0:
+            num_cols = 0
+
+        num_rows = int(rowsEntry.get())
+        if num_rows < 0:
+            num_rows = 0
+
+        block_size = int(blockSizeEntry.get())
+        if block_size < gen_scene.MIN_BLOCK_SIZE:
+            block_size = gen_scene.MIN_BLOCK_SIZE
+
+    except ValueError:
+        return False
+
+    return num_cols, num_rows, block_size
+
+def validateSceneFields(*args):
+    parameters = getSceneParameters()
+    if not parameters:
+        sceneMessage.config(text=DEFAULT_SCENE_TEXT+"\n\tInvalid parameters!")
+        return
+
+    num_cols, num_rows, block_size = parameters
+
+    message = [DEFAULT_SCENE_TEXT,
+        "    num_cols: {}".format(num_cols),
+        "    num_rows: {}".format(num_rows),
+        "    block_size: {}".format(block_size),
+    ]
+
+    pattern = re.compile(".*scenario_{}x{}_{}.*".format(
+        num_cols, num_rows, block_size))
+
+    for scenario in scenarios_list:
+        if pattern.match(scenario):
+            message.append("\nThis scenario already exists!\nIf you try to generate it again,\nnothing will happen.")
+            break
+
+    sceneMessage.config(text="\n".join(message))
+
+def startGeneratingScene():
+    parameters = getSceneParameters()
+    if not parameters:
+        return
+
+    window.destroy()
+    gen_scene.run(*parameters)
+
+# container frame for grid alignment
+sceneGridFrame = Frame(sceneFrame)
+
+# box for choosing number of blocks (rows and columns)
+sceneBlocksFrame = Frame(sceneGridFrame)
+
+Label(sceneBlocksFrame, text="Number of Blocks").grid(
+    column=0, row=0, columnspan=2)
+
+Label(sceneBlocksFrame, text="Columns:").grid(column=0, row=1)
+
+columnsEntry = Entry(sceneBlocksFrame, width=5, justify=CENTER)
+columnsEntry.bind("<KeyRelease>", validateSceneFields)
+columnsEntry.insert(0, 1)
+columnsEntry.grid(column=1, row=1)
+
+Label(sceneBlocksFrame, text="Rows:").grid(column=0, row=2)
+
+rowsEntry = Entry(sceneBlocksFrame, width=5, justify=CENTER)
+rowsEntry.bind("<KeyRelease>", validateSceneFields)
+rowsEntry.insert(0, 1)
+rowsEntry.grid(column=1, row=2)
+
+sceneBlocksFrame.grid(column=0, row=0)
+
+# box for choosing size of blocks
+sceneBlockSizeFrame = Frame(sceneGridFrame)
+
+Label(sceneBlockSizeFrame, text="Size of Blocks").pack()
+
+blockSizeEntry = Entry(sceneBlockSizeFrame, width=5, justify=CENTER)
+blockSizeEntry.bind("<KeyRelease>", validateSceneFields)
+blockSizeEntry.insert(0, 50)
+blockSizeEntry.pack()
+
+sceneBlockSizeFrame.grid(column=1, row=0)
+
+# text box to display info about scene that will be generated
+sceneMessage = Label(sceneGridFrame, bd=5, justify=LEFT)
+sceneMessage.grid(column=0, row=1)
+validateSceneFields()
+
+# button to start generating scene
+Button(sceneGridFrame, text="Start Generating Scenario",
+       command=startGeneratingScene).grid(column=1, row=1)
+
+sceneGridFrame.pack()
 
 dataFrame.createReturnButton(sceneFrame).pack(padx=5, pady=5)
 
@@ -358,8 +459,7 @@ demoGridFrame = Frame(demoFrame)
 
 # box for selecting scenario
 demoSceneFrame = Frame(demoGridFrame)
-Label(demoSceneFrame,
-      text="Choose Scenario\nFormat: columns, rows, block size").pack()
+Label(demoSceneFrame, text=CHOOSE_SCENARIO_TEXT).pack()
 
 demoSceneScrollbar = Scrollbar(demoSceneFrame)
 demoSceneScrollbar.pack(side=RIGHT, fill=Y)
@@ -392,7 +492,7 @@ demoDenseFrame.grid(column=1, row=0)
 
 # listbox for selecting dataset
 demoDataFrame = Frame(demoGridFrame)
-Label(demoDataFrame, text="Choose Dataset\nFormat: scenario code, traffic density, turn bias, trial id").pack()
+Label(demoDataFrame, text=CHOOSE_DATASET_TEXT).pack()
 
 demoDataScrollbar = Scrollbar(demoDataFrame)
 demoDataScrollbar.pack(side=RIGHT, fill=Y)
@@ -409,8 +509,6 @@ demoDataFrame.grid(column=0, row=1, columnspan=2)
 demoStratFrame = Frame(demoGridFrame)
 Label(demoStratFrame, text="Choose Strategy").pack()
 
-strategyMap = {}
-
 demoStratScrollbar = Scrollbar(demoStratFrame)
 demoStratScrollbar.pack(side=RIGHT, fill=Y)
 
@@ -422,6 +520,7 @@ demoStratBox.config(width=0)
 demoStratScrollbar.config(command=demoStratBox.yview)
 demoStratFrame.grid(column=0, row=2)
 
+strategyMap = {}
 for strategy, description in ALL_STRATEGIES:
     strategyMap[description] = strategy
     demoStratBox.insert(END, description)
