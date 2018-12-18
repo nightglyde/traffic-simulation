@@ -206,11 +206,11 @@ if __name__ == "__main__":
     while True:
         try:
             max_density = int(input("\nMaximum traffic density (cars per minute): "))
-            if max_density >= 10 and max_density % 10 == 0:
+            if max_density >= min_density and max_density % 10 == 0:
                 break
         except ValueError:
             pass
-        print("Traffic density must be a positive multiple of 10.")
+        print("Traffic density must be a positive multiple of 10.\nMaximum density must be greater than minimum density.")
 
     run(module_name, scenario_code, num_trials, min_density, max_density)
 

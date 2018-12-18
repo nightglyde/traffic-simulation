@@ -1,14 +1,19 @@
 from tkinter import *
 
+import math
 import pkgutil
 import re
 
 from src.util import ALL_STRATEGIES
 
+import src.generate_test_data.generate_datasets as gen_data
 import src.run_demo_simulation as run_demo
 import src.run_simulations_with_results as run_sim
 
 import datasets.scenarios as scenarios
+
+DEFAULT_DATA_TEXT = '''How proposed changes will affect dataset numbers:
+\t\tExisting + New = Total'''
 
 ANY_DENSITY = "any"
 
@@ -57,12 +62,12 @@ class MyFrame(Frame):
         self.parent.title(self.description)
 
     def createButton(self, frame):
-        Button(self, text=frame.description,
-               command=lambda: frame.tkraise()).pack()
+        return Button(frame, text=self.description,
+                      command=lambda: self.tkraise())
 
     def createReturnButton(self, frame):
-        Button(self, text="Return to {}".format(frame.description),
-               command=lambda: frame.tkraise()).pack(padx=5, pady=5)
+        return Button(frame, text="Return to {}".format(self.description),
+                      command=lambda: self.tkraise())
 
 # main menu
 mainFrame = MyFrame(window, "Main Menu")
@@ -83,29 +88,201 @@ analyseFrame = MyFrame(window, "Analyse Simulation Results")
 # main menu #
 #############
 
-mainFrame.createButton(dataFrame)
-mainFrame.createButton(simFrame)
-mainFrame.createButton(analyseFrame)
+dataFrame.createButton(mainFrame).pack()
+simFrame.createButton(mainFrame).pack()
+analyseFrame.createButton(mainFrame).pack()
 
 ######################
 # generate test data #
 ######################
 
-dataFrame.createButton(sceneFrame)
-dataFrame.createReturnButton(mainFrame)
+def dataMessageSetDefault():
+    dataMessage.config(text=DEFAULT_DATA_TEXT)
+
+def validateDataFields(*args):
+    items = dataSceneBox.curselection()
+    if not items:
+        return dataMessageSetDefault()
+    scenario = dataSceneBox.get(items[0])
+
+    try:
+        numTrials = int(numTrialsEntry.get())
+        if numTrials < 1:
+            return dataMessageSetDefault()
+
+        minDensity = int(minDensityEntry.get())
+        if minDensity < 10:
+            minDensity = 10
+        else:
+            minDensity = int(math.ceil(minDensity / 10.0)) * 10
+
+        maxDensity = int(maxDensityEntry.get())
+        maxDensity = int(math.floor(maxDensity / 10.0)) * 10
+
+        if maxDensity < minDensity:
+            return dataMessageSetDefault()
+
+    except ValueError:
+        return dataMessageSetDefault()
+
+    countMap = {}
+    for density in densities_map[scenario]:
+        try:
+            densityInt = int(density)
+        except ValueError:
+            continue
+
+        if not minDensity <= densityInt <= maxDensity:
+            continue
+
+        pattern = re.compile("dataset_[0-9]+x[0-9]+_[0-9]+_{}".format(density))
+
+        testCaseCount = 0
+        for module in datasets_map[scenario]:
+            if pattern.search(module):
+                testCaseCount += 1
+
+        countMap[densityInt] = testCaseCount
+
+    message = [DEFAULT_DATA_TEXT]
+
+    for density in range(minDensity, maxDensity+1, 10):
+        if density in countMap:
+            testCaseCount = countMap[density]
+        else:
+            testCaseCount = 0
+
+        message.append("density={}:    {} + {} = {}".format(
+            density, testCaseCount, numTrials, testCaseCount + numTrials))
+
+    dataMessage.config(text="\n".join(message))
+
+def startGeneratingData():
+    items = dataSceneBox.curselection()
+    if not items:
+        return
+    scenario = dataSceneBox.get(items[0])
+
+    try:
+        numTrials = int(numTrialsEntry.get())
+        if numTrials < 1:
+            return
+
+        minDensity = int(minDensityEntry.get())
+        if minDensity < 10:
+            minDensity = 10
+        else:
+            minDensity = int(math.ceil(minDensity / 10.0)) * 10
+
+        maxDensity = int(maxDensityEntry.get())
+        maxDensity = int(math.floor(maxDensity / 10.0)) * 10
+
+        if maxDensity < minDensity:
+            return
+
+    except ValueError:
+        return
+
+    m = re.match(".*([0-9]+x[0-9]+_[0-9]+).*", scenario)
+    if m:
+        scenario_code = m.group(1)
+    else:
+        return
+
+    window.destroy()
+    gen_data.run(scenario, scenario_code, numTrials, minDensity, maxDensity)
+
+# container frame for grid alignment
+dataGridFrame = Frame(dataFrame)
+
+# box for selecting scenario
+dataSceneFrame = Frame(dataGridFrame)
+Label(dataSceneFrame,
+      text="Choose Scenario\nFormat: columns, rows, block size").pack()
+
+dataSceneScrollbar = Scrollbar(dataSceneFrame)
+dataSceneScrollbar.pack(side=RIGHT, fill=Y)
+
+dataSceneBox = Listbox(dataSceneFrame, selectmode=SINGLE, exportselection=0,
+                       yscrollcommand=dataSceneScrollbar.set)
+dataSceneBox.bind('<<ListboxSelect>>', validateDataFields)
+dataSceneBox.pack()
+
+dataSceneScrollbar.config(command=dataSceneBox.yview)
+dataSceneFrame.grid(column=0, row=0)#, columnspan=2)
+
+for module in scenarios_list:
+    dataSceneBox.insert(END, module)
+
+if dataSceneBox.size():
+    dataSceneBox.config(width=0)
+
+# button to go to generate test scenario screen
+sceneFrame.createButton(dataGridFrame).grid(column=1, row=0)
+
+# box for choosing test case parameters
+dataFieldsFrame = Frame(dataGridFrame)
+
+# box for choosing number of trials
+dataTrialsFrame = Frame(dataFieldsFrame)
+
+Label(dataTrialsFrame, text="Number of Trials").pack()
+
+numTrialsEntry = Entry(dataTrialsFrame, width=5, justify=CENTER)
+numTrialsEntry.bind("<KeyRelease>", validateDataFields)
+numTrialsEntry.insert(0, 1)
+numTrialsEntry.pack()
+
+dataTrialsFrame.grid(column=0, row=0)
+
+# box for choosing traffic density
+dataDenseFrame = Frame(dataFieldsFrame)
+
+Label(dataDenseFrame, text="Traffic Density").grid(
+    column=0, row=0, columnspan=2)
+
+Label(dataDenseFrame, text="Minimum:").grid(column=0, row=1)
+
+minDensityEntry = Entry(dataDenseFrame, width=5, justify=CENTER)
+minDensityEntry.bind("<KeyRelease>", validateDataFields)
+minDensityEntry.insert(0, 10)
+minDensityEntry.grid(column=1, row=1)
+
+Label(dataDenseFrame, text="Maximum:").grid(column=0, row=2)
+
+maxDensityEntry = Entry(dataDenseFrame, width=5, justify=CENTER)
+maxDensityEntry.bind("<KeyRelease>", validateDataFields)
+maxDensityEntry.insert(0, 150)
+maxDensityEntry.grid(column=1, row=2)
+
+dataDenseFrame.grid(column=1, row=0)
+
+dataFieldsFrame.grid(column=0, row=1, columnspan=2)
+
+# text box to display info about data that will be generated
+dataMessage = Label(dataGridFrame, text=DEFAULT_DATA_TEXT, bd=5)
+dataMessage.grid(column=0, row=2)
+
+# button to start generating data
+Button(dataGridFrame, text="Generate Test Data",
+       command=startGeneratingData).grid(column=1, row=2)
+
+dataGridFrame.pack()
+
+mainFrame.createReturnButton(dataFrame).pack(padx=5, pady=5)
 
 ##########################
 # generate test scenario #
 ##########################
 
-sceneFrame.createReturnButton(dataFrame)
+dataFrame.createReturnButton(sceneFrame).pack(padx=5, pady=5)
 
 ##################
 # run simulation #
 ##################
 
-simFrame.createButton(demoFrame)
-simFrame.createButton(fullSimFrame)
+demoFrame.createButton(simFrame).pack()
+fullSimFrame.createButton(simFrame).pack()
 
 #######################
 # run demo simulation #
@@ -203,7 +380,7 @@ if demoSceneBox.size():
 
 # dropdown menu for specifying traffic density
 demoDenseFrame = Frame(demoGridFrame, bd=2)
-Label(demoDenseFrame, text="Filter by Traffic Density\n(cars per minute)").pack()
+Label(demoDenseFrame, text="Filter Dataset by Traffic Density\n(cars per minute)").pack()
 
 densityVar = StringVar()
 densityVar.set(ANY_DENSITY)
@@ -249,24 +426,25 @@ for strategy, description in ALL_STRATEGIES:
     strategyMap[description] = strategy
     demoStratBox.insert(END, description)
 
+# button to start the demo
 Button(demoGridFrame, text="Start Demo",
        command=startDemo).grid(column=1, row=2)
 
 demoGridFrame.pack()
 
-demoFrame.createReturnButton(mainFrame)
+mainFrame.createReturnButton(demoFrame).pack(padx=5, pady=5)
 
 ###############################
 # run simulation with results #
 ###############################
 
-fullSimFrame.createReturnButton(mainFrame)
+mainFrame.createReturnButton(fullSimFrame).pack(padx=5, pady=5)
 
 ##############################
 # analyse simulation results #
 ##############################
 
-analyseFrame.createReturnButton(mainFrame)
+mainFrame.createReturnButton(analyseFrame).pack(padx=5, pady=5)
 
 #############
 # start gui #
