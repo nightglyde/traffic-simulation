@@ -168,18 +168,19 @@ if __name__ == "__main__":
 
         m = re.match(".*([0-9]+x[0-9]+_[0-9]+).*", module_name)
         if m:
+            scenario_code = m.group(1)
             print("Module found: {}, Scenario code: {}".format(
-                module_name, m.group(1)))
+                module_name, scenario_code))
+            module_names.append((module_name, scenario_code))
         else:
             print("Module found: {}, Unrecognised filename format".format(
                 module_name))
-        module_names.append(module_name)
 
     while True:
         scenario_code = input("\nEnter scenario code: ")
 
-        for module_name in module_names:
-            if re.match(".*({}).*".format(scenario_code), module_name):
+        for module_name, scenario in module_names:
+            if scenario_code == scenario:
                 break
         else:
             print("This scenario code is not recognised.")
