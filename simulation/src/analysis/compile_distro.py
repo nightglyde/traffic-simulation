@@ -71,11 +71,15 @@ def main():
 
     filename = "{}/distribution_{}.txt".format(COMPILED_RESULTS_PATH, dataset_prefix)
     f = open(filename, 'w')
-    for i in range(len(durations[0])):
-        line = []
-        for s in range(NUM_STRATEGIES):
-            line.append(str(durations[s][i]/1000))
-        f.write(" ".join(line) + "\n")
+    try:
+        for i in range(len(durations[0])):
+            line = []
+            for s in range(NUM_STRATEGIES):
+                line.append(str(durations[s][i]/1000))
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
 if __name__ == "__main__":

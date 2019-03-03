@@ -1,3 +1,4 @@
+import os
 import math
 import random
 import pygame
@@ -547,4 +548,12 @@ def generateRect(circle_centre, radius, zoom):
     top, left = zoom.getDrawable(circle_centre - Vector(radius, radius))
     width = zoom.scaleDistance(radius) * 2
     return [top, left, width, width]
+
+def removeFile(f, filename):
+    print("Program stopped unexpectedly in the middle of writing to file.")
+    f.close()
+
+    print("Removing incomplete file {}...".format(filename))
+    os.remove(filename)
+    print("File removed.")
 

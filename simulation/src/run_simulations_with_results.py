@@ -142,15 +142,21 @@ class WorldHandler:
     def recordResults(self, time):
         self.printDuration(time)
         print("Writing results to file...")
+
         f = open(self.filename, 'w')
+        try:
 
-        total = 0
-        count = 0
-        for start_time, end_time, duration in self.world.results:
-            total += duration
-            count += 1
+            total = 0
+            count = 0
+            for start_time, end_time, duration in self.world.results:
+                total += duration
+                count += 1
 
-            f.write("{} {} {}\n".format(start_time, end_time, duration))
+                f.write("{} {} {}\n".format(start_time, end_time, duration))
+
+        except BaseException as exception:
+            removeFile(f, self.filename)
+            raise exception
 
         f.close()
 

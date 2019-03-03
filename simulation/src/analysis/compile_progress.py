@@ -77,14 +77,18 @@ def main():
 
     f = open(filename, 'w')
 
-    for t in range(NUM_BUCKETS+1):
-        line = [str(t*BUCKET_MINUTES)]
-        for s in range(NUM_STRATEGIES):
-            line.append(str(all_results[s][t]))
+    try:
+        for t in range(NUM_BUCKETS+1):
+            line = [str(t*BUCKET_MINUTES)]
+            for s in range(NUM_STRATEGIES):
+                line.append(str(all_results[s][t]))
 
-        line = " ".join(line)
+            line = " ".join(line)
 
-        f.write(line + '\n')
+            f.write(line + '\n')
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
 
     f.close()
 

@@ -136,11 +136,15 @@ class DatasetGenerator:
 
                 f = open(filename, 'w')
 
-                f.write("from src.util import *\n")
-                f.write("schedule = deque([\n")
-                for item in schedule:
-                    f.write("  {},\n".format(item))
-                f.write("])\n")
+                try:
+                    f.write("from src.util import *\n")
+                    f.write("schedule = deque([\n")
+                    for item in schedule:
+                        f.write("  {},\n".format(item))
+                    f.write("])\n")
+                except BaseException as exception:
+                    removeFile(f, filename)
+                    raise exception
 
                 f.close()
 

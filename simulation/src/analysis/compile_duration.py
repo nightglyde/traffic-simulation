@@ -173,45 +173,65 @@ def run(scenario_code, strategies_list, num_test_cases):
     filename = "{}/duration_min_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line)
-    for line in minimums:
-        f.write(" ".join(line) + "\n")
+    try:
+        f.write(first_line)
+        for line in minimums:
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
     # MAXIMUM
     filename = "{}/duration_max_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line)
-    for line in maximums:
-        f.write(" ".join(line) + "\n")
+    try:
+        f.write(first_line)
+        for line in maximums:
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
     # MEAN
     filename = "{}/duration_mean_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line)
-    for line in averages:
-        f.write(" ".join(line) + "\n")
+    try:
+        f.write(first_line)
+        for line in averages:
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
     # STANDARD DEVIATION
     filename = "{}/duration_stdev_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line)
-    for line in std_devs:
-        f.write(" ".join(line) + "\n")
+    try:
+        f.write(first_line)
+        for line in std_devs:
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
     # NUMBER OF FAILED TEST CASES
     filename = "{}/fails_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line)
-    for line in fails:
-        f.write(" ".join(line) + "\n")
+    try:
+        f.write(first_line)
+        for line in fails:
+            f.write(" ".join(line) + "\n")
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
     f.close()
 
     first_line_for_strategy = "density mean min max stdev\n"
@@ -222,18 +242,23 @@ def run(scenario_code, strategies_list, num_test_cases):
             COMPILED_RESULTS_PATH, strategy_name, dataset_prefix, dataset_suffix)
 
         f = open(filename, 'w')
+        try:
+            f.write(first_line_for_strategy)
 
-        f.write(first_line_for_strategy)
+            for i, density in enumerate(density_codes):
+                line = [
+                    density,
+                    averages[i][strategy_num+1],
+                    minimums[i][strategy_num+1],
+                    maximums[i][strategy_num+1],
+                    std_devs[i][strategy_num+1],
+                ]
+                f.write(" ".join(line) + "\n")
 
-        for i, density in enumerate(density_codes):
-            line = [
-                density,
-                averages[i][strategy_num+1],
-                minimums[i][strategy_num+1],
-                maximums[i][strategy_num+1],
-                std_devs[i][strategy_num+1],
-            ]
-            f.write(" ".join(line) + "\n")
+        except BaseException as exception:
+            removeFile(f, filename)
+            raise exception
+
         f.close()
 
     #for i, short_name in enumerate(short_names):
@@ -253,19 +278,24 @@ def run(scenario_code, strategies_list, num_test_cases):
     filename = "{}/duration_combined_{}_{}.txt".format(
         COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
     f = open(filename, 'w')
-    f.write(first_line_for_combined)
-    for i, density in enumerate(density_codes):
-        line = [density]
+    try:
+        f.write(first_line_for_combined)
+        for i, density in enumerate(density_codes):
+            line = [density]
 
-        for j in range(len(strategies_list)):
-            line += [
-                averages[i][j+1],
-                minimums[i][j+1],
-                maximums[i][j+1],
-                std_devs[i][j+1],
-            ]
+            for j in range(len(strategies_list)):
+                line += [
+                    averages[i][j+1],
+                    minimums[i][j+1],
+                    maximums[i][j+1],
+                    std_devs[i][j+1],
+                ]
 
-        f.write(" ".join(line) + "\n")
+            f.write(" ".join(line) + "\n")
+
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
 
     f.close()
 

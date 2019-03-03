@@ -647,114 +647,119 @@ def run(num_cols=1, num_rows=1, block_size=50):
 
     f = open(filename, 'w')
 
-    f.write("from src.util import *\n")
-    f.write("from src.simulation.road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection\n")
+    try:
+        f.write("from src.util import *\n")
+        f.write("from src.simulation.road_network import Road, IntersectionRoad, Intersection, FollowRoad, EnterIntersection\n")
 
-    f.write("\n")
+        f.write("\n")
 
-    f.write("NUM_ROWS = {}\n".format(NUM_ROWS))
-    f.write("NUM_COLS = {}\n".format(NUM_COLS))
+        f.write("NUM_ROWS = {}\n".format(NUM_ROWS))
+        f.write("NUM_COLS = {}\n".format(NUM_COLS))
 
-    f.write("world_width  = {}\n".format(WORLD_WIDTH))
-    f.write("world_height = {}\n".format(WORLD_HEIGHT))
+        f.write("world_width  = {}\n".format(WORLD_WIDTH))
+        f.write("world_height = {}\n".format(WORLD_HEIGHT))
 
-    f.write("\n")
+        f.write("\n")
 
-    for road in intersection_roads:
-        road.generateName()
-        f.write("{} = {}\n".format(road.name, road))
+        for road in intersection_roads:
+            road.generateName()
+            f.write("{} = {}\n".format(road.name, road))
 
-    for road in normal_roads:
-        road.generateName()
-        f.write("{} = {}\n".format(road.name, road))
+        for road in normal_roads:
+            road.generateName()
+            f.write("{} = {}\n".format(road.name, road))
 
-    for road in terminal_roads:
-        road.generateName()
-        f.write("{} = {}\n".format(road.name, road))
+        for road in terminal_roads:
+            road.generateName()
+            f.write("{} = {}\n".format(road.name, road))
 
-    for road in crossing_roads:
-        road.generateName()
-        f.write("{} = {}\n".format(road.name, road))
+        for road in crossing_roads:
+            road.generateName()
+            f.write("{} = {}\n".format(road.name, road))
 
-    f.write("\n")
+        f.write("\n")
 
-    for intersection in all_intersections:
-        f.write("{} = {}\n".format(intersection.name, intersection))
+        for intersection in all_intersections:
+            f.write("{} = {}\n".format(intersection.name, intersection))
 
-        index_mapping = intersection.generateIndexMapping()
+            index_mapping = intersection.generateIndexMapping()
 
-        for i in range(len(intersection.inputs)):
-            new_i = index_mapping[i]
+            for i in range(len(intersection.inputs)):
+                new_i = index_mapping[i]
 
-            road = intersection.inputs[i]
-            f.write("{}.setIntersection({}, {})\n".format(
-                road.name, intersection.name, new_i))
+                road = intersection.inputs[i]
+                f.write("{}.setIntersection({}, {})\n".format(
+                    road.name, intersection.name, new_i))
 
-            for j in range(len(intersection.outputs)):
-                new_j = index_mapping[j]
+                for j in range(len(intersection.outputs)):
+                    new_j = index_mapping[j]
 
-                pair = (i, j)
+                    pair = (i, j)
 
-                if not pair in intersection.paths:
-                    continue
+                    if not pair in intersection.paths:
+                        continue
 
-                path, turn, dist = intersection.paths[pair]
+                    path, turn, dist = intersection.paths[pair]
 
-                path = [road.name for road in path]
-                path = "[" + ",".join(path) + "]"
+                    path = [road.name for road in path]
+                    path = "[" + ",".join(path) + "]"
 
-                if turn == LEFT:
-                    turn = "LEFT"
-                elif turn == RIGHT:
-                    turn = "RIGHT"
-                else:
-                    turn = "CENTRE"
+                    if turn == LEFT:
+                        turn = "LEFT"
+                    elif turn == RIGHT:
+                        turn = "RIGHT"
+                    else:
+                        turn = "CENTRE"
 
-                f.write("{}.addConnection({}, {}, {}, {}, {})\n".format(
-                      intersection.name, new_i, new_j, path, turn, dist))
+                    f.write("{}.addConnection({}, {}, {}, {}, {})\n".format(
+                          intersection.name, new_i, new_j, path, turn, dist))
 
-    f.write("\n")
+        f.write("\n")
 
-    for road in normal_roads:
-        f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
+        for road in normal_roads:
+            f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
 
-    for road in crossing_roads:
-        f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
+        for road in crossing_roads:
+            f.write("{}.setNext({})\n".format(road.name, road.next_road.name))
 
-    f.write("\n")
+        f.write("\n")
 
-    names = [road.name for road in all_roads]
-    f.write("roads = [" + ",".join(names) + "]\n")
+        names = [road.name for road in all_roads]
+        f.write("roads = [" + ",".join(names) + "]\n")
 
-    f.write("\n")
+        f.write("\n")
 
-    names = [road.name for road in entry_roads]
-    f.write("entry_roads = [" + ",".join(names) + "]\n")
+        names = [road.name for road in entry_roads]
+        f.write("entry_roads = [" + ",".join(names) + "]\n")
 
-    f.write("\n")
+        f.write("\n")
 
-    f.write("valid_routes = [\n")
-    for i in range(len(entry_roads)):
-        routes = valid_routes[i]
-        f.write("  [\n")
-        for route in routes:
-            f.write("    {},\n".format(route))
-        f.write("  ],\n")
-    f.write("]\n")
+        f.write("valid_routes = [\n")
+        for i in range(len(entry_roads)):
+            routes = valid_routes[i]
+            f.write("  [\n")
+            for route in routes:
+                f.write("    {},\n".format(route))
+            f.write("  ],\n")
+        f.write("]\n")
 
-    f.write("\n")
+        f.write("\n")
 
-    names = [intersection.name for intersection in all_intersections]
-    f.write("intersections = [" + ",".join(names) + "]\n")
+        names = [intersection.name for intersection in all_intersections]
+        f.write("intersections = [" + ",".join(names) + "]\n")
 
-    f.write("\n")
+        f.write("\n")
 
-    f.write("grass = [\n")
-    for grass_area in grass:
-        f.write("{},\n".format(grass_area))
-    f.write("]\n")
+        f.write("grass = [\n")
+        for grass_area in grass:
+            f.write("{},\n".format(grass_area))
+        f.write("]\n")
 
-    f.write("\n")
+        f.write("\n")
+
+    except BaseException as exception:
+        removeFile(f, filename)
+        raise exception
 
     f.close()
 
