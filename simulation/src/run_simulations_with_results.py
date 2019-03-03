@@ -3,7 +3,7 @@ import sys, os
 ABS_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(ABS_PATH)
 
-RESULTS_PATH = ABS_PATH + "/results/raw_results"
+RESULTS_PATH = os.path.join(ABS_PATH, "results", "raw_results")
 
 import pkgutil
 import time as time_module
@@ -88,7 +88,7 @@ def worldGenerator():
                 continue
 
             filename_short = "{}_{}.txt".format(strategy_name, short_name)
-            filename = "{}/{}".format(RESULTS_PATH, filename_short)
+            filename = os.path.join(RESULTS_PATH, filename_short)
 
             try:
                 f = open(filename)

@@ -4,8 +4,8 @@ import statistics
 ABS_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(ABS_PATH)
 
-RAW_RESULTS_PATH      = ABS_PATH + "/results/raw_results"
-COMPILED_RESULTS_PATH = ABS_PATH + "/results/compiled_results"
+RAW_RESULTS_PATH      = os.path.join(ABS_PATH, "results", "raw_results")
+COMPILED_RESULTS_PATH = os.path.join(ABS_PATH, "results", "compiled_results")
 
 import pkgutil
 import re
@@ -101,7 +101,8 @@ def run(scenario_code, strategies_list, num_test_cases):
 
             for strategy in strategies_list:
 
-                filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset)
+                filename = os.path.join(RAW_RESULTS_PATH,
+                                        "{}_{}.txt".format(strategy, dataset))
                 try:
                     durations = getDurations(filename, expected_count)
                     found_a_file = True
@@ -132,12 +133,14 @@ def run(scenario_code, strategies_list, num_test_cases):
             num_fails = 0
 
             for dataset in good_datasets:
-                filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset)
+                filename = os.path.join(RAW_RESULTS_PATH,
+                                        "{}_{}.txt".format(strategy, dataset))
 
                 all_durations += getDurations(filename, expected_count)
 
             for dataset in bad_datasets:
-                filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset)
+                filename = os.path.join(RAW_RESULTS_PATH,
+                                        "{}_{}.txt".format(strategy, dataset))
 
                 try:
                     durations = getDurations(filename, expected_count)
@@ -170,8 +173,10 @@ def run(scenario_code, strategies_list, num_test_cases):
     first_line = "density " + " ".join(strategies_list) + "\n"
 
     # MINIMUM
-    filename = "{}/duration_min_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "duration_min_{}_{}.txt".format(dataset_prefix, dataset_suffix))
+
     f = open(filename, 'w')
     try:
         f.write(first_line)
@@ -183,8 +188,9 @@ def run(scenario_code, strategies_list, num_test_cases):
     f.close()
 
     # MAXIMUM
-    filename = "{}/duration_max_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "duration_max_{}_{}.txt".format(dataset_prefix, dataset_suffix))
     f = open(filename, 'w')
     try:
         f.write(first_line)
@@ -196,8 +202,9 @@ def run(scenario_code, strategies_list, num_test_cases):
     f.close()
 
     # MEAN
-    filename = "{}/duration_mean_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "duration_mean_{}_{}.txt".format(dataset_prefix, dataset_suffix))
     f = open(filename, 'w')
     try:
         f.write(first_line)
@@ -209,8 +216,9 @@ def run(scenario_code, strategies_list, num_test_cases):
     f.close()
 
     # STANDARD DEVIATION
-    filename = "{}/duration_stdev_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "duration_stdev_{}_{}.txt".format(dataset_prefix, dataset_suffix))
     f = open(filename, 'w')
     try:
         f.write(first_line)
@@ -222,8 +230,9 @@ def run(scenario_code, strategies_list, num_test_cases):
     f.close()
 
     # NUMBER OF FAILED TEST CASES
-    filename = "{}/fails_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "fails_{}_{}.txt".format(dataset_prefix, dataset_suffix))
     f = open(filename, 'w')
     try:
         f.write(first_line)
@@ -238,8 +247,9 @@ def run(scenario_code, strategies_list, num_test_cases):
 
     # DISTRIBUTION OF SINGLE STRATEGY
     def writeFileForStrategy(strategy_num, strategy_name):
-        filename = "{}/duration_{}_{}_{}.txt".format(
-            COMPILED_RESULTS_PATH, strategy_name, dataset_prefix, dataset_suffix)
+        filename = os.path.join(
+            COMPILED_RESULTS_PATH, "duration_{}_{}_{}.txt".format(
+                strategy_name, dataset_prefix, dataset_suffix))
 
         f = open(filename, 'w')
         try:
@@ -275,8 +285,9 @@ def run(scenario_code, strategies_list, num_test_cases):
             strategy, strategy, strategy, strategy)
     first_line_for_combined += "\n"
 
-    filename = "{}/duration_combined_{}_{}.txt".format(
-        COMPILED_RESULTS_PATH, dataset_prefix, dataset_suffix)
+    filename = os.path.join(
+        COMPILED_RESULTS_PATH,
+        "duration_combined_{}_{}.txt".format(dataset_prefix, dataset_suffix))
     f = open(filename, 'w')
     try:
         f.write(first_line_for_combined)

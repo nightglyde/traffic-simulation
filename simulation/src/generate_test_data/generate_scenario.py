@@ -476,10 +476,11 @@ def run(num_cols=1, num_rows=1, block_size=50):
 
     scenario_code = "{}x{}_{}".format(num_cols, num_rows, block_size)
 
-    filename = "{}/datasets/scenarios/scenario_{}.py".format(ABS_PATH,
-                                                             scenario_code)
+    filename = os.path.join(ABS_PATH, "datasets", "scenarios",
+                            "scenario_{}.py".format(scenario_code))
 
-    dataset_dir = "{}/datasets/datasets_{}".format(ABS_PATH, scenario_code)
+    dataset_dir = os.path.join(
+        ABS_PATH, "datasets", "datasets_{}".format(scenario_code))
 
     if not os.path.exists(dataset_dir):
         print("\nCreating dataset directory:\n{}".format(dataset_dir))

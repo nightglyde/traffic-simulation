@@ -1,8 +1,8 @@
 import os
 import statistics
 
-RESULTS_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) \
-                    + "/results/raw_results"
+RESULTS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                            "results", "raw_results")
 
 strategy_codes = [
     "TrafficLights",
@@ -163,7 +163,8 @@ def main():
 
                     for strategy in strategy_codes:
 
-                        filename = "{}/{}_{}".format(RESULTS_PATH,strategy, dataset)
+                        filename = os.path.join(
+                            RESULTS_PATH, "{}_{}".format(strategy, dataset))
 
                         try:
                             if not getDurations(filename, expected_count):
@@ -191,7 +192,8 @@ def main():
 
                     for dataset in good_datasets:
 
-                        filename = "{}/{}_{}".format(RESULTS_PATH, strategy, dataset)
+                        filename = os.path.join(
+                            RESULTS_PATH, "{}_{}".format(strategy, dataset))
 
                         try:
                             mean_duration, max_duration = getDurations(filename, expected_count)
@@ -227,7 +229,8 @@ def main():
 
             for strategy in strategy_codes:
 
-                filename = "{}/{}_{}".format(RESULTS_PATH, strategy, dataset)
+                filename = os.path.join(
+                    RESULTS_PATH, "{}_{}".format(strategy, dataset))
 
                 try:
 

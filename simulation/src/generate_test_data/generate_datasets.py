@@ -22,8 +22,10 @@ HOUR_DURATION   = MINUTE_DURATION * 60
 class DatasetGenerator:
     def __init__(self, module_name, scenario_code):
 
-        path_dir = ABS_PATH + "/datasets/datasets_{}".format(scenario_code)
-        self.path_prefix = path_dir + "/dataset_{}".format(scenario_code)
+        path_dir = os.path.join(
+            ABS_PATH, "datasets", "datasets_{}".format(scenario_code))
+        self.path_prefix = os.path.join(
+            path_dir, "dataset_{}".format(scenario_code))
 
         if not os.path.exists(path_dir):
             print("\nCreating dataset directory:\n{}".format(path_dir))

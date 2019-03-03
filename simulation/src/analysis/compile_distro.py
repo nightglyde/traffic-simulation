@@ -3,8 +3,8 @@ import statistics
 
 ABS_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-RAW_RESULTS_PATH      = ABS_PATH + "/results/raw_results"
-COMPILED_RESULTS_PATH = ABS_PATH + "/results/compiled_results"
+RAW_RESULTS_PATH      = os.path.join(ABS_PATH, "results", "raw_results")
+COMPILED_RESULTS_PATH = os.path.join(ABS_PATH, "results", "compiled_results")
 
 strategy_codes = [
     "TrafficLights",
@@ -48,7 +48,8 @@ def main():
 
         for strategy in strategy_codes:
 
-            filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset)
+            filename = os.path.join(RAW_RESULTS_PATH,
+                                    "{}_{}.txt".format(strategy, dataset))
 
             try:
                 if not getDurations(filename):
@@ -65,11 +66,13 @@ def main():
 
         for s, strategy in enumerate(strategy_codes):
 
-            filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset)
+            filename = os.path.join(RAW_RESULTS_PATH,
+                                    "{}_{}.txt".format(strategy, dataset))
 
             durations[s] += getDurations(filename)
 
-    filename = "{}/distribution_{}.txt".format(COMPILED_RESULTS_PATH, dataset_prefix)
+    filename = os.path.join(COMPILED_RESULTS_PATH,
+                            "distribution_{}.txt".format(dataset_prefix))
     f = open(filename, 'w')
     try:
         for i in range(len(durations[0])):

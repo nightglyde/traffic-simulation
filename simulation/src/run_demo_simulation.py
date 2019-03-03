@@ -22,7 +22,8 @@ def generateFilename(world):
     batch_name = "{}_{}".format(timestamp, strategy_name)
 
     for i in range(1000):
-        yield "{}/results/screenshots/img_{}_{:03}.png".format(ABS_PATH, batch_name, i)
+        yield os.path.join(ABS_PATH, "results", "screenshots",
+                           "img_{}_{:03}.png".format(batch_name, i))
 
 def run(scenario_name, dataset_name, strategy):
     scenario = __import__(scenario_name, fromlist="dummy")
@@ -124,7 +125,9 @@ def run(scenario_name, dataset_name, strategy):
                     world.resetZoom()
 
                 if event.key == pygame.K_RETURN:
-                    pygame.image.save(screen, next(filenames))
+                    filename = next(filenames)
+                    pygame.image.save(screen, filename)
+                    print("Saved screenshot to {}".format(filename))
 
             #elif event.type == pygame.USEREVENT:
             #    paused = True

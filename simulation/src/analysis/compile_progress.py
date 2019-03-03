@@ -2,8 +2,8 @@ import os
 
 ABS_PATH = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-RAW_RESULTS_PATH      = ABS_PATH + "/results/raw_results"
-COMPILED_RESULTS_PATH = ABS_PATH + "/results/compiled_results"
+RAW_RESULTS_PATH      = os.path.join(ABS_PATH, "results", "raw_results")
+COMPILED_RESULTS_PATH = os.path.join(ABS_PATH, "results", "compiled_results")
 
 strategy_codes = [
     "TrafficLights",
@@ -67,13 +67,13 @@ def main():
     all_results = []
     for strategy in strategy_codes:
 
-        filename = "{}/{}_{}.txt".format(RAW_RESULTS_PATH, strategy, dataset_name)
+        filename = os.path.join(RAW_RESULTS_PATH, "{}_{}.txt".format(strategy, dataset_name))
 
         results = progressOverTime(filename)
 
         all_results.append(results)
 
-    filename = "{}/progress_{}.txt".format(COMPILED_RESULTS_PATH, dataset_name)
+    filename = os.path.join(COMPILED_RESULTS_PATH, "progress_{}.txt".format(dataset_name))
 
     f = open(filename, 'w')
 
