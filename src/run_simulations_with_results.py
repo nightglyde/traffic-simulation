@@ -12,10 +12,10 @@ import re
 from src.util import *
 from src.simulation.world import World
 
-from datasets.scenarios.scenario_2x2_50 import roads, entry_roads, intersections,\
+from datasets.scenarios.scenario_1x1_50 import roads, entry_roads, intersections,\
                                  valid_routes, grass, world_width, world_height
 
-import datasets.datasets_2x2_50 as datasets
+import datasets.datasets_1x1_50 as datasets
 
 # time formatting
 TIME_FORMAT = "%H:%M:%S"
