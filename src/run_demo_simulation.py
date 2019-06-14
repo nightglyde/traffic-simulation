@@ -8,22 +8,7 @@ from time import gmtime, strftime
 from src.util import *
 from src.simulation.world import World
 
-#from datasets.scenarios.scenario_2x2_50 import\
-#    roads, entry_roads, intersections, valid_routes,\
-#    grass, world_width, world_height
-#from datasets.datasets_2x2_50.dataset_2x2_50_030_111_02 import schedule
-
 INCLUDE_CAPTION = True
-
-def generateFilename(world):
-    timestamp = strftime("%Y-%m-%d_%H-%M", gmtime())
-    strategy_name = ALL_STRATEGIES[world.strategy][1]
-
-    batch_name = "{}_{}".format(timestamp, strategy_name)
-
-    for i in range(1000):
-        yield os.path.join(ABS_PATH, "results", "screenshots",
-                           "img_{}_{:03}.png".format(batch_name, i))
 
 def run(scenario_name, dataset_name, strategy):
     scenario = __import__(scenario_name, fromlist="dummy")
@@ -43,8 +28,6 @@ def run(scenario_name, dataset_name, strategy):
     world.setup(scenario.roads, scenario.intersections, scenario.grass,
                 scenario.entry_roads, scenario.valid_routes, dataset.schedule,
                 strategy)
-
-    filenames = generateFilename(world)
 
     world_time = 0
     prev_time  = pygame.time.get_ticks()
@@ -123,15 +106,6 @@ def run(scenario_name, dataset_name, strategy):
 
                 if event.key == pygame.K_ESCAPE:
                     world.resetZoom()
-
-                if event.key == pygame.K_RETURN:
-                    filename = next(filenames)
-                    pygame.image.save(screen, filename)
-                    print("Saved screenshot to {}".format(filename))
-
-            #elif event.type == pygame.USEREVENT:
-            #    paused = True
-
 
         # update world
         if not paused:
